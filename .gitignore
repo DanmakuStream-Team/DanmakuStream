@@ -1,0 +1,27 @@
+# 前端开发依赖
+node_modules/
+dist/
+*.local
+
+# Go
+backend/vendor/
+backend/*.exe
+backend/server
+
+# Python
+ai-service/__pycache__/
+ai-service/.venv/
+ai-service/*.pyc
+ai-service/.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 配置（不提交密钥）
+*.env
+!*.env.example

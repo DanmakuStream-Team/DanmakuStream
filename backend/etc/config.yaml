@@ -1,0 +1,25 @@
+Name: danmakustream-api
+Host: 0.0.0.0
+Port: 8080
+
+Auth:
+  AccessSecret: "your-jwt-secret-key-change-in-production"
+  AccessExpire: 86400  # 24 hours in seconds
+
+Database:
+  DataSource: "root:password@tcp(mysql:3306)/danmakustream?charset=utf8mb4&parseTime=True&loc=Local"
+
+Redis:
+  Host: redis:6379
+  Type: node
+
+MinIO:
+  Endpoint: "minio:9000"
+  AccessKey: "minioadmin"
+  SecretKey: "minioadmin"
+  Bucket: "danmakustream"
+  UseSSL: false
+
+Log:
+  Mode: console
+  Level: info
