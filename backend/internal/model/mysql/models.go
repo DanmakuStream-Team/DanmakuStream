@@ -71,6 +71,15 @@ type LiveRoom struct {
 	EndedAt     *time.Time
 }
 
+// UserInfo is a safe DTO returned to the client (no password field).
+type UserInfo struct {
+	ID       uint   `json:"id"`
+	Username string `json:"username"`
+	Nickname string `json:"nickname"`
+	Avatar   string `json:"avatar"`
+	Role     string `json:"role"`
+}
+
 type Follow struct {
 	gorm.Model
 	FollowerID uint `gorm:"not null;uniqueIndex:idx_follow"`

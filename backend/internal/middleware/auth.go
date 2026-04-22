@@ -17,9 +17,9 @@ type Claims struct {
 }
 
 // AuthMiddleware validates JWT and injects user claims into context.
-func AuthMiddleware(secret string) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func AuthMiddleware(secret string) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
 				httpx.Error(w, ErrUnauthorized)
@@ -39,21 +39,21 @@ func AuthMiddleware(secret string) func(http.Handler) http.Handler {
 			ctx := context.WithValue(r.Context(), CtxKeyUserID, claims.UserID)
 			ctx = context.WithValue(ctx, CtxKeyUsername, claims.Username)
 			ctx = context.WithValue(ctx, CtxKeyRole, claims.Role)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
+			next(w, r.WithContext(ctx))
+		}
 	}
 }
 
 // AdminMiddleware ensures the user has admin role.
-func AdminMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func AdminMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		role, _ := r.Context().Value(CtxKeyRole).(string)
 		if role != "admin" {
 			httpx.Error(w, ErrForbidden)
 			return
 		}
-		next.ServeHTTP(w, r)
-	})
+		next(w, r)
+	}
 }
 
 // Context keys

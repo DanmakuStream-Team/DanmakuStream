@@ -7,14 +7,14 @@ Auth:
   AccessExpire: 86400  # 24 hours in seconds
 
 Database:
-  DataSource: "root:password@tcp(mysql:3306)/danmakustream?charset=utf8mb4&parseTime=True&loc=Local"
+  DataSource: "root:password@tcp(127.0.0.1:3306)/danmakustream?charset=utf8mb4&parseTime=True&loc=Local"
 
 Redis:
-  Host: redis:6379
+  Host: 127.0.0.1:6379
   Type: node
 
 MinIO:
-  Endpoint: "minio:9000"
+  Endpoint: "127.0.0.1:9000"
   AccessKey: "minioadmin"
   SecretKey: "minioadmin"
   Bucket: "danmakustream"

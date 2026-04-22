@@ -8,7 +8,6 @@ import (
 	"danmakustream/backend/internal/middleware"
 	"danmakustream/backend/internal/svc"
 	"github.com/gorilla/websocket"
-	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
 var upgrader = websocket.Upgrader{
