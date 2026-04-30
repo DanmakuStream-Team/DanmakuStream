@@ -1,7 +1,7 @@
 <template>
   <a-layout class="layout">
     <a-layout-header class="header">
-      <div class="logo" @click="router.push('/')">灵视 VisionLive</div>
+      <div class="logo" @click="router.push('/')">Danmaku</div>
       <div class="search-bar">
         <a-input-search
           v-model="searchKeyword"
@@ -33,7 +33,7 @@
       <router-view />
     </a-layout-content>
     <a-layout-footer class="footer">
-      灵视 VisionLive © 2026
+      Danmaku © 2026
     </a-layout-footer>
   </a-layout>
 </template>
