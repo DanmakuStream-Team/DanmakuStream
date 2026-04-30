@@ -44,26 +44,26 @@ func main() {
 	// ─── Auth-required routes ─────────────────────────────────────────
 	server.AddRoutes(rest.WithMiddlewares([]rest.Middleware{authMW},
 		[]rest.Route{
-		{Method: http.MethodGet, Path: "/api/v1/auth/me", Handler: getMeHandler(ctx)},
-		{Method: http.MethodPost, Path: "/api/v1/videos/upload", Handler: videoUploadHandler(ctx)},
-		{Method: http.MethodPut, Path: "/api/v1/videos/:id", Handler: videoUpdateHandler(ctx)},
-		{Method: http.MethodPost, Path: "/api/v1/videos/:id/like", Handler: videoLikeHandler(ctx)},
-		{Method: http.MethodPost, Path: "/api/v1/videos/:id/collect", Handler: videoCollectHandler(ctx)},
-		{Method: http.MethodPost, Path: "/api/v1/danmaku", Handler: danmakuSendHandler(ctx)},
-		{Method: http.MethodPost, Path: "/api/v1/comments", Handler: commentCreateHandler(ctx)},
-		{Method: http.MethodPost, Path: "/api/v1/users/:id/follow", Handler: followHandler(ctx)},
-		{Method: http.MethodGet, Path: "/api/v1/live", Handler: liveListHandler(ctx)},
-		{Method: http.MethodPost, Path: "/api/v1/live", Handler: liveStartHandler(ctx)},
-		{Method: http.MethodPut, Path: "/api/v1/live/:id/end", Handler: liveEndHandler(ctx)},
-	}...))
+			{Method: http.MethodGet, Path: "/api/v1/auth/me", Handler: getMeHandler(ctx)},
+			{Method: http.MethodPost, Path: "/api/v1/videos/upload", Handler: videoUploadHandler(ctx)},
+			{Method: http.MethodPut, Path: "/api/v1/videos/:id", Handler: videoUpdateHandler(ctx)},
+			{Method: http.MethodPost, Path: "/api/v1/videos/:id/like", Handler: videoLikeHandler(ctx)},
+			{Method: http.MethodPost, Path: "/api/v1/videos/:id/collect", Handler: videoCollectHandler(ctx)},
+			{Method: http.MethodPost, Path: "/api/v1/danmaku", Handler: danmakuSendHandler(ctx)},
+			{Method: http.MethodPost, Path: "/api/v1/comments", Handler: commentCreateHandler(ctx)},
+			{Method: http.MethodPost, Path: "/api/v1/users/:id/follow", Handler: followHandler(ctx)},
+			{Method: http.MethodGet, Path: "/api/v1/live", Handler: liveListHandler(ctx)},
+			{Method: http.MethodPost, Path: "/api/v1/live", Handler: liveStartHandler(ctx)},
+			{Method: http.MethodPut, Path: "/api/v1/live/:id/end", Handler: liveEndHandler(ctx)},
+		}...))
 
 	// ─── Admin routes ─────────────────────────────────────────────────
 	server.AddRoutes(rest.WithMiddlewares([]rest.Middleware{authMW, adminMW},
 		[]rest.Route{
-		{Method: http.MethodGet, Path: "/api/v1/admin/videos", Handler: adminVideoListHandler(ctx)},
-		{Method: http.MethodPut, Path: "/api/v1/admin/videos/:id/status", Handler: adminVideoStatusHandler(ctx)},
-		{Method: http.MethodPut, Path: "/api/v1/admin/danmaku/:id/block", Handler: adminDanmakuBlockHandler(ctx)},
-	}...))
+			{Method: http.MethodGet, Path: "/api/v1/admin/videos", Handler: adminVideoListHandler(ctx)},
+			{Method: http.MethodPut, Path: "/api/v1/admin/videos/:id/status", Handler: adminVideoStatusHandler(ctx)},
+			{Method: http.MethodPut, Path: "/api/v1/admin/danmaku/:id/block", Handler: adminDanmakuBlockHandler(ctx)},
+		}...))
 
 	// ─── WebSocket ────────────────────────────────────────────────────
 	server.AddRoute(rest.Route{
@@ -77,23 +77,23 @@ func main() {
 }
 
 // Placeholder handler functions (to be implemented in respective handler packages)
-func videoListHandler(ctx *svc.ServiceContext) http.HandlerFunc   { return notImplemented }
-func videoDetailHandler(ctx *svc.ServiceContext) http.HandlerFunc  { return notImplemented }
-func videoUploadHandler(ctx *svc.ServiceContext) http.HandlerFunc  { return notImplemented }
-func videoUpdateHandler(ctx *svc.ServiceContext) http.HandlerFunc  { return notImplemented }
-func videoLikeHandler(ctx *svc.ServiceContext) http.HandlerFunc    { return notImplemented }
-func videoCollectHandler(ctx *svc.ServiceContext) http.HandlerFunc { return notImplemented }
-func danmakuListHandler(ctx *svc.ServiceContext) http.HandlerFunc  { return notImplemented }
-func danmakuSendHandler(ctx *svc.ServiceContext) http.HandlerFunc  { return notImplemented }
-func commentCreateHandler(ctx *svc.ServiceContext) http.HandlerFunc { return notImplemented }
-func userProfileHandler(ctx *svc.ServiceContext) http.HandlerFunc  { return notImplemented }
-func getMeHandler(ctx *svc.ServiceContext) http.HandlerFunc        { return notImplemented }
-func followHandler(ctx *svc.ServiceContext) http.HandlerFunc       { return notImplemented }
-func liveListHandler(ctx *svc.ServiceContext) http.HandlerFunc     { return notImplemented }
-func liveStartHandler(ctx *svc.ServiceContext) http.HandlerFunc    { return notImplemented }
-func liveEndHandler(ctx *svc.ServiceContext) http.HandlerFunc      { return notImplemented }
-func adminVideoListHandler(ctx *svc.ServiceContext) http.HandlerFunc   { return notImplemented }
-func adminVideoStatusHandler(ctx *svc.ServiceContext) http.HandlerFunc { return notImplemented }
+func videoListHandler(ctx *svc.ServiceContext) http.HandlerFunc         { return notImplemented }
+func videoDetailHandler(ctx *svc.ServiceContext) http.HandlerFunc       { return notImplemented }
+func videoUploadHandler(ctx *svc.ServiceContext) http.HandlerFunc       { return notImplemented }
+func videoUpdateHandler(ctx *svc.ServiceContext) http.HandlerFunc       { return notImplemented }
+func videoLikeHandler(ctx *svc.ServiceContext) http.HandlerFunc         { return notImplemented }
+func videoCollectHandler(ctx *svc.ServiceContext) http.HandlerFunc      { return notImplemented }
+func danmakuListHandler(ctx *svc.ServiceContext) http.HandlerFunc       { return notImplemented }
+func danmakuSendHandler(ctx *svc.ServiceContext) http.HandlerFunc       { return notImplemented }
+func commentCreateHandler(ctx *svc.ServiceContext) http.HandlerFunc     { return notImplemented }
+func userProfileHandler(ctx *svc.ServiceContext) http.HandlerFunc       { return notImplemented }
+func getMeHandler(ctx *svc.ServiceContext) http.HandlerFunc             { return notImplemented }
+func followHandler(ctx *svc.ServiceContext) http.HandlerFunc            { return notImplemented }
+func liveListHandler(ctx *svc.ServiceContext) http.HandlerFunc          { return notImplemented }
+func liveStartHandler(ctx *svc.ServiceContext) http.HandlerFunc         { return notImplemented }
+func liveEndHandler(ctx *svc.ServiceContext) http.HandlerFunc           { return notImplemented }
+func adminVideoListHandler(ctx *svc.ServiceContext) http.HandlerFunc    { return notImplemented }
+func adminVideoStatusHandler(ctx *svc.ServiceContext) http.HandlerFunc  { return notImplemented }
 func adminDanmakuBlockHandler(ctx *svc.ServiceContext) http.HandlerFunc { return notImplemented }
 
 func notImplemented(w http.ResponseWriter, r *http.Request) {
