@@ -25,3 +25,9 @@ Thumbs.db
 # 配置（不提交密钥）
 *.env
 !*.env.example
+
+# test
+assets/
+*.mp4
+*.mov
+*.mkv
