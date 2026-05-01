@@ -37,7 +37,7 @@ func main() {
 		{Method: http.MethodPost, Path: "/api/v1/auth/login", Handler: authhandler.LoginHandler(ctx)},
 		{Method: http.MethodPost, Path: "/api/v1/auth/register", Handler: authhandler.RegisterHandler(ctx)},
 		{Method: http.MethodGet, Path: "/api/v1/videos", Handler: videohandler.ListHandler(ctx)},
-		{Method: http.MethodGet, Path: "/api/v1/videos/:id", Handler: videoDetailHandler(ctx)},
+		{Method: http.MethodGet, Path: "/api/v1/videos/:id", Handler: videohandler.DetailHandler(ctx)},
 		{Method: http.MethodGet, Path: "/api/v1/danmaku/:videoId", Handler: danmakuListHandler(ctx)},
 		{Method: http.MethodGet, Path: "/api/v1/users/:id", Handler: userProfileHandler(ctx)},
 	})
@@ -78,8 +78,6 @@ func main() {
 }
 
 // Placeholder handler functions (to be implemented in respective handler packages)
-func videoListHandler(ctx *svc.ServiceContext) http.HandlerFunc         { return notImplemented }
-func videoDetailHandler(ctx *svc.ServiceContext) http.HandlerFunc       { return notImplemented }
 func videoUploadHandler(ctx *svc.ServiceContext) http.HandlerFunc       { return notImplemented }
 func videoUpdateHandler(ctx *svc.ServiceContext) http.HandlerFunc       { return notImplemented }
 func videoLikeHandler(ctx *svc.ServiceContext) http.HandlerFunc         { return notImplemented }

@@ -9,11 +9,11 @@ import (
 type User struct {
 	gorm.Model
 	Username    string `gorm:"uniqueIndex;size:50;not null"`
-	Password    string `gorm:"not null"`                  // bcrypt hash
+	Password    string `gorm:"not null"` // bcrypt hash
 	Nickname    string `gorm:"size:50"`
 	Avatar      string `gorm:"size:500"`
 	Bio         string `gorm:"size:500"`
-	Role        string `gorm:"size:20;default:user"`     // user | creator | admin
+	Role        string `gorm:"size:20;default:user"` // user | creator | admin
 	FollowCount int64  `gorm:"default:0"`
 	FanCount    int64  `gorm:"default:0"`
 }
@@ -24,7 +24,7 @@ type Video struct {
 	Description  string `gorm:"type:text"`
 	CoverURL     string `gorm:"size:500"`
 	VideoURL     string `gorm:"size:500"`
-	Duration     int    `gorm:"default:0"`              // seconds
+	Duration     int    `gorm:"default:0"` // seconds
 	ViewCount    int64  `gorm:"default:0"`
 	LikeCount    int64  `gorm:"default:0"`
 	CollectCount int64  `gorm:"default:0"`
