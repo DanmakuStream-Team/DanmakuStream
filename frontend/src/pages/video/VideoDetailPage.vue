@@ -18,6 +18,13 @@
               ref="playerContainer"
               class="player-container"
             />
+
+            <DanmakuLayer
+              v-if="!playerError"
+              :danmakus="danmakuList"
+              :current-time="currentTime"
+              :enabled="danmakuEnabled"
+            />
           </a-spin>
         </div>
 
@@ -132,6 +139,11 @@
 
     <!-- 弹幕控制栏 -->
     <div v-if="video" class="danmaku-control">
+      <a-switch v-model="danmakuEnabled">
+        <template #checked>弹幕开</template>
+        <template #unchecked>弹幕关</template>
+      </a-switch>
+
       <a-input
         v-model="danmakuInput"
         placeholder="发送弹幕..."
@@ -160,7 +172,8 @@ import { danmakuApi } from '@/api/danmaku'
 import { videoApi } from '@/api/video'
 import { commentApi } from '@/api/comment'
 import CommentItem from '@/components/common/CommentItem.vue'
-import type { ApiResponse, Comment } from '@/types'
+import DanmakuLayer from '@/components/common/DanmakuLayer.vue'
+import type { ApiResponse, Comment, Danmaku } from '@/types'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -185,6 +198,9 @@ const commentSubmitting = ref(false)
 
 const danmakuInput = ref('')
 const danmakuColor = ref('#FFFFFF')
+const danmakuList = ref<Danmaku[]>([])
+const currentTime = ref(0)
+const danmakuEnabled = ref(true)
 
 const video = computed(() => videoStore.currentVideo)
 
@@ -222,7 +238,11 @@ onMounted(async () => {
     loading.value = true
 
     await videoStore.fetchVideoDetail(videoId)
-    await fetchComments(videoId)
+
+    await Promise.allSettled([
+      fetchComments(videoId),
+      fetchDanmakuList(videoId),
+    ])
 
     await nextTick()
     initPlayer()
@@ -247,6 +267,15 @@ async function fetchComments(videoId: number) {
     comments.value = []
   } finally {
     commentLoading.value = false
+  }
+}
+
+async function fetchDanmakuList(videoId: number) {
+  try {
+    const res = await danmakuApi.getDanmakuList(videoId)
+    danmakuList.value = normalizeResponseData<Danmaku[]>(res, [])
+  } catch {
+    danmakuList.value = []
   }
 }
 
@@ -365,6 +394,14 @@ function initPlayer() {
     player.value.on('playing', () => {
       playerLoading.value = false
     })
+
+    player.value.on('timeupdate', () => {
+      currentTime.value = player.value?.currentTime || 0
+    })
+
+    player.value.on('seeked', () => {
+      currentTime.value = player.value?.currentTime || 0
+    })
   } catch {
     playerLoading.value = false
     playerError.value = '播放器初始化失败'
@@ -434,16 +471,28 @@ async function sendDanmaku() {
     return
   }
 
-  const currentTime = player.value?.currentTime || 0
+  const sendTime = player.value?.currentTime || 0
 
   try {
     await danmakuApi.sendDanmaku({
       videoId: video.value.id,
       content,
-      time: currentTime,
+      time: sendTime,
       color: danmakuColor.value,
       fontSize: 'medium',
       type: 'scroll',
+    })
+
+    danmakuList.value.push({
+      id: Date.now(),
+      videoId: video.value.id,
+      userId: authStore.userInfo?.id || 0,
+      content,
+      time: sendTime,
+      color: danmakuColor.value,
+      fontSize: 'medium',
+      type: 'scroll',
+      createdAt: new Date().toISOString(),
     })
 
     danmakuInput.value = ''
@@ -641,11 +690,16 @@ function normalizeResponseData<T>(res: unknown, fallback: T): T {
 .danmaku-control {
   position: sticky;
   bottom: 0;
+  z-index: 50;
   background: #fff;
   padding: 12px;
   display: flex;
   gap: 8px;
   align-items: center;
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.danmaku-control :deep(.arco-switch) {
+  flex-shrink: 0;
 }
 </style>
