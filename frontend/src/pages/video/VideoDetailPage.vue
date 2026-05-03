@@ -3,30 +3,14 @@
     <a-spin :loading="loading">
       <div v-if="video" class="main-content">
         <!-- 播放器区域 -->
-        <div class="player-wrapper">
-          <a-spin :loading="playerLoading" class="player-spin">
-            <div v-if="playerError" class="player-error">
-              <div class="error-title">视频加载失败</div>
-              <div class="error-desc">{{ playerError }}</div>
-              <a-button type="primary" @click="retryInitPlayer">
-                重新加载
-              </a-button>
-            </div>
-
-            <div
-              v-show="!playerError"
-              ref="playerContainer"
-              class="player-container"
-            />
-
-            <DanmakuLayer
-              v-if="!playerError"
-              :danmakus="danmakuList"
-              :current-time="currentTime"
-              :enabled="danmakuEnabled"
-            />
-          </a-spin>
-        </div>
+        <VideoPlayer
+          ref="videoPlayerRef"
+          :url="video.videoUrl"
+          :poster="video.coverUrl"
+          :danmakus="danmakuList"
+          @timeupdate="handleTimeUpdate"
+          @error="handlePlayerError"
+        />
 
         <!-- 视频信息 -->
         <div class="video-info">
@@ -71,7 +55,6 @@
             <span>{{ commentCount }} 条</span>
           </div>
 
-          <!-- 评论输入框 -->
           <div v-if="authStore.isLoggedIn" class="comment-input">
             <div v-if="replyTarget" class="reply-target">
               <span>
@@ -116,7 +99,6 @@
             登录后可以发表评论
           </a-alert>
 
-          <!-- 评论列表 -->
           <a-spin :loading="commentLoading">
             <div class="comment-list">
               <a-empty v-if="comments.length === 0" description="暂无评论" />
@@ -137,13 +119,8 @@
       <a-empty v-else-if="!loading" description="视频不存在" />
     </a-spin>
 
-    <!-- 弹幕控制栏 -->
+    <!-- 弹幕发送栏 -->
     <div v-if="video" class="danmaku-control">
-      <a-switch v-model="danmakuEnabled">
-        <template #checked>弹幕开</template>
-        <template #unchecked>弹幕关</template>
-      </a-switch>
-
       <a-input
         v-model="danmakuInput"
         placeholder="发送弹幕..."
@@ -161,10 +138,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Message } from '@arco-design/web-vue'
-import Player from 'xgplayer'
-import 'xgplayer/dist/index.min.css'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useVideoStore } from '@/store/video'
@@ -172,19 +147,24 @@ import { danmakuApi } from '@/api/danmaku'
 import { videoApi } from '@/api/video'
 import { commentApi } from '@/api/comment'
 import CommentItem from '@/components/common/CommentItem.vue'
-import DanmakuLayer from '@/components/common/DanmakuLayer.vue'
+import VideoPlayer from '@/components/common/VideoPlayer.vue'
 import type { ApiResponse, Comment, Danmaku } from '@/types'
+
+type VideoPlayerExpose = {
+  play: () => void
+  pause: () => void
+  seek: (time: number) => void
+  getCurrentTime: () => number
+  getDuration: () => number
+}
 
 const route = useRoute()
 const authStore = useAuthStore()
 const videoStore = useVideoStore()
 
-const playerContainer = ref<HTMLElement>()
-const player = ref<Player | null>(null)
+const videoPlayerRef = ref<VideoPlayerExpose>()
 
 const loading = ref(true)
-const playerLoading = ref(false)
-const playerError = ref('')
 
 const liked = ref(false)
 const collected = ref(false)
@@ -200,7 +180,6 @@ const danmakuInput = ref('')
 const danmakuColor = ref('#FFFFFF')
 const danmakuList = ref<Danmaku[]>([])
 const currentTime = ref(0)
-const danmakuEnabled = ref(true)
 
 const video = computed(() => videoStore.currentVideo)
 
@@ -243,18 +222,11 @@ onMounted(async () => {
       fetchComments(videoId),
       fetchDanmakuList(videoId),
     ])
-
-    await nextTick()
-    initPlayer()
   } catch {
     Message.error('视频详情加载失败')
   } finally {
     loading.value = false
   }
-})
-
-onUnmounted(() => {
-  destroyPlayer()
 })
 
 async function fetchComments(videoId: number) {
@@ -337,88 +309,6 @@ function cancelReply() {
   replyInput.value = ''
 }
 
-function initPlayer() {
-  destroyPlayer()
-
-  if (!video.value) {
-    playerError.value = '视频信息不存在'
-    return
-  }
-
-  if (!video.value.videoUrl) {
-    playerError.value = '视频地址为空'
-    return
-  }
-
-  if (!playerContainer.value) {
-    playerError.value = '播放器容器初始化失败'
-    return
-  }
-
-  playerLoading.value = true
-  playerError.value = ''
-
-  try {
-    player.value = new Player({
-      el: playerContainer.value,
-      url: video.value.videoUrl,
-      poster: video.value.coverUrl,
-      width: '100%',
-      height: '100%',
-      autoplay: false,
-      fluid: true,
-      playbackRate: [0.5, 0.75, 1, 1.25, 1.5, 2],
-      defaultPlaybackRate: 1,
-      playsinline: true,
-      lang: 'zh-cn',
-    })
-
-    player.value.once('ready', () => {
-      playerLoading.value = false
-    })
-
-    player.value.on('error', () => {
-      playerLoading.value = false
-      playerError.value = '播放器加载出错，请检查视频地址或网络连接'
-    })
-
-    player.value.on('canplay', () => {
-      playerLoading.value = false
-      playerError.value = ''
-    })
-
-    player.value.on('waiting', () => {
-      playerLoading.value = true
-    })
-
-    player.value.on('playing', () => {
-      playerLoading.value = false
-    })
-
-    player.value.on('timeupdate', () => {
-      currentTime.value = player.value?.currentTime || 0
-    })
-
-    player.value.on('seeked', () => {
-      currentTime.value = player.value?.currentTime || 0
-    })
-  } catch {
-    playerLoading.value = false
-    playerError.value = '播放器初始化失败'
-  }
-}
-
-function destroyPlayer() {
-  if (player.value) {
-    player.value.destroy()
-    player.value = null
-  }
-}
-
-function retryInitPlayer() {
-  initPlayer()
-}
-
 async function toggleLike() {
   if (!authStore.isLoggedIn) {
     Message.warning('请先登录')
@@ -471,7 +361,7 @@ async function sendDanmaku() {
     return
   }
 
-  const sendTime = player.value?.currentTime || 0
+  const sendTime = videoPlayerRef.value?.getCurrentTime() || currentTime.value || 0
 
   try {
     await danmakuApi.sendDanmaku({
@@ -499,6 +389,14 @@ async function sendDanmaku() {
   } catch {
     Message.error('弹幕发送失败')
   }
+}
+
+function handleTimeUpdate(time: number) {
+  currentTime.value = time
+}
+
+function handlePlayerError(message: string) {
+  Message.error(message)
 }
 
 function getCommentAuthorName(comment: Comment) {
@@ -551,48 +449,6 @@ function normalizeResponseData<T>(res: unknown, fallback: T): T {
 
 .main-content {
   width: 100%;
-}
-
-.player-wrapper {
-  position: relative;
-  background: #000;
-  border-radius: 8px;
-  overflow: hidden;
-  aspect-ratio: 16 / 9;
-}
-
-.player-spin {
-  width: 100%;
-  height: 100%;
-}
-
-.player-container {
-  width: 100%;
-  height: 100%;
-  background: #000;
-}
-
-.player-error {
-  width: 100%;
-  height: 100%;
-  min-height: 360px;
-  color: #fff;
-  background: #111;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-
-.error-title {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.error-desc {
-  color: #c9cdd4;
-  font-size: 14px;
 }
 
 .video-info {
@@ -697,9 +553,5 @@ function normalizeResponseData<T>(res: unknown, fallback: T): T {
   gap: 8px;
   align-items: center;
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.danmaku-control :deep(.arco-switch) {
-  flex-shrink: 0;
 }
 </style>
