@@ -88,7 +88,7 @@
             <div class="comment-submit-row">
               <a-button
                 type="primary"
-                :loading="commentSubmitting"
+                :loading="commentStore.submitting"
                 @click="submitComment(replyTarget?.id)"
               >
                 {{ replyTarget ? '发送回复' : '发表评论' }}
@@ -101,13 +101,16 @@
           </a-alert>
 
           <!-- 评论列表 -->
-          <a-spin :loading="commentLoading">
+          <a-spin :loading="commentStore.loading">
             <div class="comment-list">
-              <a-empty v-if="comments.length === 0" description="暂无评论" />
+              <a-empty
+                v-if="commentStore.comments.length === 0"
+                description="暂无评论"
+              />
 
               <template v-else>
                 <CommentItem
-                  v-for="comment in comments"
+                  v-for="comment in commentStore.comments"
                   :key="comment.id"
                   :comment="comment"
                   @reply="startReply"
@@ -140,14 +143,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Message } from '@arco-design/web-vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useVideoStore } from '@/store/video'
+import { useCommentStore } from '@/store/comment'
 import { danmakuApi } from '@/api/danmaku'
 import { videoApi } from '@/api/video'
-import { commentApi } from '@/api/comment'
 import CommentItem from '@/components/common/CommentItem.vue'
 import VideoPlayer from '@/components/common/VideoPlayer.vue'
 import type { ApiResponse, Comment, Danmaku } from '@/types'
@@ -163,6 +166,7 @@ type VideoPlayerExpose = {
 const route = useRoute()
 const authStore = useAuthStore()
 const videoStore = useVideoStore()
+const commentStore = useCommentStore()
 
 const videoPlayerRef = ref<VideoPlayerExpose>()
 
@@ -171,12 +175,9 @@ const loading = ref(true)
 const liked = ref(false)
 const collected = ref(false)
 
-const comments = ref<Comment[]>([])
 const commentInput = ref('')
 const replyInput = ref('')
 const replyTarget = ref<Comment | null>(null)
-const commentLoading = ref(false)
-const commentSubmitting = ref(false)
 
 const danmakuInput = ref('')
 const danmakuColor = ref('#FFFFFF')
@@ -203,7 +204,7 @@ const normalizedTags = computed(() => {
 })
 
 const commentCount = computed(() => {
-  return countComments(comments.value)
+  return commentStore.countComments()
 })
 
 onMounted(async () => {
@@ -221,7 +222,7 @@ onMounted(async () => {
     await videoStore.fetchVideoDetail(videoId)
 
     await Promise.allSettled([
-      fetchComments(videoId),
+      commentStore.fetchComments(videoId),
       fetchDanmakuList(videoId),
     ])
   } catch {
@@ -231,18 +232,9 @@ onMounted(async () => {
   }
 })
 
-async function fetchComments(videoId: number) {
-  commentLoading.value = true
-
-  try {
-    const res = await commentApi.getComments(videoId)
-    comments.value = normalizeResponseData<Comment[]>(res, [])
-  } catch {
-    comments.value = []
-  } finally {
-    commentLoading.value = false
-  }
-}
+onUnmounted(() => {
+  commentStore.clearComments()
+})
 
 async function fetchDanmakuList(videoId: number) {
   try {
@@ -270,10 +262,8 @@ async function submitComment(parentId?: number) {
     return
   }
 
-  commentSubmitting.value = true
-
   try {
-    await commentApi.createComment(video.value.id, content, parentId)
+    await commentStore.createComment(video.value.id, content, parentId)
 
     Message.success(parentId ? '回复成功' : '评论成功')
 
@@ -283,12 +273,8 @@ async function submitComment(parentId?: number) {
     } else {
       commentInput.value = ''
     }
-
-    await fetchComments(video.value.id)
   } catch {
     Message.error(parentId ? '回复失败' : '评论失败')
-  } finally {
-    commentSubmitting.value = false
   }
 }
 
@@ -413,12 +399,6 @@ function formatTime(time?: string) {
   }
 
   return date.toLocaleString()
-}
-
-function countComments(list: Comment[]) {
-  return list.reduce((total, comment) => {
-    return total + 1 + countComments(comment.replies || [])
-  }, 0)
 }
 
 function normalizeResponseData<T>(res: unknown, fallback: T): T {
