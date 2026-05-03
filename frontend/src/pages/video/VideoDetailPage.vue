@@ -55,6 +55,7 @@
             <span>{{ commentCount }} 条</span>
           </div>
 
+          <!-- 评论输入框 -->
           <div v-if="authStore.isLoggedIn" class="comment-input">
             <div v-if="replyTarget" class="reply-target">
               <span>
@@ -99,6 +100,7 @@
             登录后可以发表评论
           </a-alert>
 
+          <!-- 评论列表 -->
           <a-spin :loading="commentLoading">
             <div class="comment-list">
               <a-empty v-if="comments.length === 0" description="暂无评论" />
@@ -271,11 +273,7 @@ async function submitComment(parentId?: number) {
   commentSubmitting.value = true
 
   try {
-    await commentApi.createComment({
-      videoId: video.value.id,
-      content,
-      parentId,
-    })
+    await commentApi.createComment(video.value.id, content, parentId)
 
     Message.success(parentId ? '回复成功' : '评论成功')
 
