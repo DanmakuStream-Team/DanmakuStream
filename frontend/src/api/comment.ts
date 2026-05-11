@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import type { ApiResponse, Comment } from '@/types'
+import type { Comment } from '@/types'
 
 export interface CreateCommentParams {
   videoId: number
@@ -9,10 +9,10 @@ export interface CreateCommentParams {
 
 export const commentApi = {
   createComment(data: CreateCommentParams) {
-    return request.post<ApiResponse<Comment>>('/comments', data)
+    return request.post<Comment>('/comments', data)
   },
 
   getComments(videoId: number) {
-    return request.get<ApiResponse<Comment[]>>(`/comments/${videoId}`)
+    return request.get<Comment[]>(`/comments/${videoId}`)
   },
 }

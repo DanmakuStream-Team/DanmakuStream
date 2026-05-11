@@ -2,7 +2,6 @@
 set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:8080}"
-USERNAME="${USERNAME:-testuser_$(date +%s)}"
 PASSWORD="${PASSWORD:-123456}"
 NICKNAME="${NICKNAME:-测试用户}"
 MYSQL_USER="${MYSQL_USER:-root}"
@@ -81,16 +80,16 @@ echo "Testing API server: $BASE_URL"
 echo
 
 echo "1. POST /api/v1/auth/register"
-register_body="{\"username\":\"$USERNAME\",\"password\":\"$PASSWORD\",\"nickname\":\"$NICKNAME\"}"
+register_body="{\"password\":\"$PASSWORD\",\"nickname\":\"$NICKNAME\"}"
 register_resp="$(request POST /api/v1/auth/register "$register_body")"
 printf '%s' "$register_resp" | json_assert_has_key token
 printf '%s' "$register_resp" | json_assert_has_key userInfo.id
 user_id="$(printf '%s' "$register_resp" | json_get userInfo.id)"
-echo "   ok: registered user id=$user_id username=$USERNAME"
+echo "   ok: registered user uid=$user_id"
 echo
 
 echo "2. POST /api/v1/auth/login"
-login_body="{\"username\":\"$USERNAME\",\"password\":\"$PASSWORD\"}"
+login_body="{\"nickname\":\"$NICKNAME\",\"password\":\"$PASSWORD\"}"
 login_resp="$(request POST /api/v1/auth/login "$login_body")"
 printf '%s' "$login_resp" | json_assert_has_key token
 printf '%s' "$login_resp" | json_assert_has_key userInfo.id

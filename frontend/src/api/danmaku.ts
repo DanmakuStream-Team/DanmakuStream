@@ -1,15 +1,15 @@
 import request from '@/utils/request'
-import type { ApiResponse, Danmaku } from '@/types'
+import type { Danmaku } from '@/types'
 
 export const danmakuApi = {
   getDanmakuList(videoId: number) {
-    return request.get<ApiResponse<Danmaku[]>>(`/danmaku/${videoId}`)
+    return request.get<Danmaku[]>(`/danmaku/${videoId}`)
   },
   sendDanmaku(data: Pick<Danmaku, 'videoId' | 'content' | 'time' | 'color' | 'fontSize' | 'type'>) {
-    return request.post<ApiResponse<Danmaku>>('/danmaku', data)
+    return request.post<Danmaku>('/danmaku', data)
   },
   blockDanmaku(id: number) {
-    return request.put<ApiResponse>(`/danmaku/${id}/block`)
+    return request.put<void>(`/danmaku/${id}/block`)
   },
 }
 

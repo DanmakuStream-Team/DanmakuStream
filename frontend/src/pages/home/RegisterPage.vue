@@ -3,9 +3,6 @@
     <div class="register-card">
       <h2>注册</h2>
       <a-form :model="form" layout="vertical" @submit="handleRegister">
-        <a-form-item field="username" label="用户名" :rules="[{ required: true, minLength: 3 }]">
-          <a-input v-model="form.username" placeholder="3-20位字母或数字" />
-        </a-form-item>
         <a-form-item field="nickname" label="昵称" :rules="[{ required: true }]">
           <a-input v-model="form.nickname" placeholder="请输入昵称" />
         </a-form-item>
@@ -25,23 +22,32 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { Message } from '@arco-design/web-vue'
-import { authApi } from '@/api/auth'
+import { useAuthStore } from '@/store/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const loading = ref(false)
-const form = reactive({ username: '', nickname: '', password: '' })
+const form = reactive({ nickname: '', password: '' })
 
 async function handleRegister() {
   try {
     loading.value = true
-    await authApi.register(form)
-    Message.success('注册成功，请登录')
-    router.push('/login')
-  } catch {
-    Message.error('注册失败，请重试')
+    await authStore.register(form.nickname, form.password)
+    Message.success('注册成功')
+    router.push('/')
+  } catch (error) {
+    Message.error(getErrorMessage(error, '注册失败，请重试'))
   } finally {
     loading.value = false
   }
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
+  return fallback
 }
 </script>
 

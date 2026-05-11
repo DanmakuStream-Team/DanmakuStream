@@ -2,7 +2,7 @@
   <a-layout class="layout">
     <a-layout-sider class="sider" :width="200">
       <div class="sider-title">管理后台</div>
-      <a-menu :selected-keys="[route.name as string]" @menu-item-click="(key) => router.push({ name: key })">
+      <a-menu :selected-keys="[route.name as string]" @menu-item-click="(key: string) => router.push({ name: key })">
         <a-menu-item key="AdminDashboard"><icon-dashboard /> 概览</a-menu-item>
         <a-menu-item key="AdminVideos"><icon-video-camera /> 视频审核</a-menu-item>
         <a-menu-item key="AdminDanmaku"><icon-message /> 弹幕管理</a-menu-item>

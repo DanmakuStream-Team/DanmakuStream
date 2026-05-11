@@ -3,8 +3,8 @@
     <div class="login-card">
       <h2>登录</h2>
       <a-form :model="form" layout="vertical" @submit="handleLogin">
-        <a-form-item field="username" label="用户名" :rules="[{ required: true }]">
-          <a-input v-model="form.username" placeholder="请输入用户名" />
+        <a-form-item field="nickname" label="昵称" :rules="[{ required: true }]">
+          <a-input v-model="form.nickname" placeholder="请输入昵称" />
         </a-form-item>
         <a-form-item field="password" label="密码" :rules="[{ required: true }]">
           <a-input-password v-model="form.password" placeholder="请输入密码" />
@@ -29,16 +29,16 @@ const route = useRoute()
 const authStore = useAuthStore()
 
 const loading = ref(false)
-const form = reactive({ username: '', password: '' })
+const form = reactive({ nickname: '', password: '' })
 
 async function handleLogin() {
   try {
     loading.value = true
-    await authStore.login(form.username, form.password)
+    await authStore.login(form.nickname, form.password)
     const redirect = route.query.redirect as string
     router.push(redirect || '/')
   } catch {
-    Message.error('用户名或密码错误')
+    Message.error('昵称或密码错误')
   } finally {
     loading.value = false
   }

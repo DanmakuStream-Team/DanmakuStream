@@ -3,6 +3,8 @@ package authlogic
 import (
 	"context"
 	"errors"
+	"strconv"
+	"strings"
 	"time"
 
 	"danmakustream/backend/internal/middleware"
@@ -27,13 +29,21 @@ type LoginResp struct {
 }
 
 func (l *LoginLogic) Login(req *LoginReq) (*LoginResp, error) {
+	nickname := strings.TrimSpace(req.Nickname)
+	if nickname == "" {
+		nickname = strings.TrimSpace(req.Username)
+	}
+	if nickname == "" {
+		return nil, errors.New("昵称或密码错误")
+	}
+
 	var user model.User
-	if err := l.svcCtx.DB.Where("username = ?", req.Username).First(&user).Error; err != nil {
-		return nil, errors.New("用户名或密码错误")
+	if err := l.svcCtx.DB.Where("nickname = ?", nickname).First(&user).Error; err != nil {
+		return nil, errors.New("昵称或密码错误")
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		return nil, errors.New("用户名或密码错误")
+		return nil, errors.New("昵称或密码错误")
 	}
 
 	token, err := l.generateToken(&user)
@@ -78,11 +88,15 @@ func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Register
 }
 
 func (l *RegisterLogic) Register(req *RegisterReq) (*LoginResp, error) {
-	// Check duplicate username
+	nickname := strings.TrimSpace(req.Nickname)
+	if nickname == "" || req.Password == "" {
+		return nil, errors.New("昵称和密码不能为空")
+	}
+
 	var count int64
-	l.svcCtx.DB.Model(&model.User{}).Where("username = ?", req.Username).Count(&count)
+	l.svcCtx.DB.Model(&model.User{}).Where("nickname = ?", nickname).Count(&count)
 	if count > 0 {
-		return nil, errors.New("用户名已存在")
+		return nil, errors.New("昵称已存在")
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -91,12 +105,17 @@ func (l *RegisterLogic) Register(req *RegisterReq) (*LoginResp, error) {
 	}
 
 	user := model.User{
-		Username: req.Username,
+		Username: "pending-" + strconv.FormatInt(time.Now().UnixNano(), 10),
 		Password: string(hashedPassword),
-		Nickname: req.Nickname,
+		Nickname: nickname,
 		Role:     "user",
 	}
 	if err := l.svcCtx.DB.Create(&user).Error; err != nil {
+		return nil, err
+	}
+
+	user.Username = strconv.FormatUint(uint64(user.ID), 10)
+	if err := l.svcCtx.DB.Model(&user).Update("username", user.Username).Error; err != nil {
 		return nil, err
 	}
 
@@ -133,11 +152,11 @@ func (l *RegisterLogic) generateToken(user *model.User) (string, error) {
 
 // Request types (shared between handler and logic)
 type LoginReq = struct {
-	Username string `json:"username"`
+	Nickname string `json:"nickname"`
+	Username string `json:"username,optional"`
 	Password string `json:"password"`
 }
 type RegisterReq = struct {
-	Username string `json:"username"`
 	Password string `json:"password"`
 	Nickname string `json:"nickname"`
 }

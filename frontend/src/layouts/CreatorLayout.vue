@@ -2,7 +2,7 @@
   <a-layout class="layout">
     <a-layout-sider class="sider" :width="200">
       <div class="sider-title">创作者中心</div>
-      <a-menu :selected-keys="[route.name as string]" @menu-item-click="(key) => router.push({ name: key })">
+      <a-menu :selected-keys="[route.name as string]" @menu-item-click="(key: string) => router.push({ name: key })">
         <a-menu-item key="CreatorDashboard"><icon-home /> 概览</a-menu-item>
         <a-menu-item key="VideoUpload"><icon-upload /> 上传视频</a-menu-item>
       </a-menu>
