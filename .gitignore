@@ -17,6 +17,9 @@ ai-service/.env
 # IDE
 .vscode/
 .idea/
+.agents/
+.claude/
+.codex/
 
 # OS
 .DS_Store
@@ -25,6 +28,7 @@ Thumbs.db
 # 配置（不提交密钥）
 *.env
 !*.env.example
+
 
 # test
 assets/

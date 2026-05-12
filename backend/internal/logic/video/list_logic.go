@@ -2,7 +2,6 @@ package videologic
 
 import (
 	"context"
-	"time"
 
 	model "danmakustream/backend/internal/model/mysql"
 	"danmakustream/backend/internal/svc"
@@ -20,8 +19,8 @@ func NewListVideoLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ListVid
 type VideoListReq struct {
 	Page     int    `form:"page"`
 	PageSize int    `form:"pageSize"`
-	Keyword  string `form:"keyword,optional"`
-	Tag      string `form:"tag,optional"`
+	Keyword  string `form:"keyword"`
+	Tag      string `form:"tag"`
 }
 
 type PageResult[T any] struct {
@@ -43,7 +42,7 @@ type VideoInfo struct {
 	CollectCount int64           `json:"collectCount"`
 	DanmakuCount int64           `json:"danmakuCount"`
 	Tags         string          `json:"tags"`
-	CreatedAt    time.Time       `json:"createdAt"`
+	CreatedAt    string          `json:"createdAt"`
 	Author       *model.UserInfo `json:"author"`
 }
 
@@ -98,7 +97,7 @@ func (l *ListVideoLogic) List(req *VideoListReq) (*PageResult[VideoInfo], error)
 			CollectCount: video.CollectCount,
 			DanmakuCount: video.DanmakuCount,
 			Tags:         video.Tags,
-			CreatedAt:    video.CreatedAt,
+			CreatedAt:    video.CreatedAt.Format("2006-01-02 15:04:05"),
 			Author: &model.UserInfo{
 				ID:       video.Author.ID,
 				Username: video.Author.Username,

@@ -1,31 +1,23 @@
 package config
 
-import (
-	"github.com/zeromicro/go-zero/rest"
-)
-
 type Config struct {
-	rest.RestConf
+	Name string `yaml:"Name"`
+	Host string `yaml:"Host"`
+	Port int    `yaml:"Port"`
 
 	Auth struct {
-		AccessSecret string
-		AccessExpire int64
-	}
+		AccessSecret string `yaml:"AccessSecret"`
+		AccessExpire int64  `yaml:"AccessExpire"`
+	} `yaml:"Auth"`
 
 	Database struct {
-		DataSource string
-	}
+		DataSource string `yaml:"DataSource"`
+	} `yaml:"Database"`
 
-	Redis struct {
-		Host string
-		Type string
-	}
+	VideoDir string `yaml:"VideoDir"`
 
-	MinIO struct {
-		Endpoint  string
-		AccessKey string
-		SecretKey string
-		Bucket    string
-		UseSSL    bool
-	}
+	Log struct {
+		Mode  string `yaml:"Mode"`
+		Level string `yaml:"Level"`
+	} `yaml:"Log"`
 }

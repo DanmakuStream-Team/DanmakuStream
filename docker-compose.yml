@@ -15,33 +15,6 @@ services:
       interval: 10s
       retries: 5
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      retries: 5
-
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 10s
-      retries: 5
-
   # ── Backend (Go) ──────────────────────────────────────────────────
   backend:
     build:
@@ -52,14 +25,11 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
     environment:
       - TZ=Asia/Shanghai
     volumes:
       - ./backend/etc/config.yaml:/app/etc/config.yaml
+      - video_data:/app/data
 
   # ── AI Service (Python) ───────────────────────────────────────────
   ai-service:
@@ -68,9 +38,6 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
-    depends_on:
-      redis:
-        condition: service_healthy
     env_file:
       - ./ai-service/.env
 
@@ -86,5 +53,4 @@ services:
 
 volumes:
   mysql_data:
-  redis_data:
-  minio_data:
+  video_data:

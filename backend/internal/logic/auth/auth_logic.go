@@ -10,6 +10,7 @@ import (
 	"danmakustream/backend/internal/middleware"
 	model "danmakustream/backend/internal/model/mysql"
 	"danmakustream/backend/internal/svc"
+
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -21,6 +22,17 @@ type LoginLogic struct {
 
 func NewLoginLogic(ctx context.Context, svcCtx *svc.ServiceContext) *LoginLogic {
 	return &LoginLogic{ctx: ctx, svcCtx: svcCtx}
+}
+
+type LoginReq struct {
+	Nickname string `json:"nickname"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type RegisterReq struct {
+	Password string `json:"password"`
+	Nickname string `json:"nickname"`
 }
 
 type LoginResp struct {
@@ -46,7 +58,7 @@ func (l *LoginLogic) Login(req *LoginReq) (*LoginResp, error) {
 		return nil, errors.New("昵称或密码错误")
 	}
 
-	token, err := l.generateToken(&user)
+	token, err := generateToken(l.svcCtx, &user)
 	if err != nil {
 		return nil, err
 	}
@@ -61,30 +73,6 @@ func (l *LoginLogic) Login(req *LoginReq) (*LoginResp, error) {
 			Role:     user.Role,
 		},
 	}, nil
-}
-
-func (l *LoginLogic) generateToken(user *model.User) (string, error) {
-	expire := l.svcCtx.Config.Auth.AccessExpire
-	claims := middleware.Claims{
-		UserID:   user.ID,
-		Username: user.Username,
-		Role:     user.Role,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(expire) * time.Second)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(l.svcCtx.Config.Auth.AccessSecret))
-}
-
-type RegisterLogic struct {
-	ctx    context.Context
-	svcCtx *svc.ServiceContext
-}
-
-func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *RegisterLogic {
-	return &RegisterLogic{ctx: ctx, svcCtx: svcCtx}
 }
 
 func (l *RegisterLogic) Register(req *RegisterReq) (*LoginResp, error) {
@@ -119,7 +107,7 @@ func (l *RegisterLogic) Register(req *RegisterReq) (*LoginResp, error) {
 		return nil, err
 	}
 
-	token, err := l.generateToken(&user)
+	token, err := generateToken(l.svcCtx, &user)
 	if err != nil {
 		return nil, err
 	}
@@ -135,8 +123,17 @@ func (l *RegisterLogic) Register(req *RegisterReq) (*LoginResp, error) {
 	}, nil
 }
 
-func (l *RegisterLogic) generateToken(user *model.User) (string, error) {
-	expire := l.svcCtx.Config.Auth.AccessExpire
+type RegisterLogic struct {
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *RegisterLogic {
+	return &RegisterLogic{ctx: ctx, svcCtx: svcCtx}
+}
+
+func generateToken(svcCtx *svc.ServiceContext, user *model.User) (string, error) {
+	expire := svcCtx.Config.Auth.AccessExpire
 	claims := middleware.Claims{
 		UserID:   user.ID,
 		Username: user.Username,
@@ -147,16 +144,5 @@ func (l *RegisterLogic) generateToken(user *model.User) (string, error) {
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(l.svcCtx.Config.Auth.AccessSecret))
-}
-
-// Request types (shared between handler and logic)
-type LoginReq = struct {
-	Nickname string `json:"nickname"`
-	Username string `json:"username,optional"`
-	Password string `json:"password"`
-}
-type RegisterReq = struct {
-	Password string `json:"password"`
-	Nickname string `json:"nickname"`
+	return token.SignedString([]byte(svcCtx.Config.Auth.AccessSecret))
 }

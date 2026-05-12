@@ -1,25 +1,25 @@
 package danmakulogic
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"sync"
 	"time"
 
+	model "danmakustream/backend/internal/model/mysql"
 	"danmakustream/backend/internal/svc"
+
 	"github.com/gorilla/websocket"
 )
 
 // Hub maintains the set of active clients and broadcasts messages.
 type Hub struct {
-	// rooms[roomID] -> set of clients
-	rooms    map[uint]map[*Client]bool
-	mu       sync.RWMutex
+	rooms      map[uint]map[*Client]bool
+	mu         sync.RWMutex
 	Register   chan *Client
 	Unregister chan *Client
 	Broadcast  chan *RoomMessage
-	svcCtx   *svc.ServiceContext
+	svcCtx     *svc.ServiceContext
 }
 
 type RoomMessage struct {
@@ -28,8 +28,8 @@ type RoomMessage struct {
 }
 
 var (
-	globalHub  *Hub
-	hubOnce    sync.Once
+	globalHub *Hub
+	hubOnce   sync.Once
 )
 
 func GetHub(svcCtx *svc.ServiceContext) *Hub {
@@ -73,7 +73,6 @@ func (h *Hub) Run() {
 				select {
 				case client.Send <- msg.Payload:
 				default:
-					// Slow client: drop message
 				}
 			}
 			h.mu.RUnlock()
@@ -113,6 +112,7 @@ type IncomingMessage struct {
 	Type    string `json:"type"`
 	Content string `json:"content"`
 	Color   string `json:"color"`
+	Time    int    `json:"time"`
 }
 
 func (c *Client) ReadPump() {
@@ -142,9 +142,17 @@ func (c *Client) ReadPump() {
 			continue
 		}
 
-		// Persist danmaku to Redis (queue for batch write to MySQL)
-		ctx := context.Background()
-		_ = c.Hub.svcCtx.Redis.RPush(ctx, "danmaku:queue", message).Err()
+		// Persist danmaku directly to MySQL
+		danmaku := model.Danmaku{
+			VideoID:  c.RoomID,
+			UserID:   c.UserID,
+			Content:  incoming.Content,
+			Color:    incoming.Color,
+			Time:     incoming.Time,
+			FontSize: "medium",
+			Type:     "scroll",
+		}
+		c.Hub.svcCtx.DB.Create(&danmaku)
 
 		// Broadcast to room
 		outgoing, _ := json.Marshal(map[string]any{
@@ -153,7 +161,7 @@ func (c *Client) ReadPump() {
 				"userId":  c.UserID,
 				"content": incoming.Content,
 				"color":   incoming.Color,
-				"time":    time.Now().Unix(),
+				"time":    incoming.Time,
 			},
 		})
 		c.Hub.Broadcast <- &RoomMessage{RoomID: c.RoomID, Payload: outgoing}

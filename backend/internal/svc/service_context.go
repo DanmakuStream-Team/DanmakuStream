@@ -1,31 +1,26 @@
 package svc
 
 import (
-	"danmakustream/backend/internal/config"
-	"danmakustream/backend/internal/model/mysql"
+	"os"
+	"path/filepath"
 
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/redis/go-redis/v9"
+	"danmakustream/backend/internal/config"
+	model "danmakustream/backend/internal/model/mysql"
+
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
-// ServiceContext holds shared dependencies injected into handlers/logic.
 type ServiceContext struct {
-	Config config.Config
-	DB     *gorm.DB
-	Redis  *redis.Client
-	MinIO  *minio.Client
+	Config   config.Config
+	DB       *gorm.DB
+	VideoDir string
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
 	db := initDB(c)
-	rdb := initRedis(c)
-	mc := initMinIO(c)
 
-	// Auto migrate tables
 	db.AutoMigrate(
 		&model.User{},
 		&model.Video{},
@@ -37,11 +32,18 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		&model.Collect{},
 	)
 
+	videoDir := c.VideoDir
+	if videoDir == "" {
+		videoDir = "data"
+	}
+	absDir, _ := filepath.Abs(videoDir)
+	os.MkdirAll(filepath.Join(absDir, "videos"), 0755)
+	os.MkdirAll(filepath.Join(absDir, "covers"), 0755)
+
 	return &ServiceContext{
-		Config: c,
-		DB:     db,
-		Redis:  rdb,
-		MinIO:  mc,
+		Config:   c,
+		DB:       db,
+		VideoDir: absDir,
 	}
 }
 
@@ -56,22 +58,4 @@ func initDB(c config.Config) *gorm.DB {
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetMaxOpenConns(100)
 	return db
-}
-
-func initRedis(c config.Config) *redis.Client {
-	rdb := redis.NewClient(&redis.Options{
-		Addr: c.Redis.Host,
-	})
-	return rdb
-}
-
-func initMinIO(c config.Config) *minio.Client {
-	mc, err := minio.New(c.MinIO.Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(c.MinIO.AccessKey, c.MinIO.SecretKey, ""),
-		Secure: c.MinIO.UseSSL,
-	})
-	if err != nil {
-		panic("failed to connect to MinIO: " + err.Error())
-	}
-	return mc
 }
