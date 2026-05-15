@@ -10,6 +10,7 @@ import (
 	"danmakustream/backend/internal/config"
 	"danmakustream/backend/internal/handler/response"
 	authhandler "danmakustream/backend/internal/handler/v1/auth"
+	danmakuhandler "danmakustream/backend/internal/handler/v1/danmaku"
 	videohandler "danmakustream/backend/internal/handler/v1/video"
 	wshandler "danmakustream/backend/internal/handler/ws"
 	"danmakustream/backend/internal/middleware"
@@ -66,7 +67,7 @@ func main() {
 		v1.POST("/auth/register", authhandler.RegisterHandler(svcCtx))
 		v1.GET("/videos", videohandler.ListHandler(svcCtx))
 		v1.GET("/videos/:id", videohandler.DetailHandler(svcCtx))
-		v1.GET("/danmaku/:videoId", notImplemented)
+		v1.GET("/danmaku/:videoId", danmakuhandler.ListHandler(svcCtx))
 		v1.GET("/users/:id", notImplemented)
 	}
 
@@ -79,7 +80,7 @@ func main() {
 		auth.PUT("/videos/:id", notImplemented)
 		auth.POST("/videos/:id/like", notImplemented)
 		auth.POST("/videos/:id/collect", notImplemented)
-		auth.POST("/danmaku", notImplemented)
+		auth.POST("/danmaku", danmakuhandler.SendHandler(svcCtx))
 		auth.POST("/comments", notImplemented)
 		auth.POST("/users/:id/follow", notImplemented)
 		auth.GET("/live", notImplemented)
@@ -93,7 +94,7 @@ func main() {
 	{
 		admin.GET("/admin/videos", notImplemented)
 		admin.PUT("/admin/videos/:id/status", notImplemented)
-		admin.PUT("/admin/danmaku/:id/block", notImplemented)
+		admin.PUT("/admin/danmaku/:id/block", danmakuhandler.BlockHandler(svcCtx))
 	}
 
 	// WebSocket

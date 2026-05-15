@@ -18,7 +18,8 @@
     "tailwindcss": "^4.3.0",
     "vue": "^3.4.27",
     "vue-router": "^4.3.3",
-    "xgplayer": "^3.0.15"
+    "xgplayer": "^3.0.15",
+    "xgplayer-hls": "^3.0.24"
   },
   "devDependencies": {
     "@types/node": "^20.14.2",

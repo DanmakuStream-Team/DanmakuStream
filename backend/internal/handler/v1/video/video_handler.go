@@ -10,9 +10,9 @@ import (
 	"strconv"
 
 	"danmakustream/backend/internal/handler/response"
+	videologic "danmakustream/backend/internal/logic/video"
 	"danmakustream/backend/internal/middleware"
 	model "danmakustream/backend/internal/model/mysql"
-	videologic "danmakustream/backend/internal/logic/video"
 	"danmakustream/backend/internal/svc"
 
 	"github.com/gin-gonic/gin"
@@ -74,12 +74,13 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		}
 
 		// Create video record first to get ID
+		// TODO: 接入审核后改回 "pending"，由 admin 审核接口（PUT /admin/videos/:id/status）置为 approved
 		video := model.Video{
 			Title:       title,
 			Description: description,
 			Tags:        tags,
 			AuthorID:    userID,
-			Status:      "pending",
+			Status:      "approved",
 		}
 		if err := svcCtx.DB.Create(&video).Error; err != nil {
 			response.Fail(c, http.StatusInternalServerError, "创建视频记录失败")

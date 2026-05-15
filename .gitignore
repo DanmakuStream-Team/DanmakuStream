@@ -31,7 +31,5 @@ Thumbs.db
 
 
 # test
-assets/
-*.mp4
-*.mov
-*.mkv
+/backend/data
+

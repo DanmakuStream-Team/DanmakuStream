@@ -1,18 +1,20 @@
 <template>
-  <div class="video-player">
-    <a-spin :loading="playerLoading" class="player-spin">
-      <div v-if="playerError" class="player-error">
-        <div class="error-title">视频加载失败</div>
-        <div class="error-desc">{{ playerError }}</div>
-        <a-button type="primary" @click="retry">
-          重新加载
-        </a-button>
-      </div>
+  <div class="relative w-full bg-black rounded-xl overflow-hidden aspect-video">
+    <div v-if="playerError" class="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 text-white bg-neutral-900">
+      <div class="text-xl font-semibold">视频加载失败</div>
+      <div class="text-sm text-gray-400">{{ playerError }}</div>
+      <el-button type="primary" @click="retry">重新加载</el-button>
+    </div>
 
+    <div
+      v-loading="playerLoading && !playerError"
+      element-loading-background="rgba(0,0,0,0.4)"
+      class="w-full h-full"
+    >
       <div
         v-show="!playerError"
         ref="playerContainer"
-        class="player-container"
+        class="w-full h-full bg-black"
       />
 
       <DanmakuLayer
@@ -21,15 +23,16 @@
         :current-time="currentTime"
         :enabled="danmakuEnabled"
       />
-    </a-spin>
+    </div>
 
-    <div class="player-toolbar">
-      <a-switch v-model="danmakuEnabled">
-        <template #checked>弹幕开</template>
-        <template #unchecked>弹幕关</template>
-      </a-switch>
-
-      <span class="time-text">
+    <div class="absolute left-3 right-3 bottom-3 z-30 flex items-center gap-3 pointer-events-none">
+      <el-switch
+        v-model="danmakuEnabled"
+        active-text="弹幕开"
+        inactive-text="弹幕关"
+        class="pointer-events-auto"
+      />
+      <span class="text-white text-xs drop-shadow">
         {{ formatDuration(currentTime) }} / {{ formatDuration(duration) }}
       </span>
     </div>
@@ -39,6 +42,7 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import Player from 'xgplayer'
+import HlsPlugin from 'xgplayer-hls'
 import 'xgplayer/dist/index.min.css'
 import DanmakuLayer from '@/components/common/DanmakuLayer.vue'
 import type { Danmaku } from '@/types'
@@ -109,6 +113,8 @@ function initPlayer() {
   playerError.value = ''
 
   try {
+    const isHls = /\.m3u8(\?|$)/i.test(props.url)
+
     player.value = new Player({
       el: playerContainer.value,
       url: props.url,
@@ -121,6 +127,7 @@ function initPlayer() {
       defaultPlaybackRate: 1,
       playsinline: true,
       lang: 'zh-cn',
+      plugins: isHls ? [HlsPlugin] : [],
     })
 
     player.value.once('ready', () => {
@@ -182,114 +189,24 @@ function retry() {
   initPlayer()
 }
 
-function play() {
-  player.value?.play()
-}
-
-function pause() {
-  player.value?.pause()
-}
-
+function play() { player.value?.play() }
+function pause() { player.value?.pause() }
 function seek(time: number) {
   if (!player.value) return
-
   player.value.currentTime = time
   currentTime.value = time
   emit('seek', time)
 }
-
-function getCurrentTime() {
-  return player.value?.currentTime || 0
-}
-
-function getDuration() {
-  return player.value?.duration || duration.value || 0
-}
+function getCurrentTime() { return player.value?.currentTime || 0 }
+function getDuration() { return player.value?.duration || duration.value || 0 }
 
 function formatDuration(seconds: number) {
-  if (!Number.isFinite(seconds) || seconds < 0) {
-    return '00:00'
-  }
-
+  if (!Number.isFinite(seconds) || seconds < 0) return '00:00'
   const total = Math.floor(seconds)
   const minute = Math.floor(total / 60)
   const second = total % 60
-
   return `${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`
 }
 
-defineExpose({
-  play,
-  pause,
-  seek,
-  getCurrentTime,
-  getDuration,
-})
+defineExpose({ play, pause, seek, getCurrentTime, getDuration })
 </script>
-
-<style scoped>
-.video-player {
-  position: relative;
-  width: 100%;
-  background: #000;
-  border-radius: 8px;
-  overflow: hidden;
-  aspect-ratio: 16 / 9;
-}
-
-.player-spin {
-  width: 100%;
-  height: 100%;
-}
-
-.player-container {
-  width: 100%;
-  height: 100%;
-  background: #000;
-}
-
-.player-error {
-  width: 100%;
-  height: 100%;
-  min-height: 360px;
-  color: #fff;
-  background: #111;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-
-.error-title {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.error-desc {
-  color: #c9cdd4;
-  font-size: 14px;
-}
-
-.player-toolbar {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  pointer-events: none;
-}
-
-.player-toolbar :deep(.arco-switch) {
-  pointer-events: auto;
-}
-
-.time-text {
-  color: #fff;
-  font-size: 13px;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
-}
-</style>
