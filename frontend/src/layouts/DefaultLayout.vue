@@ -1,41 +1,69 @@
 <template>
-  <a-layout class="layout">
-    <a-layout-header class="header">
-      <div class="logo" @click="router.push('/')">Danmaku</div>
-      <div class="search-bar">
-        <a-input-search
-          v-model="searchKeyword"
-          placeholder="搜索视频"
-          size="large"
-          @search="handleSearch"
-        />
-      </div>
-      <div class="nav-actions">
-        <template v-if="authStore.isLoggedIn">
-          <a-button @click="router.push('/creator/upload')">投稿</a-button>
-          <a-dropdown>
-            <a-avatar :image-url="authStore.userInfo?.avatar" />
-            <template #content>
-              <a-doption @click="router.push(`/user/${authStore.userInfo?.id}`)">个人主页</a-doption>
-              <a-doption v-if="authStore.isCreator" @click="router.push('/creator')">创作者中心</a-doption>
-              <a-doption v-if="authStore.isAdmin" @click="router.push('/admin')">管理后台</a-doption>
-              <a-doption @click="handleLogout">退出登录</a-doption>
+  <div class="min-h-screen flex flex-col bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm sticky top-0 z-50">
+      <div class="max-w-7xl mx-auto px-4 h-16 flex items-center gap-6">
+        <div
+          class="text-xl font-bold text-blue-600 cursor-pointer whitespace-nowrap select-none"
+          @click="router.push('/')"
+        >
+          Danmaku
+        </div>
+
+        <div class="flex-1 max-w-xl">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="搜索视频"
+            size="large"
+            clearable
+            @keydown.enter="handleSearch(searchKeyword)"
+          >
+            <template #suffix>
+              <el-icon class="cursor-pointer" @click="handleSearch(searchKeyword)">
+                <Search />
+              </el-icon>
             </template>
-          </a-dropdown>
-        </template>
-        <template v-else>
-          <a-button @click="router.push('/login')">登录</a-button>
-          <a-button type="primary" @click="router.push('/register')">注册</a-button>
-        </template>
+          </el-input>
+        </div>
+
+        <div class="ml-auto flex items-center gap-3">
+          <template v-if="authStore.isLoggedIn">
+            <el-button @click="router.push('/creator/upload')">投稿</el-button>
+            <el-dropdown>
+              <el-avatar
+                :src="authStore.userInfo?.avatar"
+                class="cursor-pointer"
+              >
+                {{ authStore.userInfo?.nickname?.slice(0, 1) }}
+              </el-avatar>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="router.push(`/user/${authStore.userInfo?.id}`)">个人主页</el-dropdown-item>
+                  <el-dropdown-item v-if="authStore.isCreator" @click="router.push('/creator')">创作者中心</el-dropdown-item>
+                  <el-dropdown-item v-if="authStore.isAdmin" @click="router.push('/admin')">管理后台</el-dropdown-item>
+                  <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </template>
+          <template v-else>
+            <el-button @click="router.push('/login')">登录</el-button>
+            <el-button type="primary" @click="router.push('/register')">注册</el-button>
+          </template>
+        </div>
       </div>
-    </a-layout-header>
-    <a-layout-content class="content">
+    </header>
+
+    <!-- Content -->
+    <main class="flex-1 p-6">
       <router-view />
-    </a-layout-content>
-    <a-layout-footer class="footer">
-      Danmaku © 2026
-    </a-layout-footer>
-  </a-layout>
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center text-gray-400 py-4 text-sm">
+      Danmaku DanmakuStream © 2026
+    </footer>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -56,26 +84,3 @@ function handleLogout() {
   router.push('/')
 }
 </script>
-
-<style scoped>
-.layout { min-height: 100vh; }
-.header {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 0 24px;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0,0,0,.1);
-}
-.logo {
-  font-size: 20px;
-  font-weight: bold;
-  color: #165dff;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.search-bar { flex: 1; max-width: 480px; }
-.nav-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
-.content { padding: 24px; background: #f5f6fa; }
-.footer { text-align: center; color: #86909c; }
-</style>

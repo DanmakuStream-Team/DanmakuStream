@@ -1,23 +1,29 @@
 <template>
-  <a-card hoverable class="video-card" @click="$emit('click')">
-    <template #cover>
-      <div class="cover-wrapper">
-        <img :src="video.coverUrl" :alt="video.title" class="cover-img" />
-        <span class="duration">{{ formatDuration(video.duration) }}</span>
+  <div
+    class="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+    @click="$emit('click')"
+  >
+    <div class="relative">
+      <img :src="video.coverUrl" :alt="video.title" class="w-full aspect-video object-cover" />
+      <span class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+        {{ formatDuration(video.duration) }}
+      </span>
+    </div>
+    <div class="p-3">
+      <div class="text-sm font-semibold text-gray-900 line-clamp-2 leading-snug mb-2">
+        {{ video.title }}
       </div>
-    </template>
-    <a-card-meta :title="video.title">
-      <template #description>
-        <div class="meta">
-          <span class="author">
-            <a-avatar :size="18" :image-url="video.author.avatar" />
-            {{ video.author.nickname }}
-          </span>
-          <span class="views">{{ formatCount(video.viewCount) }} 次播放</span>
+      <div class="flex items-center justify-between text-xs text-gray-500">
+        <div class="flex items-center gap-1.5 min-w-0">
+          <el-avatar :size="18" :src="video.author.avatar">
+            {{ video.author.nickname?.slice(0, 1) }}
+          </el-avatar>
+          <span class="truncate">{{ video.author.nickname }}</span>
         </div>
-      </template>
-    </a-card-meta>
-  </a-card>
+        <span class="flex-shrink-0">{{ formatCount(video.viewCount) }} 播放</span>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -37,22 +43,3 @@ function formatCount(count: number): string {
   return String(count)
 }
 </script>
-
-<style scoped>
-.video-card { cursor: pointer; }
-.cover-wrapper { position: relative; }
-.cover-img { width: 100%; aspect-ratio: 16/9; object-fit: cover; }
-.duration {
-  position: absolute;
-  bottom: 6px;
-  right: 6px;
-  background: rgba(0,0,0,.7);
-  color: #fff;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-}
-.meta { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
-.author { display: flex; align-items: center; gap: 4px; color: #86909c; font-size: 13px; }
-.views { color: #86909c; font-size: 12px; }
-</style>

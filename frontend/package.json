@@ -9,10 +9,13 @@
     "lint": "eslint . --ext .vue,.ts,.tsx --fix"
   },
   "dependencies": {
-    "@arco-design/web-vue": "^2.55.3",
+    "@element-plus/icons-vue": "^2.3.2",
+    "@tailwindcss/vite": "^4.3.0",
     "@vueuse/core": "^10.9.0",
     "axios": "^1.7.2",
+    "element-plus": "^2.14.0",
     "pinia": "^2.1.7",
+    "tailwindcss": "^4.3.0",
     "vue": "^3.4.27",
     "vue-router": "^4.3.3",
     "xgplayer": "^3.0.15"

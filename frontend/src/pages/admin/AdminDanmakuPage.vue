@@ -1,6 +1,6 @@
 <template>
-  <div class="admin-danmaku">
-    <a-result title="弹幕管理" subtitle="功能开发中..." />
+  <div class="flex items-center justify-center py-20">
+    <el-result title="弹幕管理" sub-title="功能开发中..." />
   </div>
 </template>
 

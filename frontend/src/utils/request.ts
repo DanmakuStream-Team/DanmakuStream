@@ -1,6 +1,6 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosResponse } from 'axios'
-import { Message } from '@arco-design/web-vue'
+import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/store/auth'
 
 interface WrappedResponse<T = unknown> {
@@ -31,7 +31,7 @@ request.interceptors.response.use(
 
     if (isWrappedResponse(body)) {
       if (body.code !== 0) {
-        Message.error(body.message || '请求失败')
+        ElMessage.error(body.message || '请求失败')
         return Promise.reject(new Error(body.message || '请求失败'))
       }
 
@@ -46,7 +46,7 @@ request.interceptors.response.use(
       authStore.logout()
       window.location.href = '/login'
     } else {
-      Message.error(getErrorMessage(error, '网络错误'))
+      ElMessage.error(getErrorMessage(error, '网络错误'))
     }
     return Promise.reject(new Error(getErrorMessage(error, '网络错误')))
   }

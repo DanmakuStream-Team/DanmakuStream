@@ -1,6 +1,6 @@
 <template>
-  <div class="creator-dashboard">
-    <a-result title="创作者中心" subtitle="功能开发中..." />
+  <div class="flex items-center justify-center py-20">
+    <el-result title="创作者中心" sub-title="功能开发中..." />
   </div>
 </template>
 

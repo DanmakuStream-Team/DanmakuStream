@@ -1,6 +1,6 @@
 <template>
-  <div class="admin-dashboard">
-    <a-result title="管理后台" subtitle="功能开发中..." />
+  <div class="flex items-center justify-center py-20">
+    <el-result title="管理后台" sub-title="功能开发中..." />
   </div>
 </template>
 
