@@ -5,6 +5,7 @@ import (
 
 	"danmakustream/backend/internal/handler/response"
 	authlogic "danmakustream/backend/internal/logic/auth"
+	"danmakustream/backend/internal/middleware"
 	"danmakustream/backend/internal/svc"
 
 	"github.com/gin-gonic/gin"
@@ -38,6 +39,23 @@ func RegisterHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		resp, err := l.Register(&req)
 		if err != nil {
 			response.Fail(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		response.Ok(c, resp)
+	}
+}
+
+func MeHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint(middleware.CtxKeyUserID)
+		if userID == 0 {
+			response.Fail(c, http.StatusUnauthorized, "未授权")
+			return
+		}
+		l := authlogic.NewMeLogic(c.Request.Context(), svcCtx)
+		resp, err := l.Me(userID)
+		if err != nil {
+			response.Fail(c, http.StatusNotFound, err.Error())
 			return
 		}
 		response.Ok(c, resp)

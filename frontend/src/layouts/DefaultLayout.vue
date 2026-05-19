@@ -38,9 +38,9 @@
               </el-avatar>
               <template #dropdown>
                 <el-dropdown-menu>
+                  <el-dropdown-item @click="router.push('/creator')">创作者中心</el-dropdown-item>
                   <el-dropdown-item @click="router.push(`/user/${authStore.userInfo?.id}`)">个人主页</el-dropdown-item>
-                  <el-dropdown-item v-if="authStore.isCreator" @click="router.push('/creator')">创作者中心</el-dropdown-item>
-                  <el-dropdown-item v-if="authStore.isAdmin" @click="router.push('/admin')">管理后台</el-dropdown-item>
+                  <el-dropdown-item v-if="authStore.isAdmin" divided @click="router.push('/admin')">管理后台</el-dropdown-item>
                   <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
