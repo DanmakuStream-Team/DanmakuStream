@@ -132,6 +132,43 @@ func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Register
 	return &RegisterLogic{ctx: ctx, svcCtx: svcCtx}
 }
 
+type MeLogic struct {
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewMeLogic(ctx context.Context, svcCtx *svc.ServiceContext) *MeLogic {
+	return &MeLogic{ctx: ctx, svcCtx: svcCtx}
+}
+
+type MeInfo struct {
+	ID          uint   `json:"id"`
+	Username    string `json:"username"`
+	Nickname    string `json:"nickname"`
+	Avatar      string `json:"avatar"`
+	Bio         string `json:"bio"`
+	Role        string `json:"role"`
+	FollowCount int64  `json:"followCount"`
+	FanCount    int64  `json:"fanCount"`
+}
+
+func (l *MeLogic) Me(userID uint) (*MeInfo, error) {
+	var u model.User
+	if err := l.svcCtx.DB.First(&u, userID).Error; err != nil {
+		return nil, errors.New("用户不存在")
+	}
+	return &MeInfo{
+		ID:          u.ID,
+		Username:    u.Username,
+		Nickname:    u.Nickname,
+		Avatar:      u.Avatar,
+		Bio:         u.Bio,
+		Role:        u.Role,
+		FollowCount: u.FollowCount,
+		FanCount:    u.FanCount,
+	}, nil
+}
+
 func generateToken(svcCtx *svc.ServiceContext, user *model.User) (string, error) {
 	expire := svcCtx.Config.Auth.AccessExpire
 	claims := middleware.Claims{

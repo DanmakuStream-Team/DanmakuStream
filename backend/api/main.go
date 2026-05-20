@@ -75,7 +75,7 @@ func main() {
 	auth := v1.Group("")
 	auth.Use(authMW)
 	{
-		auth.GET("/auth/me", notImplemented)
+		auth.GET("/auth/me", authhandler.MeHandler(svcCtx))
 		auth.POST("/videos/upload", videohandler.UploadHandler(svcCtx))
 		auth.PUT("/videos/:id", notImplemented)
 		auth.POST("/videos/:id/like", notImplemented)
