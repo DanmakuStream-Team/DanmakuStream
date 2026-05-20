@@ -108,3 +108,26 @@ function formatCount(n: number) {
   return String(n)
 }
 </script>
+
+<style scoped>
+/* 顶部渐变标题 */
+.creator-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.25);
+}
+
+/* 统计卡片 */
+.stat-card {
+  background: #fff;
+  border: 1px solid #f3f4f6;
+}
+
+/* 功能卡片 */
+.func-card {
+  background: #fff;
+  border: 1px solid #f3f4f6;
+}
+.func-card:hover {
+  border-color: #667eea;
+}
+</style>

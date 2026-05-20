@@ -128,3 +128,18 @@ function formatCount(count?: number) {
   return String(count)
 }
 </script>
+
+<style scoped>
+/* 顶部渐变背景 统一项目色系 */
+.profile-header {
+  background: linear-gradient(135deg, #36d1dc 0%, #5b86e5 100%);
+  box-shadow: 0 4px 16px rgba(54, 209, 220, 0.25);
+}
+.tab-wrap {
+  border: 1px solid #f5f5f5;
+}
+.empty-content {
+  background: #fafbfc;
+  border-radius: 12px;
+}
+</style>
