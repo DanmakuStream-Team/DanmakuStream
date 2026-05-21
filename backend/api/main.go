@@ -14,7 +14,7 @@ import (
 
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/rest"
-)
+)	
 
 var configFile = flag.String("f", "etc/config.yaml", "the config file")
 
@@ -45,7 +45,7 @@ func main() {
 	// ─── Auth-required routes ─────────────────────────────────────────
 	server.AddRoutes(rest.WithMiddlewares([]rest.Middleware{authMW},
 		[]rest.Route{
-			{Method: http.MethodGet, Path: "/api/v1/auth/me", Handler: getMeHandler(ctx)},
+			{Method: http.MethodGet, Path: "/api/v1/auth/me", Handler: authhandler.MeHandler(ctx)},
 			{Method: http.MethodPost, Path: "/api/v1/videos/upload", Handler: videoUploadHandler(ctx)},
 			{Method: http.MethodPut, Path: "/api/v1/videos/:id", Handler: videoUpdateHandler(ctx)},
 			{Method: http.MethodPost, Path: "/api/v1/videos/:id/like", Handler: videoLikeHandler(ctx)},

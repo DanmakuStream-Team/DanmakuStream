@@ -26,6 +26,8 @@ type LoginResp struct {
 	UserInfo *model.UserInfo `json:"userInfo"`
 }
 
+
+
 func (l *LoginLogic) Login(req *LoginReq) (*LoginResp, error) {
 	var user model.User
 	if err := l.svcCtx.DB.Where("username = ?", req.Username).First(&user).Error; err != nil {
@@ -140,4 +142,34 @@ type RegisterReq = struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Nickname string `json:"nickname"`
+}
+
+
+type MeLogic struct {
+    ctx    context.Context
+    svcCtx *svc.ServiceContext
+}
+
+func NewMeLogic(ctx context.Context, svcCtx *svc.ServiceContext) *MeLogic {
+    return &MeLogic{ctx: ctx, svcCtx: svcCtx}
+}
+
+func (l *MeLogic) Me() (*model.UserInfo, error) {
+    userID, ok := l.ctx.Value(middleware.CtxKeyUserID).(uint)
+    if !ok || userID == 0 {
+        return nil, errors.New("未登录")
+    }
+
+    var user model.User
+    if err := l.svcCtx.DB.First(&user, userID).Error; err != nil {
+        return nil, err
+    }
+
+    return &model.UserInfo{
+        ID:       user.ID,
+        Username: user.Username,
+        Nickname: user.Nickname,
+        Avatar:   user.Avatar,
+        Role:     user.Role,
+    }, nil
 }

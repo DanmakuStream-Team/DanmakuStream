@@ -13,8 +13,6 @@ require (
 	gorm.io/gorm v1.31.1
 )
 
-require github.com/mattn/go-sqlite3 v1.14.44 // indirect
-
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -66,5 +64,4 @@ require (
 	google.golang.org/grpc v1.65.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gorm.io/driver/sqlite v1.6.0
 )
