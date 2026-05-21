@@ -34,7 +34,7 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'creator',
         component: () => import('@/layouts/CreatorLayout.vue'),
-        meta: { requiresAuth: true, role: 'creator' },
+        meta: { requiresAuth: true },
         children: [
           {
             path: '',

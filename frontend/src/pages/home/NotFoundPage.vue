@@ -1,10 +1,10 @@
 <template>
-  <div class="not-found">
-    <a-result status="404" title="404" subtitle="页面不存在">
+  <div class="min-h-[60vh] flex items-center justify-center">
+    <el-result status="404" title="404" sub-title="页面不存在">
       <template #extra>
-        <a-button type="primary" @click="router.push('/')">返回首页</a-button>
+        <el-button type="primary" @click="router.push('/')">返回首页</el-button>
       </template>
-    </a-result>
+    </el-result>
   </div>
 </template>
 
@@ -12,7 +12,3 @@
 import { useRouter } from 'vue-router'
 const router = useRouter()
 </script>
-
-<style scoped>
-.not-found { min-height: 60vh; display: flex; align-items: center; justify-content: center; }
-</style>

@@ -2,10 +2,11 @@ package videologic
 
 import (
 	"context"
-	"time"
 
 	model "danmakustream/backend/internal/model/mysql"
 	"danmakustream/backend/internal/svc"
+
+	"gorm.io/gorm"
 )
 
 type ListVideoLogic struct {
@@ -20,8 +21,8 @@ func NewListVideoLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ListVid
 type VideoListReq struct {
 	Page     int    `form:"page"`
 	PageSize int    `form:"pageSize"`
-	Keyword  string `form:"keyword,optional"`
-	Tag      string `form:"tag,optional"`
+	Keyword  string `form:"keyword"`
+	Tag      string `form:"tag"`
 }
 
 type PageResult[T any] struct {
@@ -43,7 +44,7 @@ type VideoInfo struct {
 	CollectCount int64           `json:"collectCount"`
 	DanmakuCount int64           `json:"danmakuCount"`
 	Tags         string          `json:"tags"`
-	CreatedAt    time.Time       `json:"createdAt"`
+	CreatedAt    string          `json:"createdAt"`
 	Author       *model.UserInfo `json:"author"`
 }
 
@@ -62,9 +63,11 @@ func (l *ListVideoLogic) List(req *VideoListReq) (*PageResult[VideoInfo], error)
 		Preload("Author").
 		Where("status = ?", "approved")
 
+	var likeExpr, prefixExpr string
 	if req.Keyword != "" {
-		like := "%" + req.Keyword + "%"
-		db = db.Where("title LIKE ? OR description LIKE ?", like, like)
+		likeExpr = "%" + req.Keyword + "%"
+		prefixExpr = req.Keyword + "%"
+		db = db.Where("title LIKE ? OR description LIKE ?", likeExpr, likeExpr)
 	}
 
 	if req.Tag != "" {
@@ -76,11 +79,28 @@ func (l *ListVideoLogic) List(req *VideoListReq) (*PageResult[VideoInfo], error)
 		return nil, err
 	}
 
+	const hotScoreExpr = "(like_count * 5 + collect_count * 3 + danmaku_count * 2 + view_count) " +
+		"/ POW(GREATEST(TIMESTAMPDIFF(HOUR, created_at, NOW()), 0) + 2, 1.2)"
+
+	var orderExpr string
+	if req.Keyword != "" {
+		orderExpr = "CASE " +
+			"WHEN title = ? THEN 0 " +
+			"WHEN title LIKE ? THEN 1 " +
+			"WHEN title LIKE ? THEN 2 " +
+			"ELSE 3 END ASC, " + hotScoreExpr + " DESC"
+	} else {
+		orderExpr = hotScoreExpr + " DESC"
+	}
+
 	var videos []model.Video
-	if err := db.Order("created_at DESC").
-		Offset((req.Page - 1) * req.PageSize).
-		Limit(req.PageSize).
-		Find(&videos).Error; err != nil {
+	query := db.Offset((req.Page - 1) * req.PageSize).Limit(req.PageSize)
+	if req.Keyword != "" {
+		query = query.Order(gorm.Expr(orderExpr, req.Keyword, prefixExpr, likeExpr))
+	} else {
+		query = query.Order(orderExpr)
+	}
+	if err := query.Find(&videos).Error; err != nil {
 		return nil, err
 	}
 
@@ -98,7 +118,7 @@ func (l *ListVideoLogic) List(req *VideoListReq) (*PageResult[VideoInfo], error)
 			CollectCount: video.CollectCount,
 			DanmakuCount: video.DanmakuCount,
 			Tags:         video.Tags,
-			CreatedAt:    video.CreatedAt,
+			CreatedAt:    video.CreatedAt.Format("2006-01-02 15:04:05"),
 			Author: &model.UserInfo{
 				ID:       video.Author.ID,
 				Username: video.Author.Username,

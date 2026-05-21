@@ -1,12 +1,11 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 	"strings"
 
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
 type Claims struct {
@@ -16,64 +15,51 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// AuthMiddleware validates JWT and injects user claims into context.
-func AuthMiddleware(secret string) func(http.HandlerFunc) http.HandlerFunc {
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-				httpx.Error(w, ErrUnauthorized)
-				return
-			}
+const (
+	CtxKeyUserID   = "userId"
+	CtxKeyUsername = "username"
+	CtxKeyRole     = "role"
+)
 
-			tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
-			claims := &Claims{}
-			token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
-				return []byte(secret), nil
+func AuthMiddleware(secret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"code":    401,
+				"message": "未授权，请先登录",
 			})
-			if err != nil || !token.Valid {
-				httpx.Error(w, ErrUnauthorized)
-				return
-			}
-
-			ctx := context.WithValue(r.Context(), CtxKeyUserID, claims.UserID)
-			ctx = context.WithValue(ctx, CtxKeyUsername, claims.Username)
-			ctx = context.WithValue(ctx, CtxKeyRole, claims.Role)
-			next(w, r.WithContext(ctx))
-		}
-	}
-}
-
-// AdminMiddleware ensures the user has admin role.
-func AdminMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		role, _ := r.Context().Value(CtxKeyRole).(string)
-		if role != "admin" {
-			httpx.Error(w, ErrForbidden)
 			return
 		}
-		next(w, r)
+
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		claims := &Claims{}
+		token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
+			return []byte(secret), nil
+		})
+		if err != nil || !token.Valid {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"code":    401,
+				"message": "未授权，请先登录",
+			})
+			return
+		}
+
+		c.Set(CtxKeyUserID, claims.UserID)
+		c.Set(CtxKeyUsername, claims.Username)
+		c.Set(CtxKeyRole, claims.Role)
+		c.Next()
 	}
 }
 
-// Context keys
-type ctxKey string
-
-const (
-	CtxKeyUserID   ctxKey = "userId"
-	CtxKeyUsername ctxKey = "username"
-	CtxKeyRole     ctxKey = "role"
-)
-
-// Sentinel errors
-var (
-	ErrUnauthorized = httpError{code: 401, message: "未授权，请先登录"}
-	ErrForbidden    = httpError{code: 403, message: "权限不足"}
-)
-
-type httpError struct {
-	code    int
-	message string
+func AdminMiddleware(c *gin.Context) {
+	role, _ := c.Get(CtxKeyRole)
+	if role != "admin" {
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+			"code":    403,
+			"message": "权限不足",
+		})
+		return
+	}
+	c.Next()
 }
-
-func (e httpError) Error() string { return e.message }

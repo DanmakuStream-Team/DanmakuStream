@@ -10,7 +10,7 @@ type User struct {
 	gorm.Model
 	Username    string `gorm:"uniqueIndex;size:50;not null"`
 	Password    string `gorm:"not null"` // bcrypt hash
-	Nickname    string `gorm:"size:50"`
+	Nickname    string `gorm:"uniqueIndex;size:50;not null"`
 	Avatar      string `gorm:"size:500"`
 	Bio         string `gorm:"size:500"`
 	Role        string `gorm:"size:20;default:user"` // user | creator | admin

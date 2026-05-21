@@ -1,17 +1,22 @@
 import request from '@/utils/request'
-import type { ApiResponse, UserInfo } from '@/types'
+import type { UserInfo } from '@/types'
+
+export interface AuthResponse {
+  token: string
+  userInfo: UserInfo
+}
 
 export const authApi = {
-  login(data: { username: string; password: string }) {
-    return request.post<ApiResponse<{ token: string }>>('/auth/login', data)
+  login(data: { nickname: string; password: string }) {
+    return request.post<AuthResponse>('/auth/login', data)
   },
-  register(data: { username: string; password: string; nickname: string }) {
-    return request.post<ApiResponse>('/auth/register', data)
+  register(data: { password: string; nickname: string }) {
+    return request.post<AuthResponse>('/auth/register', data)
   },
   getUserInfo() {
-    return request.get<ApiResponse<UserInfo>>('/auth/me')
+    return request.get<UserInfo>('/auth/me')
   },
   logout() {
-    return request.post<ApiResponse>('/auth/logout')
+    return request.post<void>('/auth/logout')
   },
 }

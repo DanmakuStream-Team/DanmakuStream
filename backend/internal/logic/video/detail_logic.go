@@ -6,6 +6,7 @@ import (
 
 	model "danmakustream/backend/internal/model/mysql"
 	"danmakustream/backend/internal/svc"
+
 	"gorm.io/gorm"
 )
 
@@ -19,7 +20,7 @@ func NewDetailVideoLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Detai
 }
 
 type VideoDetailReq struct {
-	ID uint `path:"id"`
+	ID uint `uri:"id"`
 }
 
 type VideoDetailInfo struct {
@@ -65,7 +66,7 @@ func (l *DetailVideoLogic) Detail(req *VideoDetailReq) (*VideoDetailInfo, error)
 			CollectCount: video.CollectCount,
 			DanmakuCount: video.DanmakuCount,
 			Tags:         video.Tags,
-			CreatedAt:    video.CreatedAt,
+			CreatedAt:    video.CreatedAt.Format("2006-01-02 15:04:05"),
 			Author: &model.UserInfo{
 				ID:       video.Author.ID,
 				Username: video.Author.Username,

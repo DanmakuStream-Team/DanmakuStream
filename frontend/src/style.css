@@ -1,0 +1,5 @@
+@import "tailwindcss";
+
+:root {
+  --el-color-primary: #165dff;
+}

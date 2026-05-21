@@ -17,6 +17,9 @@ ai-service/.env
 # IDE
 .vscode/
 .idea/
+.agents/
+.claude/
+.codex/
 
 # OS
 .DS_Store
@@ -26,8 +29,7 @@ Thumbs.db
 *.env
 !*.env.example
 
+
 # test
-assets/
-*.mp4
-*.mov
-*.mkv
+/backend/data
+

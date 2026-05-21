@@ -1,150 +1,300 @@
 <template>
-  <div class="video-detail">
-    <a-spin :loading="loading">
-      <div class="main-content" v-if="video">
-        <!-- 播放器区域 -->
-        <div class="player-wrapper">
-          <div ref="playerContainer" class="player-container" />
-        </div>
+  <div class="max-w-5xl mx-auto pb-20">
+    <div v-loading="loading">
+      <div v-if="video">
+        <!-- Player -->
+        <VideoPlayer
+          ref="videoPlayerRef"
+          :url="video.videoUrl"
+          :poster="video.coverUrl"
+          :danmakus="danmakuList"
+          @timeupdate="handleTimeUpdate"
+          @error="handlePlayerError"
+        />
 
-        <!-- 视频信息 -->
-        <div class="video-info">
-          <h1>{{ video.title }}</h1>
-          <div class="meta">
+        <!-- Video info -->
+        <div class="mt-4">
+          <h1 class="text-2xl font-bold text-gray-900">{{ video.title }}</h1>
+          <div class="flex flex-wrap gap-4 text-sm text-gray-500 mt-2">
             <span>{{ video.viewCount }} 次播放</span>
-            <span>{{ video.createdAt }}</span>
+            <span>{{ formatTime(video.createdAt) }}</span>
           </div>
-          <div class="actions">
-            <a-button :type="liked ? 'primary' : 'outline'" @click="toggleLike">
-              <template #icon><icon-thumb-up /></template>
+
+          <div class="flex gap-3 mt-3">
+            <el-button
+              :type="liked ? 'primary' : 'default'"
+              :icon="liked ? 'StarFilled' : 'Star'"
+              @click="toggleLike"
+            >
+              <el-icon><Pointer /></el-icon>
               {{ video.likeCount }}
-            </a-button>
-            <a-button :type="collected ? 'primary' : 'outline'" @click="toggleCollect">
-              <template #icon><icon-star /></template>
+            </el-button>
+            <el-button
+              :type="collected ? 'primary' : 'default'"
+              @click="toggleCollect"
+            >
+              <el-icon><Star /></el-icon>
               {{ video.collectCount }}
-            </a-button>
+            </el-button>
           </div>
-          <div class="tags">
-            <a-tag v-for="tag in video.tags" :key="tag">{{ tag }}</a-tag>
+
+          <div class="flex flex-wrap gap-2 mt-3">
+            <el-tag v-for="tag in normalizedTags" :key="tag" size="small">{{ tag }}</el-tag>
           </div>
-          <div class="description">{{ video.description }}</div>
+
+          <p class="text-gray-600 leading-relaxed mt-3 whitespace-pre-wrap">
+            {{ video.description || '暂无简介' }}
+          </p>
         </div>
 
-        <!-- 评论区 -->
-        <div class="comment-section">
-          <h3>评论 ({{ comments.length }})</h3>
-          <div class="comment-input" v-if="authStore.isLoggedIn">
-            <a-textarea v-model="commentInput" placeholder="发表你的看法..." :max-length="500" show-word-limit />
-            <a-button type="primary" @click="submitComment">发表评论</a-button>
+        <!-- Comments -->
+        <div class="mt-8 pt-6 border-t border-gray-200">
+          <div class="flex items-center gap-3 mb-5">
+            <h3 class="text-xl font-bold text-gray-800">评论</h3>
+            <span class="text-sm text-gray-500">{{ commentCount }} 条</span>
           </div>
-          <div class="comment-list">
-            <CommentItem v-for="c in comments" :key="c.id" :comment="c" />
+
+          <!-- Input -->
+          <div v-if="authStore.isLoggedIn" class="mb-6 space-y-2">
+            <div v-if="replyTarget" class="flex items-center justify-between bg-gray-100 rounded-lg px-3 py-2 text-sm text-gray-600">
+              <span>正在回复：{{ getCommentAuthorName(replyTarget) }}</span>
+              <el-button type="text" size="small" @click="cancelReply">取消回复</el-button>
+            </div>
+            <el-input
+              v-if="replyTarget"
+              v-model="replyInput"
+              :placeholder="`回复 ${getCommentAuthorName(replyTarget)}...`"
+              type="textarea"
+              :maxlength="500"
+              show-word-limit
+              :autosize="{ minRows: 2, maxRows: 5 }"
+            />
+            <el-input
+              v-else
+              v-model="commentInput"
+              placeholder="发表你的看法..."
+              type="textarea"
+              :maxlength="500"
+              show-word-limit
+              :autosize="{ minRows: 2, maxRows: 5 }"
+            />
+            <div class="flex justify-end">
+              <el-button
+                type="primary"
+                :loading="commentStore.submitting"
+                @click="submitComment(replyTarget?.id)"
+              >
+                {{ replyTarget ? '发送回复' : '发表评论' }}
+              </el-button>
+            </div>
+          </div>
+
+          <el-alert v-else title="登录后可以发表评论" type="info" show-icon :closable="false" class="mb-6" />
+
+          <!-- List -->
+          <div v-loading="commentStore.loading" class="space-y-5">
+            <el-empty v-if="commentStore.comments.length === 0" description="暂无评论" />
+            <CommentItem
+              v-for="comment in commentStore.comments"
+              :key="comment.id"
+              :comment="comment"
+              @reply="startReply"
+            />
           </div>
         </div>
       </div>
-    </a-spin>
 
-    <!-- 弹幕控制栏 -->
-    <div class="danmaku-control" v-if="video">
-      <a-input
+      <el-empty v-else-if="!loading" description="视频不存在" class="py-20" />
+    </div>
+
+    <!-- Danmaku bar -->
+    <div v-if="video" class="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 px-4 py-3 flex gap-2 items-center">
+      <el-input
         v-model="danmakuInput"
         placeholder="发送弹幕..."
-        :max-length="100"
+        :maxlength="100"
+        class="flex-1"
         @keydown.enter="sendDanmaku"
       />
-      <a-color-picker v-model="danmakuColor" size="small" />
-      <a-button type="primary" @click="sendDanmaku">发送</a-button>
+      <el-color-picker v-model="danmakuColor" size="small" />
+      <el-button type="primary" @click="sendDanmaku">发送</el-button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useVideoStore } from '@/store/video'
+import { useCommentStore } from '@/store/comment'
 import { danmakuApi } from '@/api/danmaku'
 import { videoApi } from '@/api/video'
 import CommentItem from '@/components/common/CommentItem.vue'
-import type { Comment, Danmaku } from '@/types'
+import VideoPlayer from '@/components/common/VideoPlayer.vue'
+import type { ApiResponse, Comment, Danmaku } from '@/types'
+
+type VideoPlayerExpose = {
+  play: () => void
+  pause: () => void
+  seek: (time: number) => void
+  getCurrentTime: () => number
+  getDuration: () => number
+}
 
 const route = useRoute()
 const authStore = useAuthStore()
 const videoStore = useVideoStore()
+const commentStore = useCommentStore()
 
-const playerContainer = ref<HTMLElement>()
+const videoPlayerRef = ref<VideoPlayerExpose>()
 const loading = ref(true)
 const liked = ref(false)
 const collected = ref(false)
-const comments = ref<Comment[]>([])
 const commentInput = ref('')
+const replyInput = ref('')
+const replyTarget = ref<Comment | null>(null)
 const danmakuInput = ref('')
 const danmakuColor = ref('#FFFFFF')
 const danmakuList = ref<Danmaku[]>([])
+const currentTime = ref(0)
 
-const video = ref(videoStore.currentVideo)
+const video = computed(() => videoStore.currentVideo)
 
-onMounted(async () => {
-  const id = Number(route.params.id)
-  await videoStore.fetchVideoDetail(id)
-  video.value = videoStore.currentVideo
-  const res = await danmakuApi.getDanmakuList(id)
-  danmakuList.value = res.data.data
-  loading.value = false
-  // 初始化播放器（xgplayer）
-  // initPlayer()
+const normalizedTags = computed(() => {
+  const tags = video.value?.tags as unknown
+  if (!tags) return []
+  if (Array.isArray(tags)) return tags
+  return String(tags).split(',').map(tag => tag.trim()).filter(Boolean)
 })
 
+const commentCount = computed(() => commentStore.countComments())
+
+onMounted(async () => {
+  const videoId = Number(route.params.id)
+  if (!Number.isFinite(videoId) || videoId <= 0) {
+    ElMessage.error('视频 ID 不合法')
+    loading.value = false
+    return
+  }
+  try {
+    loading.value = true
+    await videoStore.fetchVideoDetail(videoId)
+    await Promise.allSettled([
+      commentStore.fetchComments(videoId),
+      fetchDanmakuList(videoId),
+    ])
+  } catch {
+    ElMessage.error('视频详情加载失败')
+  } finally {
+    loading.value = false
+  }
+})
+
+onUnmounted(() => {
+  commentStore.clearComments()
+})
+
+async function fetchDanmakuList(videoId: number) {
+  try {
+    const res = await danmakuApi.getDanmakuList(videoId)
+    danmakuList.value = normalizeResponseData<Danmaku[]>(res, [])
+  } catch {
+    danmakuList.value = []
+  }
+}
+
+async function submitComment(parentId?: number) {
+  if (!authStore.isLoggedIn) { ElMessage.warning('请先登录'); return }
+  if (!video.value) return
+  const content = parentId ? replyInput.value.trim() : commentInput.value.trim()
+  if (!content) { ElMessage.warning('评论内容不能为空'); return }
+  try {
+    await commentStore.createComment(video.value.id, content, parentId)
+    ElMessage.success(parentId ? '回复成功' : '评论成功')
+    if (parentId) { replyInput.value = ''; replyTarget.value = null }
+    else { commentInput.value = '' }
+  } catch {
+    ElMessage.error(parentId ? '回复失败' : '评论失败')
+  }
+}
+
+function startReply(comment: Comment) {
+  if (!authStore.isLoggedIn) { ElMessage.warning('请先登录'); return }
+  replyTarget.value = comment
+  replyInput.value = ''
+}
+
+function cancelReply() {
+  replyTarget.value = null
+  replyInput.value = ''
+}
+
 async function toggleLike() {
-  if (!authStore.isLoggedIn) return
-  await videoApi.likeVideo(video.value!.id)
-  liked.value = !liked.value
+  if (!authStore.isLoggedIn) { ElMessage.warning('请先登录'); return }
+  if (!video.value) return
+  try {
+    await videoApi.likeVideo(video.value.id)
+    liked.value = !liked.value
+  } catch { ElMessage.error('操作失败') }
 }
 
 async function toggleCollect() {
-  if (!authStore.isLoggedIn) return
-  await videoApi.collectVideo(video.value!.id)
-  collected.value = !collected.value
-}
-
-async function submitComment() {
-  if (!commentInput.value.trim()) return
-  // TODO: call comment API
-  commentInput.value = ''
+  if (!authStore.isLoggedIn) { ElMessage.warning('请先登录'); return }
+  if (!video.value) return
+  try {
+    await videoApi.collectVideo(video.value.id)
+    collected.value = !collected.value
+  } catch { ElMessage.error('操作失败') }
 }
 
 async function sendDanmaku() {
-  if (!danmakuInput.value.trim() || !authStore.isLoggedIn) return
-  await danmakuApi.sendDanmaku({
-    videoId: video.value!.id,
-    content: danmakuInput.value,
-    time: 0, // 当前播放时间
-    color: danmakuColor.value,
-    fontSize: 'medium',
-    type: 'scroll',
-  })
-  danmakuInput.value = ''
+  const content = danmakuInput.value.trim()
+  if (!content) return
+  if (!authStore.isLoggedIn) { ElMessage.warning('请先登录'); return }
+  if (!video.value) return
+  const sendTime = videoPlayerRef.value?.getCurrentTime() || currentTime.value || 0
+  try {
+    await danmakuApi.sendDanmaku({
+      videoId: video.value.id,
+      content,
+      time: sendTime,
+      color: danmakuColor.value,
+      fontSize: 'medium',
+      type: 'scroll',
+    })
+    danmakuList.value.push({
+      id: Date.now(),
+      videoId: video.value.id,
+      userId: authStore.userInfo?.id || 0,
+      content,
+      time: sendTime,
+      color: danmakuColor.value,
+      fontSize: 'medium',
+      type: 'scroll',
+      createdAt: new Date().toISOString(),
+    })
+    danmakuInput.value = ''
+  } catch { ElMessage.error('弹幕发送失败') }
+}
+
+function handleTimeUpdate(time: number) { currentTime.value = time }
+function handlePlayerError(message: string) { ElMessage.error(message) }
+function getCommentAuthorName(comment: Comment) {
+  return comment.author?.nickname || comment.author?.username || '匿名用户'
+}
+function formatTime(time?: string) {
+  if (!time) return ''
+  const date = new Date(time)
+  if (Number.isNaN(date.getTime())) return time
+  return date.toLocaleString()
+}
+function normalizeResponseData<T>(res: unknown, fallback: T): T {
+  const response = res as { data?: ApiResponse<T> | T }
+  if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+    return response.data.data ?? fallback
+  }
+  return (response.data as T) ?? fallback
 }
 </script>
-
-<style scoped>
-.video-detail { max-width: 1200px; margin: 0 auto; }
-.player-wrapper { background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 16/9; }
-.player-container { width: 100%; height: 100%; }
-.video-info { padding: 16px 0; }
-.meta { color: #86909c; margin: 8px 0; display: flex; gap: 16px; }
-.actions { display: flex; gap: 12px; margin: 12px 0; }
-.tags { display: flex; gap: 8px; margin: 12px 0; }
-.comment-section { margin-top: 24px; }
-.comment-input { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-.danmaku-control {
-  position: sticky;
-  bottom: 0;
-  background: #fff;
-  padding: 12px;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  box-shadow: 0 -2px 8px rgba(0,0,0,.1);
-}
-</style>

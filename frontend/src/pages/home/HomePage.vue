@@ -1,20 +1,26 @@
 <template>
-  <div class="home-page">
-    <div class="banner">
-      <h2>发现优质视频内容</h2>
+  <div class="max-w-7xl mx-auto">
+    <!-- Banner -->
+    <div class="py-10 text-center">
+      <h2 class="text-3xl font-bold text-gray-800">发现优质视频内容</h2>
+      <p class="text-gray-500 mt-2">探索海量弹幕视频，尽情享受</p>
     </div>
-    <div class="tag-filter">
-      <a-tag
+
+    <!-- Tag filter -->
+    <div class="flex flex-wrap gap-2 mb-6">
+      <el-check-tag
         v-for="tag in popularTags"
         :key="tag"
-        :color="selectedTag === tag ? 'arcoblue' : ''"
-        checkable
         :checked="selectedTag === tag"
-        @check="selectTag(tag)"
-      >{{ tag }}</a-tag>
+        @change="selectTag(tag)"
+      >
+        {{ tag }}
+      </el-check-tag>
     </div>
-    <a-spin :loading="videoStore.loading">
-      <div class="video-grid">
+
+    <!-- Video grid -->
+    <div v-loading="videoStore.loading">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
         <VideoCard
           v-for="video in videoStore.videoList"
           :key="video.id"
@@ -22,13 +28,18 @@
           @click="router.push(`/video/${video.id}`)"
         />
       </div>
-    </a-spin>
-    <div class="pagination">
-      <a-pagination
-        v-model:current="page"
+      <el-empty v-if="!videoStore.loading && videoStore.videoList.length === 0" description="暂无视频" class="py-20" />
+    </div>
+
+    <!-- Pagination -->
+    <div class="flex justify-center mt-10">
+      <el-pagination
+        v-model:current-page="page"
         :total="videoStore.total"
         :page-size="pageSize"
-        @change="fetchVideos"
+        layout="prev, pager, next"
+        background
+        @current-change="fetchVideos"
       />
     </div>
   </div>
@@ -45,7 +56,7 @@ const route = useRoute()
 const videoStore = useVideoStore()
 
 const page = ref(1)
-const pageSize = 24
+const pageSize = 20
 const selectedTag = ref('')
 const popularTags = ['全部', '游戏', '科技', '生活', '美食', '音乐', '动漫', '知识']
 
@@ -67,15 +78,3 @@ function fetchVideos() {
 onMounted(fetchVideos)
 watch(() => route.query.keyword, fetchVideos)
 </script>
-
-<style scoped>
-.home-page { max-width: 1400px; margin: 0 auto; }
-.banner { padding: 32px 0 16px; text-align: center; }
-.tag-filter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
-.video-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 20px;
-}
-.pagination { display: flex; justify-content: center; margin-top: 32px; }
-</style>

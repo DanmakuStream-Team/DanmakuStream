@@ -11,8 +11,9 @@ Danmaku 是一个面向内容创作者与普通用户的综合视频社区，支
 | 层级 | 技术 |
 |---|---|
 | 前端 | Vue 3 · TypeScript · Arco Design · xgplayer · Pinia |
-| 后端 | Go · Go-Zero · GORM · MySQL · Redis · MinIO |
+| 后端 | Go · Gin · GORM · MySQL |
 | AI 服务 | Python · FastAPI · LangChain · DeepSeek |
+| 视频处理 | FFmpeg · HLS 分片 |
 | 部署 | Docker Compose · Nginx |
 
 ## 目录结构
@@ -20,7 +21,7 @@ Danmaku 是一个面向内容创作者与普通用户的综合视频社区，支
 ```
 DanmakuStream/
 ├── frontend/          # Vue 3 前端应用
-├── backend/           # Go-Zero API 服务
+├── backend/           # Gin API 服务
 ├── ai-service/        # Python FastAPI AI 微服务
 ├── scripts/           # 数据库初始化脚本
 ├── docker-compose.yml
@@ -35,6 +36,7 @@ DanmakuStream/
 - Go 1.22+（本地开发）
 - Node.js 20+（本地开发）
 - Python 3.12+（本地开发）
+- FFmpeg（本地开发需要，用于视频 HLS 转码）
 
 ### 一键启动（Docker）
 
@@ -50,14 +52,13 @@ docker compose up -d
 # 前端：http://localhost
 # 后端 API：http://localhost:8080
 # AI 服务：http://localhost:8000
-# MinIO 控制台：http://localhost:9001 (minioadmin / minioadmin)
 ```
 
 ### 本地开发启动
 
 ```bash
-# 启动基础设施（MySQL / Redis / MinIO）
-docker compose up mysql redis minio -d
+# 启动基础设施（MySQL）
+docker compose up mysql -d
 
 # 后端
 cd backend
@@ -87,7 +88,7 @@ uvicorn app.main:app --reload --port 8000
 - 评论区互动
 
 ### 创作者端
-- 视频上传（分片）· 封面设置 · 元数据编辑
+- 视频上传（HLS 分片转码）· 封面设置 · 元数据编辑
 - 开启 / 关闭直播间
 
 ### 管理员端
@@ -106,7 +107,7 @@ uvicorn app.main:app --reload --port 8000
 | POST | `/api/v1/auth/login` | 登录，返回 JWT | 公开 |
 | GET | `/api/v1/videos` | 视频列表 | 公开 |
 | GET | `/api/v1/videos/:id` | 视频详情 | 公开 |
-| POST | `/api/v1/videos/upload` | 上传视频 | 登录 |
+| POST | `/api/v1/videos/upload` | 上传视频（HLS 转码） | 登录 |
 | GET | `/api/v1/danmaku/:videoId` | 拉取弹幕 | 公开 |
 | POST | `/api/v1/danmaku` | 发送弹幕 | 登录 |
 | POST | `/api/v1/live` | 开启直播间 | 登录 |
@@ -120,12 +121,12 @@ uvicorn app.main:app --reload --port 8000
 
 **客户端发送：**
 ```json
-{ "type": "danmaku", "content": "弹幕内容", "color": "#FFFFFF" }
+{ "type": "danmaku", "content": "弹幕内容", "color": "#FFFFFF", "time": 0 }
 ```
 
 **服务端推送（弹幕）：**
 ```json
-{ "type": "danmaku", "payload": { "userId": 1, "content": "...", "color": "#FFFFFF", "time": 1718000000 } }
+{ "type": "danmaku", "payload": { "userId": 1, "content": "...", "color": "#FFFFFF", "time": 0 } }
 ```
 
 **服务端推送（在线人数）：**

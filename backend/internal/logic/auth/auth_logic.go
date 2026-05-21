@@ -3,11 +3,14 @@ package authlogic
 import (
 	"context"
 	"errors"
+	"strconv"
+	"strings"
 	"time"
 
 	"danmakustream/backend/internal/middleware"
 	model "danmakustream/backend/internal/model/mysql"
 	"danmakustream/backend/internal/svc"
+
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -21,6 +24,17 @@ func NewLoginLogic(ctx context.Context, svcCtx *svc.ServiceContext) *LoginLogic 
 	return &LoginLogic{ctx: ctx, svcCtx: svcCtx}
 }
 
+type LoginReq struct {
+	Nickname string `json:"nickname"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type RegisterReq struct {
+	Password string `json:"password"`
+	Nickname string `json:"nickname"`
+}
+
 type LoginResp struct {
 	Token    string          `json:"token"`
 	UserInfo *model.UserInfo `json:"userInfo"`
@@ -29,16 +43,24 @@ type LoginResp struct {
 
 
 func (l *LoginLogic) Login(req *LoginReq) (*LoginResp, error) {
+	nickname := strings.TrimSpace(req.Nickname)
+	if nickname == "" {
+		nickname = strings.TrimSpace(req.Username)
+	}
+	if nickname == "" {
+		return nil, errors.New("昵称或密码错误")
+	}
+
 	var user model.User
-	if err := l.svcCtx.DB.Where("username = ?", req.Username).First(&user).Error; err != nil {
-		return nil, errors.New("用户名或密码错误")
+	if err := l.svcCtx.DB.Where("nickname = ?", nickname).First(&user).Error; err != nil {
+		return nil, errors.New("昵称或密码错误")
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		return nil, errors.New("用户名或密码错误")
+		return nil, errors.New("昵称或密码错误")
 	}
 
-	token, err := l.generateToken(&user)
+	token, err := generateToken(l.svcCtx, &user)
 	if err != nil {
 		return nil, err
 	}
@@ -55,36 +77,16 @@ func (l *LoginLogic) Login(req *LoginReq) (*LoginResp, error) {
 	}, nil
 }
 
-func (l *LoginLogic) generateToken(user *model.User) (string, error) {
-	expire := l.svcCtx.Config.Auth.AccessExpire
-	claims := middleware.Claims{
-		UserID:   user.ID,
-		Username: user.Username,
-		Role:     user.Role,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(expire) * time.Second)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(l.svcCtx.Config.Auth.AccessSecret))
-}
-
-type RegisterLogic struct {
-	ctx    context.Context
-	svcCtx *svc.ServiceContext
-}
-
-func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *RegisterLogic {
-	return &RegisterLogic{ctx: ctx, svcCtx: svcCtx}
-}
-
 func (l *RegisterLogic) Register(req *RegisterReq) (*LoginResp, error) {
-	// Check duplicate username
+	nickname := strings.TrimSpace(req.Nickname)
+	if nickname == "" || req.Password == "" {
+		return nil, errors.New("昵称和密码不能为空")
+	}
+
 	var count int64
-	l.svcCtx.DB.Model(&model.User{}).Where("username = ?", req.Username).Count(&count)
+	l.svcCtx.DB.Model(&model.User{}).Where("nickname = ?", nickname).Count(&count)
 	if count > 0 {
-		return nil, errors.New("用户名已存在")
+		return nil, errors.New("昵称已存在")
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -93,16 +95,21 @@ func (l *RegisterLogic) Register(req *RegisterReq) (*LoginResp, error) {
 	}
 
 	user := model.User{
-		Username: req.Username,
+		Username: "pending-" + strconv.FormatInt(time.Now().UnixNano(), 10),
 		Password: string(hashedPassword),
-		Nickname: req.Nickname,
+		Nickname: nickname,
 		Role:     "user",
 	}
 	if err := l.svcCtx.DB.Create(&user).Error; err != nil {
 		return nil, err
 	}
 
-	token, err := l.generateToken(&user)
+	user.Username = strconv.FormatUint(uint64(user.ID), 10)
+	if err := l.svcCtx.DB.Model(&user).Update("username", user.Username).Error; err != nil {
+		return nil, err
+	}
+
+	token, err := generateToken(l.svcCtx, &user)
 	if err != nil {
 		return nil, err
 	}
@@ -118,8 +125,54 @@ func (l *RegisterLogic) Register(req *RegisterReq) (*LoginResp, error) {
 	}, nil
 }
 
-func (l *RegisterLogic) generateToken(user *model.User) (string, error) {
-	expire := l.svcCtx.Config.Auth.AccessExpire
+type RegisterLogic struct {
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *RegisterLogic {
+	return &RegisterLogic{ctx: ctx, svcCtx: svcCtx}
+}
+
+type MeLogic struct {
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewMeLogic(ctx context.Context, svcCtx *svc.ServiceContext) *MeLogic {
+	return &MeLogic{ctx: ctx, svcCtx: svcCtx}
+}
+
+type MeInfo struct {
+	ID          uint   `json:"id"`
+	Username    string `json:"username"`
+	Nickname    string `json:"nickname"`
+	Avatar      string `json:"avatar"`
+	Bio         string `json:"bio"`
+	Role        string `json:"role"`
+	FollowCount int64  `json:"followCount"`
+	FanCount    int64  `json:"fanCount"`
+}
+
+func (l *MeLogic) Me(userID uint) (*MeInfo, error) {
+	var u model.User
+	if err := l.svcCtx.DB.First(&u, userID).Error; err != nil {
+		return nil, errors.New("用户不存在")
+	}
+	return &MeInfo{
+		ID:          u.ID,
+		Username:    u.Username,
+		Nickname:    u.Nickname,
+		Avatar:      u.Avatar,
+		Bio:         u.Bio,
+		Role:        u.Role,
+		FollowCount: u.FollowCount,
+		FanCount:    u.FanCount,
+	}, nil
+}
+
+func generateToken(svcCtx *svc.ServiceContext, user *model.User) (string, error) {
+	expire := svcCtx.Config.Auth.AccessExpire
 	claims := middleware.Claims{
 		UserID:   user.ID,
 		Username: user.Username,
@@ -130,18 +183,7 @@ func (l *RegisterLogic) generateToken(user *model.User) (string, error) {
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(l.svcCtx.Config.Auth.AccessSecret))
-}
-
-// Request types (shared between handler and logic)
-type LoginReq = struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-type RegisterReq = struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Nickname string `json:"nickname"`
+	return token.SignedString([]byte(svcCtx.Config.Auth.AccessSecret))
 }
 
 
