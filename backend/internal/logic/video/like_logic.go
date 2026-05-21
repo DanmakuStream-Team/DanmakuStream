@@ -35,7 +35,9 @@ func (l *LikeVideoLogic) Like(req *VideoLikeReq) (*VideoLikeResp, error) {
 	}
 
 	var video model.Video
-	if err := l.svcCtx.DB.First(&video, req.ID).Error; err != nil {
+	if err := l.svcCtx.DB.
+		Where("id = ? AND status = ?", req.ID, "approved").
+		First(&video).Error; err != nil {
 		return nil, err
 	}
 
@@ -63,7 +65,7 @@ func (l *LikeVideoLogic) Like(req *VideoLikeReq) (*VideoLikeResp, error) {
 		return nil, err
 	}
 
-	if err := l.svcCtx.DB.Delete(&like).Error; err != nil {
+	if err := l.svcCtx.DB.Unscoped().Delete(&like).Error; err != nil {
 		return nil, err
 	}
 

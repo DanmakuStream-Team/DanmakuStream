@@ -58,7 +58,9 @@ func (l *SendDanmakuLogic) Send(req *SendDanmakuReq) (*SendDanmakuResp, error) {
 	}
 
 	var video model.Video
-	if err := l.svcCtx.DB.First(&video, req.VideoID).Error; err != nil {
+	if err := l.svcCtx.DB.
+		Where("id = ? AND status = ?", req.VideoID, "approved").
+		First(&video).Error; err != nil {
 		return nil, err
 	}
 

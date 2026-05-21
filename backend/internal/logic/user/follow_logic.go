@@ -90,7 +90,7 @@ func (l *FollowLogic) Follow(req *FollowReq) (*FollowResp, error) {
 		return nil, err
 	}
 
-	if err := l.svcCtx.DB.Delete(&follow).Error; err != nil {
+	if err := l.svcCtx.DB.Unscoped().Delete(&follow).Error; err != nil {
 		return nil, err
 	}
 

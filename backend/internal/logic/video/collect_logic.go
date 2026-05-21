@@ -35,10 +35,11 @@ func (l *CollectVideoLogic) Collect(req *VideoCollectReq) (*VideoCollectResp, er
 	}
 
 	var video model.Video
-	if err := l.svcCtx.DB.First(&video, req.ID).Error; err != nil {
+	if err := l.svcCtx.DB.
+		Where("id = ? AND status = ?", req.ID, "approved").
+		First(&video).Error; err != nil {
 		return nil, err
 	}
-
 	var collect model.Collect
 	err := l.svcCtx.DB.Where("user_id = ? AND video_id = ?", userID, req.ID).First(&collect).Error
 
@@ -63,7 +64,7 @@ func (l *CollectVideoLogic) Collect(req *VideoCollectReq) (*VideoCollectResp, er
 		return nil, err
 	}
 
-	if err := l.svcCtx.DB.Delete(&collect).Error; err != nil {
+	if err := l.svcCtx.DB.Unscoped().Delete(&collect).Error; err != nil {
 		return nil, err
 	}
 
