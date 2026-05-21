@@ -9,9 +9,13 @@ import (
 	authhandler "danmakustream/backend/internal/handler/v1/auth"
 	videohandler "danmakustream/backend/internal/handler/v1/video"
 	wshandler "danmakustream/backend/internal/handler/ws"
+	danmakuhandler "danmakustream/backend/internal/handler/v1/danmaku"
+	commenthandler "danmakustream/backend/internal/handler/v1/comment"
+	userhandler "danmakustream/backend/internal/handler/v1/user"
+	adminhandler "danmakustream/backend/internal/handler/v1/admin"
 	"danmakustream/backend/internal/middleware"
 	"danmakustream/backend/internal/svc"
-
+	
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/rest"
 )	
@@ -38,8 +42,8 @@ func main() {
 		{Method: http.MethodPost, Path: "/api/v1/auth/register", Handler: authhandler.RegisterHandler(ctx)},
 		{Method: http.MethodGet, Path: "/api/v1/videos", Handler: videohandler.ListHandler(ctx)},
 		{Method: http.MethodGet, Path: "/api/v1/videos/:id", Handler: videohandler.DetailHandler(ctx)},
-		{Method: http.MethodGet, Path: "/api/v1/danmaku/:videoId", Handler: danmakuListHandler(ctx)},
-		{Method: http.MethodGet, Path: "/api/v1/users/:id", Handler: userProfileHandler(ctx)},
+		{Method: http.MethodGet, Path: "/api/v1/danmaku/:videoId", Handler: danmakuhandler.ListHandler(ctx)},
+		{Method: http.MethodGet, Path: "/api/v1/users/:id", Handler: userhandler.ProfileHandler(ctx)},
 	})
 
 	// ─── Auth-required routes ─────────────────────────────────────────
@@ -48,11 +52,11 @@ func main() {
 			{Method: http.MethodGet, Path: "/api/v1/auth/me", Handler: authhandler.MeHandler(ctx)},
 			{Method: http.MethodPost, Path: "/api/v1/videos/upload", Handler: videoUploadHandler(ctx)},
 			{Method: http.MethodPut, Path: "/api/v1/videos/:id", Handler: videoUpdateHandler(ctx)},
-			{Method: http.MethodPost, Path: "/api/v1/videos/:id/like", Handler: videoLikeHandler(ctx)},
-			{Method: http.MethodPost, Path: "/api/v1/videos/:id/collect", Handler: videoCollectHandler(ctx)},
-			{Method: http.MethodPost, Path: "/api/v1/danmaku", Handler: danmakuSendHandler(ctx)},
-			{Method: http.MethodPost, Path: "/api/v1/comments", Handler: commentCreateHandler(ctx)},
-			{Method: http.MethodPost, Path: "/api/v1/users/:id/follow", Handler: followHandler(ctx)},
+			{Method: http.MethodPost, Path: "/api/v1/videos/:id/like", Handler: videohandler.LikeHandler(ctx)},
+			{Method: http.MethodPost, Path: "/api/v1/videos/:id/collect", Handler: videohandler.CollectHandler(ctx)},
+			{Method: http.MethodPost, Path: "/api/v1/danmaku", Handler: danmakuhandler.SendHandler(ctx)},
+			{Method: http.MethodPost, Path: "/api/v1/comments", Handler: commenthandler.CreateHandler(ctx)},
+			{Method: http.MethodPost, Path: "/api/v1/users/:id/follow", Handler: userhandler.FollowHandler(ctx)},
 			{Method: http.MethodGet, Path: "/api/v1/live", Handler: liveListHandler(ctx)},
 			{Method: http.MethodPost, Path: "/api/v1/live", Handler: liveStartHandler(ctx)},
 			{Method: http.MethodPut, Path: "/api/v1/live/:id/end", Handler: liveEndHandler(ctx)},
@@ -61,7 +65,7 @@ func main() {
 	// ─── Admin routes ─────────────────────────────────────────────────
 	server.AddRoutes(rest.WithMiddlewares([]rest.Middleware{authMW, adminMW},
 		[]rest.Route{
-			{Method: http.MethodGet, Path: "/api/v1/admin/videos", Handler: adminVideoListHandler(ctx)},
+			{Method: http.MethodGet, Path: "/api/v1/admin/videos", Handler: adminhandler.VideoListHandler(ctx)},
 			{Method: http.MethodPut, Path: "/api/v1/admin/videos/:id/status", Handler: adminVideoStatusHandler(ctx)},
 			{Method: http.MethodPut, Path: "/api/v1/admin/danmaku/:id/block", Handler: adminDanmakuBlockHandler(ctx)},
 		}...))
