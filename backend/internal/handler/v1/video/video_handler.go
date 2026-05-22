@@ -1,6 +1,7 @@
 package video
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,6 +9,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+
+	"gorm.io/gorm"
 
 	"danmakustream/backend/internal/handler/response"
 	videologic "danmakustream/backend/internal/logic/video"
@@ -164,5 +167,133 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		video.VideoURL = relativePlaylist
 		video.CoverURL = coverURL
 		response.Ok(c, video)
+	}
+}
+
+func LikeHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint(middleware.CtxKeyUserID)
+
+		videoID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || videoID == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的视频 ID")
+			return
+		}
+
+		var video model.Video
+		if err := svcCtx.DB.Select("id", "status").First(&video, videoID).Error; err != nil {
+			response.Fail(c, http.StatusNotFound, "视频不存在")
+			return
+		}
+		if video.Status != "approved" {
+			response.Fail(c, http.StatusForbidden, "视频未通过审核")
+			return
+		}
+
+		var liked bool
+
+		err = svcCtx.DB.Transaction(func(tx *gorm.DB) error {
+			var like model.Like
+			err := tx.Where("user_id = ? AND video_id = ?", userID, videoID).First(&like).Error
+
+			if err == nil {
+				if err := tx.Unscoped().Delete(&like).Error; err != nil {
+					return err
+				}
+				liked = false
+				return tx.Model(&model.Video{}).
+					Where("id = ? AND like_count > 0", videoID).
+					UpdateColumn("like_count", gorm.Expr("like_count - ?", 1)).Error
+			}
+
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+
+			if err := tx.Create(&model.Like{
+				UserID:  userID,
+				VideoID: uint(videoID),
+			}).Error; err != nil {
+				return err
+			}
+
+			liked = true
+			return tx.Model(&model.Video{}).
+				Where("id = ?", videoID).
+				UpdateColumn("like_count", gorm.Expr("like_count + ?", 1)).Error
+		})
+
+		if err != nil {
+			response.Fail(c, http.StatusInternalServerError, "点赞操作失败")
+			return
+		}
+
+		response.Ok(c, gin.H{
+			"liked": liked,
+		})
+	}
+}
+
+func CollectHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint(middleware.CtxKeyUserID)
+
+		videoID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || videoID == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的视频 ID")
+			return
+		}
+
+		var video model.Video
+		if err := svcCtx.DB.Select("id", "status").First(&video, videoID).Error; err != nil {
+			response.Fail(c, http.StatusNotFound, "视频不存在")
+			return
+		}
+		if video.Status != "approved" {
+			response.Fail(c, http.StatusForbidden, "视频未通过审核")
+			return
+		}
+
+		var collected bool
+
+		err = svcCtx.DB.Transaction(func(tx *gorm.DB) error {
+			var collect model.Collect
+			err := tx.Where("user_id = ? AND video_id = ?", userID, videoID).First(&collect).Error
+
+			if err == nil {
+				if err := tx.Unscoped().Delete(&collect).Error; err != nil {
+					return err
+				}
+				collected = false
+				return tx.Model(&model.Video{}).
+					Where("id = ? AND collect_count > 0", videoID).
+					UpdateColumn("collect_count", gorm.Expr("collect_count - ?", 1)).Error
+			}
+
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+
+			if err := tx.Create(&model.Collect{
+				UserID:  userID,
+				VideoID: uint(videoID),
+			}).Error; err != nil {
+				return err
+			}
+
+			collected = true
+			return tx.Model(&model.Video{}).
+				Where("id = ?", videoID).
+				UpdateColumn("collect_count", gorm.Expr("collect_count + ?", 1)).Error
+		})
+
+		if err != nil {
+			response.Fail(c, http.StatusInternalServerError, "收藏操作失败")
+			return
+		}
+
+		response.Ok(c, gin.H{
+			"collected": collected,
+		})
 	}
 }
