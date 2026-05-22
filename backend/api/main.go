@@ -10,7 +10,6 @@ import (
 	"danmakustream/backend/internal/config"
 	"danmakustream/backend/internal/handler/response"
 	authhandler "danmakustream/backend/internal/handler/v1/auth"
-	commenthandler "danmakustream/backend/internal/handler/v1/comment"
 	danmakuhandler "danmakustream/backend/internal/handler/v1/danmaku"
 	videohandler "danmakustream/backend/internal/handler/v1/video"
 	wshandler "danmakustream/backend/internal/handler/ws"
@@ -70,7 +69,6 @@ func main() {
 		v1.GET("/videos/:id", videohandler.DetailHandler(svcCtx))
 		v1.GET("/danmaku/:videoId", danmakuhandler.ListHandler(svcCtx))
 		v1.GET("/users/:id", notImplemented)
-		v1.GET("/comments/:videoId", commenthandler.ListHandler(svcCtx))
 	}
 
 	// Auth-required routes
@@ -80,10 +78,10 @@ func main() {
 		auth.GET("/auth/me", authhandler.MeHandler(svcCtx))
 		auth.POST("/videos/upload", videohandler.UploadHandler(svcCtx))
 		auth.PUT("/videos/:id", notImplemented)
-		auth.POST("/videos/:id/like", videohandler.LikeHandler(svcCtx))
-		auth.POST("/videos/:id/collect", videohandler.CollectHandler(svcCtx))
+		auth.POST("/videos/:id/like", notImplemented)
+		auth.POST("/videos/:id/collect", notImplemented)
 		auth.POST("/danmaku", danmakuhandler.SendHandler(svcCtx))
-		auth.POST("/comments", commenthandler.CreateHandler(svcCtx))
+		auth.POST("/comments", notImplemented)
 		auth.POST("/users/:id/follow", notImplemented)
 		auth.GET("/live", notImplemented)
 		auth.POST("/live", notImplemented)
@@ -94,8 +92,8 @@ func main() {
 	admin := v1.Group("")
 	admin.Use(authMW, middleware.AdminMiddleware)
 	{
-		admin.GET("/admin/videos", notImplemented)
-		admin.PUT("/admin/videos/:id/status", notImplemented)
+		admin.GET("/admin/videos", videohandler.AdminListHandler(svcCtx))                    //管理员查看视频，包括 pending / rejected 等普通用户看不到的内容 可/api/v1/admin/videos?status=pending筛选
+		admin.PUT("/admin/videos/:id/status", videohandler.AdminUpdateStatusHandler(svcCtx)) // 管理员审核视频，通过或拒绝
 		admin.PUT("/admin/danmaku/:id/block", danmakuhandler.BlockHandler(svcCtx))
 	}
 
