@@ -36,6 +36,12 @@ func isValidVideoStatus(status string) bool {
 	return status == "pending" || status == "approved" || status == "rejected"
 }
 
+type updateVideoReq struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Tags        string `json:"tags"`
+}
+
 func ListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req videologic.VideoListReq
@@ -432,6 +438,177 @@ func AdminUpdateStatusHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		response.Ok(c, gin.H{
 			"id":     videoID,
 			"status": req.Status,
+		})
+	}
+}
+
+func UpdateHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint(middleware.CtxKeyUserID)
+		role := c.GetString(middleware.CtxKeyRole)
+
+		videoID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || videoID == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的视频 ID")
+			return
+		}
+
+		var req updateVideoReq
+		if err := c.ShouldBindJSON(&req); err != nil {
+			response.Fail(c, http.StatusBadRequest, "参数错误")
+			return
+		}
+
+		var video model.Video
+		if err := svcCtx.DB.First(&video, videoID).Error; err != nil {
+			response.Fail(c, http.StatusNotFound, "视频不存在")
+			return
+		}
+
+		if video.AuthorID != userID && role != "admin" {
+			response.Fail(c, http.StatusForbidden, "无权修改该视频")
+			return
+		}
+
+		updates := map[string]interface{}{}
+
+		if req.Title != "" {
+			updates["title"] = req.Title
+		}
+		if req.Description != "" {
+			updates["description"] = req.Description
+		}
+		if req.Tags != "" {
+			updates["tags"] = req.Tags
+		}
+
+		if len(updates) == 0 {
+			response.Fail(c, http.StatusBadRequest, "没有需要更新的内容")
+			return
+		}
+
+		if err := svcCtx.DB.Model(&video).Updates(updates).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "视频信息更新失败")
+			return
+		}
+
+		response.Ok(c, gin.H{
+			"id": video.ID,
+		})
+	}
+}
+
+func UpdateCoverHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint(middleware.CtxKeyUserID)
+		role := c.GetString(middleware.CtxKeyRole)
+
+		videoID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || videoID == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的视频 ID")
+			return
+		}
+
+		var video model.Video
+		if err := svcCtx.DB.First(&video, videoID).Error; err != nil {
+			response.Fail(c, http.StatusNotFound, "视频不存在")
+			return
+		}
+
+		if video.AuthorID != userID && role != "admin" {
+			response.Fail(c, http.StatusForbidden, "无权修改该视频")
+			return
+		}
+
+		coverFile, err := c.FormFile("cover")
+		if err != nil {
+			response.Fail(c, http.StatusBadRequest, "请上传封面图片")
+			return
+		}
+
+		fileExt := filepath.Ext(coverFile.Filename)
+		if fileExt == "" {
+			response.Fail(c, http.StatusBadRequest, "封面文件格式无效")
+			return
+		}
+
+		coverDir := filepath.Join(svcCtx.VideoDir, "covers", strconv.FormatUint(videoID, 10))
+		if err := os.MkdirAll(coverDir, 0755); err != nil {
+			response.Fail(c, http.StatusInternalServerError, "创建封面目录失败")
+			return
+		}
+
+		fileName := "cover" + fileExt
+		coverPath := filepath.Join(coverDir, fileName)
+
+		src, err := coverFile.Open()
+		if err != nil {
+			response.Fail(c, http.StatusInternalServerError, "读取封面文件失败")
+			return
+		}
+		defer src.Close()
+
+		dst, err := os.Create(coverPath)
+		if err != nil {
+			response.Fail(c, http.StatusInternalServerError, "保存封面文件失败")
+			return
+		}
+		defer dst.Close()
+
+		if _, err := io.Copy(dst, src); err != nil {
+			response.Fail(c, http.StatusInternalServerError, "保存封面文件失败")
+			return
+		}
+
+		coverURL := fmt.Sprintf("/media/covers/%d/%s", videoID, fileName)
+
+		if err := svcCtx.DB.Model(&video).
+			Update("cover_url", coverURL).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "封面更新失败")
+			return
+		}
+
+		response.Ok(c, gin.H{
+			"coverUrl": coverURL,
+		})
+	}
+}
+
+func DeleteHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint(middleware.CtxKeyUserID)
+		role := c.GetString(middleware.CtxKeyRole)
+
+		videoID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || videoID == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的视频 ID")
+			return
+		}
+
+		var video model.Video
+		if err := svcCtx.DB.First(&video, videoID).Error; err != nil {
+			response.Fail(c, http.StatusNotFound, "视频不存在")
+			return
+		}
+
+		if video.AuthorID != userID && role != "admin" {
+			response.Fail(c, http.StatusForbidden, "无权删除该视频")
+			return
+		}
+
+		if err := svcCtx.DB.Delete(&video).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "视频删除失败")
+			return
+		}
+
+		videoDir := filepath.Join(svcCtx.VideoDir, "videos", strconv.FormatUint(videoID, 10))
+		coverDir := filepath.Join(svcCtx.VideoDir, "covers", strconv.FormatUint(videoID, 10))
+
+		_ = os.RemoveAll(videoDir)
+		_ = os.RemoveAll(coverDir)
+
+		response.Ok(c, gin.H{
+			"id": video.ID,
 		})
 	}
 }

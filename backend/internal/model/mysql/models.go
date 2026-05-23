@@ -97,3 +97,9 @@ type Collect struct {
 	UserID  uint `gorm:"not null;uniqueIndex:idx_collect"`
 	VideoID uint `gorm:"not null;uniqueIndex:idx_collect"`
 }
+
+type CommentLike struct {
+	gorm.Model
+	UserID    uint `gorm:"not null;uniqueIndex:idx_comment_like"`
+	CommentID uint `gorm:"not null;uniqueIndex:idx_comment_like"`
+}
