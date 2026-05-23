@@ -1,6 +1,7 @@
 package video
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,6 +9,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+
+	"gorm.io/gorm"
 
 	"danmakustream/backend/internal/handler/response"
 	videologic "danmakustream/backend/internal/logic/video"
@@ -17,6 +20,27 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+type adminVideoListReq struct {
+	Page     int    `form:"page"`
+	PageSize int    `form:"pageSize"`
+	Status   string `form:"status"`
+	Keyword  string `form:"keyword"`
+}
+
+type updateVideoStatusReq struct {
+	Status string `json:"status" binding:"required"`
+}
+
+func isValidVideoStatus(status string) bool {
+	return status == "pending" || status == "approved" || status == "rejected"
+}
+
+type updateVideoReq struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Tags        string `json:"tags"`
+}
 
 func ListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -80,7 +104,7 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			Description: description,
 			Tags:        tags,
 			AuthorID:    userID,
-			Status:      "approved",
+			Status:      "pending",
 		}
 		if err := svcCtx.DB.Create(&video).Error; err != nil {
 			response.Fail(c, http.StatusInternalServerError, "创建视频记录失败")
@@ -164,5 +188,427 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		video.VideoURL = relativePlaylist
 		video.CoverURL = coverURL
 		response.Ok(c, video)
+	}
+}
+
+func LikeHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint(middleware.CtxKeyUserID)
+
+		videoID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || videoID == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的视频 ID")
+			return
+		}
+
+		var video model.Video
+		if err := svcCtx.DB.Select("id", "status").First(&video, videoID).Error; err != nil {
+			response.Fail(c, http.StatusNotFound, "视频不存在")
+			return
+		}
+		if video.Status != "approved" {
+			response.Fail(c, http.StatusForbidden, "视频未通过审核")
+			return
+		}
+
+		var liked bool
+
+		err = svcCtx.DB.Transaction(func(tx *gorm.DB) error {
+			var like model.Like
+			err := tx.Where("user_id = ? AND video_id = ?", userID, videoID).First(&like).Error
+
+			if err == nil {
+				if err := tx.Unscoped().Delete(&like).Error; err != nil {
+					return err
+				}
+				liked = false
+				return tx.Model(&model.Video{}).
+					Where("id = ? AND like_count > 0", videoID).
+					UpdateColumn("like_count", gorm.Expr("like_count - ?", 1)).Error
+			}
+
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+
+			if err := tx.Create(&model.Like{
+				UserID:  userID,
+				VideoID: uint(videoID),
+			}).Error; err != nil {
+				return err
+			}
+
+			liked = true
+			return tx.Model(&model.Video{}).
+				Where("id = ?", videoID).
+				UpdateColumn("like_count", gorm.Expr("like_count + ?", 1)).Error
+		})
+
+		if err != nil {
+			response.Fail(c, http.StatusInternalServerError, "点赞操作失败")
+			return
+		}
+
+		response.Ok(c, gin.H{
+			"liked": liked,
+		})
+	}
+}
+
+func CollectHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint(middleware.CtxKeyUserID)
+
+		videoID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || videoID == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的视频 ID")
+			return
+		}
+
+		var video model.Video
+		if err := svcCtx.DB.Select("id", "status").First(&video, videoID).Error; err != nil {
+			response.Fail(c, http.StatusNotFound, "视频不存在")
+			return
+		}
+		if video.Status != "approved" {
+			response.Fail(c, http.StatusForbidden, "视频未通过审核")
+			return
+		}
+
+		var collected bool
+
+		err = svcCtx.DB.Transaction(func(tx *gorm.DB) error {
+			var collect model.Collect
+			err := tx.Where("user_id = ? AND video_id = ?", userID, videoID).First(&collect).Error
+
+			if err == nil {
+				if err := tx.Unscoped().Delete(&collect).Error; err != nil {
+					return err
+				}
+				collected = false
+				return tx.Model(&model.Video{}).
+					Where("id = ? AND collect_count > 0", videoID).
+					UpdateColumn("collect_count", gorm.Expr("collect_count - ?", 1)).Error
+			}
+
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+
+			if err := tx.Create(&model.Collect{
+				UserID:  userID,
+				VideoID: uint(videoID),
+			}).Error; err != nil {
+				return err
+			}
+
+			collected = true
+			return tx.Model(&model.Video{}).
+				Where("id = ?", videoID).
+				UpdateColumn("collect_count", gorm.Expr("collect_count + ?", 1)).Error
+		})
+
+		if err != nil {
+			response.Fail(c, http.StatusInternalServerError, "收藏操作失败")
+			return
+		}
+
+		response.Ok(c, gin.H{
+			"collected": collected,
+		})
+	}
+}
+
+func AdminListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req adminVideoListReq
+		if err := c.ShouldBindQuery(&req); err != nil {
+			response.Fail(c, http.StatusBadRequest, "参数错误")
+			return
+		}
+
+		if req.Page <= 0 {
+			req.Page = 1
+		}
+		if req.PageSize <= 0 {
+			req.PageSize = 10
+		}
+		if req.PageSize > 100 {
+			req.PageSize = 100
+		}
+
+		db := svcCtx.DB.Model(&model.Video{}).Preload("Author")
+
+		if req.Status != "" {
+			if !isValidVideoStatus(req.Status) {
+				response.Fail(c, http.StatusBadRequest, "无效的视频状态")
+				return
+			}
+			db = db.Where("status = ?", req.Status)
+		}
+
+		if req.Keyword != "" {
+			keyword := "%" + req.Keyword + "%"
+			db = db.Where("title LIKE ? OR description LIKE ?", keyword, keyword)
+		}
+
+		var total int64
+		if err := db.Count(&total).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "视频列表加载失败")
+			return
+		}
+
+		var videos []model.Video
+		if err := db.
+			Order("created_at DESC").
+			Offset((req.Page - 1) * req.PageSize).
+			Limit(req.PageSize).
+			Find(&videos).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "视频列表加载失败")
+			return
+		}
+
+		list := make([]videologic.VideoInfo, 0, len(videos))
+		for _, video := range videos {
+			list = append(list, videologic.VideoInfo{
+				ID:           video.ID,
+				Title:        video.Title,
+				Description:  video.Description,
+				CoverURL:     video.CoverURL,
+				VideoURL:     video.VideoURL,
+				Duration:     video.Duration,
+				ViewCount:    video.ViewCount,
+				LikeCount:    video.LikeCount,
+				CollectCount: video.CollectCount,
+				DanmakuCount: video.DanmakuCount,
+				Status:       video.Status,
+				Tags:         video.Tags,
+				CreatedAt:    video.CreatedAt.Format("2006-01-02 15:04:05"),
+				Author: &model.UserInfo{
+					ID:       video.Author.ID,
+					Username: video.Author.Username,
+					Nickname: video.Author.Nickname,
+					Avatar:   video.Author.Avatar,
+					Role:     video.Author.Role,
+				},
+			})
+		}
+
+		response.Ok(c, videologic.PageResult[videologic.VideoInfo]{
+			List:     list,
+			Total:    total,
+			Page:     req.Page,
+			PageSize: req.PageSize,
+		})
+	}
+}
+
+func AdminUpdateStatusHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		videoID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || videoID == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的视频 ID")
+			return
+		}
+
+		var req updateVideoStatusReq
+		if err := c.ShouldBindJSON(&req); err != nil {
+			response.Fail(c, http.StatusBadRequest, "参数错误")
+			return
+		}
+
+		if !isValidVideoStatus(req.Status) {
+			response.Fail(c, http.StatusBadRequest, "无效的视频状态")
+			return
+		}
+
+		result := svcCtx.DB.Model(&model.Video{}).
+			Where("id = ?", videoID).
+			Update("status", req.Status)
+
+		if result.Error != nil {
+			response.Fail(c, http.StatusInternalServerError, "视频状态更新失败")
+			return
+		}
+		if result.RowsAffected == 0 {
+			response.Fail(c, http.StatusNotFound, "视频不存在")
+			return
+		}
+
+		response.Ok(c, gin.H{
+			"id":     videoID,
+			"status": req.Status,
+		})
+	}
+}
+
+func UpdateHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint(middleware.CtxKeyUserID)
+		role := c.GetString(middleware.CtxKeyRole)
+
+		videoID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || videoID == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的视频 ID")
+			return
+		}
+
+		var req updateVideoReq
+		if err := c.ShouldBindJSON(&req); err != nil {
+			response.Fail(c, http.StatusBadRequest, "参数错误")
+			return
+		}
+
+		var video model.Video
+		if err := svcCtx.DB.First(&video, videoID).Error; err != nil {
+			response.Fail(c, http.StatusNotFound, "视频不存在")
+			return
+		}
+
+		if video.AuthorID != userID && role != "admin" {
+			response.Fail(c, http.StatusForbidden, "无权修改该视频")
+			return
+		}
+
+		updates := map[string]interface{}{}
+
+		if req.Title != "" {
+			updates["title"] = req.Title
+		}
+		if req.Description != "" {
+			updates["description"] = req.Description
+		}
+		if req.Tags != "" {
+			updates["tags"] = req.Tags
+		}
+
+		if len(updates) == 0 {
+			response.Fail(c, http.StatusBadRequest, "没有需要更新的内容")
+			return
+		}
+
+		if err := svcCtx.DB.Model(&video).Updates(updates).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "视频信息更新失败")
+			return
+		}
+
+		response.Ok(c, gin.H{
+			"id": video.ID,
+		})
+	}
+}
+
+func UpdateCoverHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint(middleware.CtxKeyUserID)
+		role := c.GetString(middleware.CtxKeyRole)
+
+		videoID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || videoID == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的视频 ID")
+			return
+		}
+
+		var video model.Video
+		if err := svcCtx.DB.First(&video, videoID).Error; err != nil {
+			response.Fail(c, http.StatusNotFound, "视频不存在")
+			return
+		}
+
+		if video.AuthorID != userID && role != "admin" {
+			response.Fail(c, http.StatusForbidden, "无权修改该视频")
+			return
+		}
+
+		coverFile, err := c.FormFile("cover")
+		if err != nil {
+			response.Fail(c, http.StatusBadRequest, "请上传封面图片")
+			return
+		}
+
+		fileExt := filepath.Ext(coverFile.Filename)
+		if fileExt == "" {
+			response.Fail(c, http.StatusBadRequest, "封面文件格式无效")
+			return
+		}
+
+		coverDir := filepath.Join(svcCtx.VideoDir, "covers", strconv.FormatUint(videoID, 10))
+		if err := os.MkdirAll(coverDir, 0755); err != nil {
+			response.Fail(c, http.StatusInternalServerError, "创建封面目录失败")
+			return
+		}
+
+		fileName := "cover" + fileExt
+		coverPath := filepath.Join(coverDir, fileName)
+
+		src, err := coverFile.Open()
+		if err != nil {
+			response.Fail(c, http.StatusInternalServerError, "读取封面文件失败")
+			return
+		}
+		defer src.Close()
+
+		dst, err := os.Create(coverPath)
+		if err != nil {
+			response.Fail(c, http.StatusInternalServerError, "保存封面文件失败")
+			return
+		}
+		defer dst.Close()
+
+		if _, err := io.Copy(dst, src); err != nil {
+			response.Fail(c, http.StatusInternalServerError, "保存封面文件失败")
+			return
+		}
+
+		coverURL := fmt.Sprintf("/media/covers/%d/%s", videoID, fileName)
+
+		if err := svcCtx.DB.Model(&video).
+			Update("cover_url", coverURL).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "封面更新失败")
+			return
+		}
+
+		response.Ok(c, gin.H{
+			"coverUrl": coverURL,
+		})
+	}
+}
+
+func DeleteHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint(middleware.CtxKeyUserID)
+		role := c.GetString(middleware.CtxKeyRole)
+
+		videoID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || videoID == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的视频 ID")
+			return
+		}
+
+		var video model.Video
+		if err := svcCtx.DB.First(&video, videoID).Error; err != nil {
+			response.Fail(c, http.StatusNotFound, "视频不存在")
+			return
+		}
+
+		if video.AuthorID != userID && role != "admin" {
+			response.Fail(c, http.StatusForbidden, "无权删除该视频")
+			return
+		}
+
+		if err := svcCtx.DB.Delete(&video).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "视频删除失败")
+			return
+		}
+
+		videoDir := filepath.Join(svcCtx.VideoDir, "videos", strconv.FormatUint(videoID, 10))
+		coverDir := filepath.Join(svcCtx.VideoDir, "covers", strconv.FormatUint(videoID, 10))
+
+		_ = os.RemoveAll(videoDir)
+		_ = os.RemoveAll(coverDir)
+
+		response.Ok(c, gin.H{
+			"id": video.ID,
+		})
 	}
 }

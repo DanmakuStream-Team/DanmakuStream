@@ -30,6 +30,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		&model.Follow{},
 		&model.Like{},
 		&model.Collect{},
+		&model.CommentLike{},
 	)
 
 	videoDir := c.VideoDir
@@ -39,6 +40,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	absDir, _ := filepath.Abs(videoDir)
 	os.MkdirAll(filepath.Join(absDir, "videos"), 0755)
 	os.MkdirAll(filepath.Join(absDir, "covers"), 0755)
+	os.MkdirAll(filepath.Join(absDir, "avatars"), 0755)
 
 	return &ServiceContext{
 		Config:   c,

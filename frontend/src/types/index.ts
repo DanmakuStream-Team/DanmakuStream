@@ -8,6 +8,8 @@ export interface UserInfo {
   bio: string
   followCount: number
   fanCount: number
+  followed?: boolean
+  videoCount?: number
   createdAt: string
 }
 

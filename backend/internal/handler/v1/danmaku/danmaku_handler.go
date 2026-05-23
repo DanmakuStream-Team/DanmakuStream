@@ -33,6 +33,34 @@ type danmakuItem struct {
 	Type     string `json:"type"`
 }
 
+type adminDanmakuListReq struct {
+	Page     int    `form:"page"`
+	PageSize int    `form:"pageSize"`
+	VideoID  uint   `form:"videoId"`
+	Keyword  string `form:"keyword"`
+	Blocked  *bool  `form:"blocked"`
+}
+
+type adminDanmakuItem struct {
+	ID        uint   `json:"id"`
+	VideoID   uint   `json:"videoId"`
+	UserID    uint   `json:"userId"`
+	Content   string `json:"content"`
+	Time      int    `json:"time"`
+	Color     string `json:"color"`
+	FontSize  string `json:"fontSize"`
+	Type      string `json:"type"`
+	Blocked   bool   `json:"blocked"`
+	CreatedAt string `json:"createdAt"`
+}
+
+type pageResult[T any] struct {
+	List     []T   `json:"list"`
+	Total    int64 `json:"total"`
+	Page     int   `json:"page"`
+	PageSize int   `json:"pageSize"`
+}
+
 func ListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		videoID, err := strconv.ParseUint(c.Param("videoId"), 10, 64)
@@ -121,6 +149,79 @@ func SendHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			Color:    danmaku.Color,
 			FontSize: danmaku.FontSize,
 			Type:     danmaku.Type,
+		})
+	}
+}
+
+func AdminListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req adminDanmakuListReq
+		if err := c.ShouldBindQuery(&req); err != nil {
+			response.Fail(c, http.StatusBadRequest, "参数错误")
+			return
+		}
+
+		if req.Page <= 0 {
+			req.Page = 1
+		}
+		if req.PageSize <= 0 {
+			req.PageSize = 20
+		}
+		if req.PageSize > 100 {
+			req.PageSize = 100
+		}
+
+		db := svcCtx.DB.Model(&model.Danmaku{})
+
+		if req.VideoID > 0 {
+			db = db.Where("video_id = ?", req.VideoID)
+		}
+
+		if req.Keyword != "" {
+			db = db.Where("content LIKE ?", "%"+req.Keyword+"%")
+		}
+
+		if req.Blocked != nil {
+			db = db.Where("blocked = ?", *req.Blocked)
+		}
+
+		var total int64
+		if err := db.Count(&total).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "弹幕列表加载失败")
+			return
+		}
+
+		var danmakus []model.Danmaku
+		if err := db.
+			Order("created_at DESC").
+			Offset((req.Page - 1) * req.PageSize).
+			Limit(req.PageSize).
+			Find(&danmakus).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "弹幕列表加载失败")
+			return
+		}
+
+		list := make([]adminDanmakuItem, 0, len(danmakus))
+		for _, d := range danmakus {
+			list = append(list, adminDanmakuItem{
+				ID:        d.ID,
+				VideoID:   d.VideoID,
+				UserID:    d.UserID,
+				Content:   d.Content,
+				Time:      d.Time,
+				Color:     d.Color,
+				FontSize:  d.FontSize,
+				Type:      d.Type,
+				Blocked:   d.Blocked,
+				CreatedAt: d.CreatedAt.Format("2006-01-02 15:04:05"),
+			})
+		}
+
+		response.Ok(c, pageResult[adminDanmakuItem]{
+			List:     list,
+			Total:    total,
+			Page:     req.Page,
+			PageSize: req.PageSize,
 		})
 	}
 }
