@@ -1,0 +1,38 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.12.1
+2 info using node@v24.15.0
+3 silly config load:file:C:\Program Files\nodejs\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\lenovo\Desktop\大二\大二下\软工基础\大作业\DanmakuStream\frontend\.npmrc
+5 silly config load:file:C:\Users\lenovo\.npmrc
+6 silly config load:file:C:\Users\lenovo\AppData\Roaming\npm\etc\npmrc
+7 verbose title npm install
+8 verbose argv "install" "--cache" ".\\.npm-cache"
+9 verbose logfile logs-max:10 dir:C:\Users\lenovo\Desktop\大二\大二下\软工基础\大作业\DanmakuStream\frontend\.npm-cache\_logs\2026-05-24T08_25_21_848Z-
+10 verbose logfile C:\Users\lenovo\Desktop\大二\大二下\软工基础\大作业\DanmakuStream\frontend\.npm-cache\_logs\2026-05-24T08_25_21_848Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+13 silly idealTree buildDeps
+14 silly fetch manifest @element-plus/icons-vue@^2.3.2
+15 silly packumentCache full:https://registry.npmjs.org/@element-plus%2ficons-vue cache-miss
+16 http fetch GET https://registry.npmjs.org/@element-plus%2ficons-vue attempt 1 failed with EACCES
+17 http fetch GET https://registry.npmjs.org/@element-plus%2ficons-vue attempt 2 failed with EACCES
+18 http fetch GET https://registry.npmjs.org/@element-plus%2ficons-vue attempt 3 failed with EACCES
+19 silly fetch manifest axios@^1.7.2
+20 silly packumentCache full:https://registry.npmjs.org/axios cache-miss
+21 http fetch GET https://registry.npmjs.org/axios attempt 1 failed with EACCES
+22 http fetch GET https://registry.npmjs.org/axios attempt 2 failed with EACCES
+23 http fetch GET https://registry.npmjs.org/axios attempt 3 failed with EACCES
+24 silly fetch manifest element-plus@^2.14.0
+25 silly packumentCache full:https://registry.npmjs.org/element-plus cache-miss
+26 http fetch GET https://registry.npmjs.org/element-plus attempt 1 failed with EACCES
+27 http fetch GET https://registry.npmjs.org/element-plus attempt 2 failed with EACCES
+28 http fetch GET https://registry.npmjs.org/element-plus attempt 3 failed with EACCES
+29 silly fetch manifest pinia@^2.1.7
+30 silly packumentCache full:https://registry.npmjs.org/pinia cache-miss
+31 http fetch GET https://registry.npmjs.org/pinia attempt 1 failed with EACCES
+32 http fetch GET https://registry.npmjs.org/pinia attempt 2 failed with EACCES
+33 http fetch GET https://registry.npmjs.org/pinia attempt 3 failed with EACCES
+34 silly fetch manifest vue@^3.4.27
+35 silly packumentCache full:https://registry.npmjs.org/vue cache-miss
+36 http fetch GET https://registry.npmjs.org/vue attempt 1 failed with EACCES
+37 http fetch GET https://registry.npmjs.org/vue attempt 2 failed with EACCES

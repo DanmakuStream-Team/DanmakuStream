@@ -1,7 +1,7 @@
-import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Comment } from '@/types'
+import { defineStore } from 'pinia'
 import { commentApi } from '@/api/comment'
+import type { Comment } from '@/types'
 
 export const useCommentStore = defineStore('comment', () => {
   const comments = ref<Comment[]>([])
@@ -11,8 +11,8 @@ export const useCommentStore = defineStore('comment', () => {
   async function fetchComments(videoId: number) {
     loading.value = true
     try {
-      const res = await commentApi.getComments(videoId)
-      comments.value = res.data ?? []
+      const res = await commentApi.list(videoId)
+      comments.value = res.data
     } finally {
       loading.value = false
     }
@@ -21,28 +21,21 @@ export const useCommentStore = defineStore('comment', () => {
   async function createComment(videoId: number, content: string, parentId?: number) {
     submitting.value = true
     try {
-      const res = await commentApi.createComment({ videoId, content, parentId })
-      const comment = res.data
-
+      const res = await commentApi.create({ videoId, content, parentId })
       if (parentId) {
         const parent = findComment(comments.value, parentId)
-        if (parent) {
-          parent.replies = [...(parent.replies ?? []), comment]
-        }
+        if (parent) parent.replies = [...(parent.replies || []), res.data]
       } else {
-        comments.value = [comment, ...comments.value]
+        comments.value = [res.data, ...comments.value]
       }
-
-      return comment
+      return res.data
     } finally {
       submitting.value = false
     }
   }
 
   function countComments() {
-    return comments.value.reduce((total, comment) => {
-      return total + 1 + countReplies(comment.replies ?? [])
-    }, 0)
+    return comments.value.reduce((sum, item) => sum + 1 + countReplies(item.replies || []), 0)
   }
 
   function clearComments() {
@@ -52,19 +45,14 @@ export const useCommentStore = defineStore('comment', () => {
   return { comments, loading, submitting, fetchComments, createComment, countComments, clearComments }
 })
 
-function findComment(comments: Comment[], id: number): Comment | undefined {
-  for (const comment of comments) {
-    if (comment.id === id) {
-      return comment
-    }
-
-    const reply = findComment(comment.replies ?? [], id)
-    if (reply) {
-      return reply
-    }
+function findComment(list: Comment[], id: number): Comment | undefined {
+  for (const item of list) {
+    if (item.id === id) return item
+    const child = findComment(item.replies || [], id)
+    if (child) return child
   }
 }
 
-function countReplies(replies: Comment[]): number {
-  return replies.reduce((total, reply) => total + 1 + countReplies(reply.replies ?? []), 0)
+function countReplies(list: Comment[]): number {
+  return list.reduce((sum, item) => sum + 1 + countReplies(item.replies || []), 0)
 }

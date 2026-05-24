@@ -1,47 +1,56 @@
+import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import type { UserInfo } from '@/types'
 import { authApi } from '@/api/auth'
+import type { UserInfo } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string>(localStorage.getItem('token') || '')
-  const userInfo = ref<UserInfo | null>(null)
+  const token = ref(localStorage.getItem('token') || '')
+  const userInfo = ref<UserInfo | null>(readUser())
 
-  const isLoggedIn = computed(() => !!token.value)
+  const isLoggedIn = computed(() => Boolean(token.value))
   const isAdmin = computed(() => userInfo.value?.role === 'admin')
   const isCreator = computed(() => userInfo.value?.role === 'creator' || isAdmin.value)
 
-  function setToken(t: string) {
-    token.value = t
-    localStorage.setItem('token', t)
-  }
-
-  function setUserInfo(info: UserInfo) {
-    userInfo.value = info
-  }
-
   async function login(nickname: string, password: string) {
     const res = await authApi.login({ nickname, password })
-    setToken(res.data.token)
-    setUserInfo(res.data.userInfo)
+    setSession(res.data.token, res.data.userInfo)
   }
 
   async function register(nickname: string, password: string) {
     const res = await authApi.register({ nickname, password })
-    setToken(res.data.token)
-    setUserInfo(res.data.userInfo)
+    setSession(res.data.token, res.data.userInfo)
   }
 
   async function fetchUserInfo() {
-    const res = await authApi.getUserInfo()
-    setUserInfo(res.data)
+    if (!token.value) return
+    const res = await authApi.me()
+    userInfo.value = res.data
+    localStorage.setItem('userInfo', JSON.stringify(res.data))
+  }
+
+  function setSession(nextToken: string, nextUser: UserInfo) {
+    token.value = nextToken
+    userInfo.value = nextUser
+    localStorage.setItem('token', nextToken)
+    localStorage.setItem('userInfo', JSON.stringify(nextUser))
   }
 
   function logout() {
     token.value = ''
     userInfo.value = null
     localStorage.removeItem('token')
+    localStorage.removeItem('userInfo')
   }
 
-  return { token, userInfo, isLoggedIn, isAdmin, isCreator, login, register, logout, fetchUserInfo }
+  return { token, userInfo, isLoggedIn, isAdmin, isCreator, login, register, fetchUserInfo, logout }
 })
+
+function readUser() {
+  const raw = localStorage.getItem('userInfo')
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as UserInfo
+  } catch {
+    return null
+  }
+}
