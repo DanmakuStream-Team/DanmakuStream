@@ -7,28 +7,29 @@
       </div>
     </section>
 
-    <section class="page-shell channel-wrap">
-      <div class="channel-left">
-        <button class="hot-button" type="button" @click="resetFilter">
-          <span>火</span>
-          热门
-        </button>
+    <section class="page-shell feature-wrap">
+      <div class="feature-heading">
+        <button type="button" @click="resetFilter">功能入口</button>
+        <p>围绕视频、弹幕、投稿、审核和直播组织页面</p>
       </div>
-      <div class="channels">
+      <div class="features">
         <button
-          v-for="item in channels"
-          :key="item"
+          v-for="item in backendFeatures"
+          :key="item.key"
           type="button"
-          :class="{ active: activeChannel === item }"
-          @click="selectChannel(item)"
+          :class="{ active: activeFeature === item.key }"
+          @click="selectFeature(item)"
         >
-          {{ item }}
+          <strong>{{ item.label }}</strong>
+          <span>{{ item.desc }}</span>
         </button>
       </div>
-      <div class="channel-right">
-        <button type="button" @click="router.push('/live/1')">直播</button>
-        <button type="button" @click="router.push('/creator')">创作中心</button>
-        <button type="button" @click="router.push('/admin')">审核后台</button>
+      <div class="quick-links">
+        <button type="button" @click="router.push('/creator/upload')">上传视频</button>
+        <button type="button" @click="router.push('/creator')">我的投稿</button>
+        <button type="button" @click="router.push('/live/1')">进入直播</button>
+        <button type="button" @click="router.push('/admin/videos')">视频审核</button>
+        <button type="button" @click="router.push('/admin/danmaku')">弹幕管理</button>
       </div>
     </section>
 
@@ -36,7 +37,7 @@
       <div class="feed-head">
         <div>
           <h2>推荐视频</h2>
-          <p>{{ loadError || '展示后端返回的已审核视频，支持关键词和标签筛选。' }}</p>
+          <p>{{ loadError || activeFeatureText }}</p>
         </div>
         <div class="feed-tools">
           <el-input
@@ -103,12 +104,24 @@ const videoStore = useVideoStore()
 const page = ref(1)
 const pageSize = 20
 const keyword = ref(String(route.query.keyword || ''))
-const activeChannel = ref(String(route.query.channel || '全部'))
+const activeFeature = ref(String(route.query.feature || 'video'))
 const loadError = ref('')
 
-const channels = ['全部', '动画', '番剧', '国创', '音乐', '舞蹈', '游戏', '知识', '科技', '运动', '生活', '美食', '影视', '汽车']
+const backendFeatures = [
+  { key: 'video', label: '视频浏览', desc: '列表 / 搜索 / 详情' },
+  { key: 'upload', label: '投稿上传', desc: '视频 / 封面 / 转码' },
+  { key: 'comment', label: '评论互动', desc: '评论 / 回复 / 点赞' },
+  { key: 'danmaku', label: '弹幕系统', desc: '拉取 / 发送 / 屏蔽' },
+  { key: 'live', label: '直播间', desc: '播放 / 实时弹幕 / 互动' },
+  { key: 'user', label: '用户主页', desc: '资料 / 作品 / 关注' },
+  { key: 'audit', label: '审核后台', desc: '视频审核 / 弹幕治理' },
+]
 const featuredVideo = computed(() => videoStore.videoList[0])
 const gridVideos = computed(() => videoStore.videoList.slice(featuredVideo.value ? 1 : 0))
+const activeFeatureText = computed(() => {
+  const item = backendFeatures.find((feature) => feature.key === activeFeature.value)
+  return item ? `${item.label}：${item.desc}` : '展示后端返回的已审核视频。'
+})
 
 async function loadVideos() {
   loadError.value = ''
@@ -117,24 +130,38 @@ async function loadVideos() {
       page: page.value,
       pageSize,
       keyword: keyword.value.trim() || undefined,
-      tag: activeChannel.value === '全部' ? undefined : activeChannel.value,
     })
   } catch (error: any) {
     loadError.value = '后端服务暂未连接，当前只显示空状态。'
   }
 }
 
-function selectChannel(channel: string) {
-  activeChannel.value = channel
-  page.value = 1
-  loadVideos()
+function selectFeature(item: (typeof backendFeatures)[number]) {
+  activeFeature.value = item.key
+  if (item.key === 'upload') {
+    router.push('/creator/upload')
+    return
+  }
+  if (item.key === 'user') {
+    router.push('/login')
+    return
+  }
+  if (item.key === 'audit') {
+    router.push('/admin')
+    return
+  }
+  if (item.key === 'live') {
+    router.push('/live/1')
+    return
+  }
+  router.push({ path: '/', query: { feature: item.key } })
 }
 
 function resetFilter() {
-  activeChannel.value = '全部'
+  activeFeature.value = 'video'
   keyword.value = ''
   page.value = 1
-  loadVideos()
+  router.push({ path: '/', query: { feature: 'video' } })
 }
 
 onMounted(loadVideos)
@@ -144,8 +171,8 @@ watch(() => route.query.keyword, (value) => {
   loadVideos()
 })
 
-watch(() => route.query.channel, (value) => {
-  activeChannel.value = String(value || '全部')
+watch(() => route.query.feature, (value) => {
+  activeFeature.value = String(value || 'video')
   page.value = 1
   loadVideos()
 })
@@ -189,42 +216,98 @@ watch(() => route.query.channel, (value) => {
   font-size: 15px;
 }
 
-.channel-wrap {
+.feature-wrap {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 18px;
+  grid-template-columns: 1fr;
+  gap: 16px;
   padding: 18px 0 20px;
   border-bottom: 1px solid #f1f2f3;
 }
 
-.hot-button {
-  display: grid;
-  gap: 5px;
-  justify-items: center;
+.feature-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.feature-heading button {
   border: 0;
   background: transparent;
+  color: #18191c;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.feature-heading button:hover {
+  color: #00aeec;
+}
+
+.feature-heading p {
+  margin: 0;
+  color: #9499a0;
+  font-size: 13px;
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.features button,
+.quick-links button {
+  border: 0;
+  border-radius: 8px;
+  background: #f6f7f8;
   color: #61666d;
   cursor: pointer;
 }
 
-.hot-button span {
+.features button {
   display: grid;
-  width: 46px;
-  height: 46px;
-  place-items: center;
-  border-radius: 50%;
-  background: #fb7299;
-  color: #fff;
-  font-weight: 800;
+  gap: 4px;
+  min-height: 62px;
+  padding: 9px 12px;
+  text-align: left;
 }
 
-.channels {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(70px, 1fr));
+.features strong {
+  color: #18191c;
+  font-size: 15px;
+}
+
+.features span {
+  color: #9499a0;
+  font-size: 12px;
+}
+
+.quick-links button {
+  height: 34px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+
+.features button:hover,
+.features button.active,
+.quick-links button:hover {
+  background: #e3f6ff;
+  color: #00aeec;
+}
+
+.features button:hover strong,
+.features button.active strong {
+  color: #00aeec;
+}
+
+.quick-links {
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
+/*
 .channels button,
 .channel-right button {
   height: 34px;
@@ -248,6 +331,7 @@ watch(() => route.query.channel, (value) => {
   grid-template-columns: repeat(3, auto);
   gap: 12px;
 }
+*/
 
 .feed-section {
   padding-top: 26px;
@@ -362,18 +446,23 @@ watch(() => route.query.channel, (value) => {
 }
 
 @media (max-width: 1100px) {
-  .channel-wrap,
   .feed-layout {
     grid-template-columns: 1fr;
   }
 
-  .channel-right {
-    justify-content: start;
+  .features {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 760px) {
-  .channels,
+  .feature-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .features,
   .video-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

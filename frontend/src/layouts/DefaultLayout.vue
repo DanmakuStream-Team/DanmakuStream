@@ -73,10 +73,11 @@ const keyword = ref('')
 
 const navItems = [
   { key: 'home', label: '首页', path: '/' },
-  { key: 'bangumi', label: '番剧', path: '/', query: { channel: '番剧' } },
+  { key: 'video', label: '视频', path: '/', query: { feature: 'video' } },
+  { key: 'danmaku', label: '弹幕', path: '/', query: { feature: 'danmaku' } },
   { key: 'live', label: '直播', path: '/live/1' },
-  { key: 'creator', label: '创作', path: '/creator' },
-  { key: 'admin', label: '管理', path: '/admin' },
+  { key: 'creator', label: '投稿', path: '/creator/upload' },
+  { key: 'admin', label: '审核', path: '/admin' },
 ]
 
 function goNav(item: (typeof navItems)[number]) {
@@ -85,10 +86,13 @@ function goNav(item: (typeof navItems)[number]) {
 
 function isActive(key: string) {
   if (key === 'home') {
-    return route.path === '/' && route.query.channel !== '番剧'
+    return route.path === '/' && !route.query.feature
   }
-  if (key === 'bangumi') {
-    return route.path === '/' && route.query.channel === '番剧'
+  if (key === 'video') {
+    return route.path === '/' && route.query.feature === 'video'
+  }
+  if (key === 'danmaku') {
+    return route.path === '/' && route.query.feature === 'danmaku'
   }
   if (key === 'live') {
     return route.path.startsWith('/live')
