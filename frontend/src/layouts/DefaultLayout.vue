@@ -3,17 +3,17 @@
     <el-header class="topbar">
       <div class="topbar-inner">
         <button class="brand" type="button" @click="router.push('/')">
-          <span class="brand-mark">D</span>
-          <span>DanmakuStream</span>
+          <span class="brand-script">Danmaku</span>
+          <span class="brand-name">Stream</span>
         </button>
 
         <nav class="nav">
           <button
             v-for="item in navItems"
-            :key="item.path"
+            :key="item.key"
             type="button"
-            :class="{ active: route.path === item.path }"
-            @click="router.push(item.path)"
+            :class="{ active: isActive(item.key) }"
+            @click="goNav(item)"
           >
             {{ item.label }}
           </button>
@@ -23,7 +23,7 @@
           <el-input
             v-model="keyword"
             class="search"
-            placeholder="搜索视频"
+            placeholder="搜索视频、弹幕、创作者"
             clearable
             @keyup.enter="search"
           >
@@ -31,12 +31,12 @@
               <el-icon><Search /></el-icon>
             </template>
           </el-input>
-          <el-button circle title="上传" @click="router.push('/creator/upload')">
+          <el-button class="round-action" circle title="投稿" @click="router.push('/creator/upload')">
             <el-icon><Upload /></el-icon>
           </el-button>
           <el-dropdown v-if="authStore.isLoggedIn" trigger="click">
             <button class="user-button" type="button">
-              <el-avatar :size="32" :src="authStore.userInfo?.avatar">
+              <el-avatar :size="34" :src="authStore.userInfo?.avatar">
                 {{ authStore.userInfo?.nickname?.slice(0, 1) || '我' }}
               </el-avatar>
             </button>
@@ -49,7 +49,7 @@
               </el-dropdown-menu>
             </template>
           </el-dropdown>
-          <el-button v-else type="primary" @click="router.push('/login')">登录</el-button>
+          <el-button v-else class="login-btn" type="primary" @click="router.push('/login')">登录</el-button>
         </div>
       </div>
     </el-header>
@@ -72,10 +72,35 @@ const authStore = useAuthStore()
 const keyword = ref('')
 
 const navItems = [
-  { label: '发现', path: '/' },
-  { label: '创作', path: '/creator' },
-  { label: '管理', path: '/admin' },
+  { key: 'home', label: '首页', path: '/' },
+  { key: 'bangumi', label: '番剧', path: '/', query: { channel: '番剧' } },
+  { key: 'live', label: '直播', path: '/live/1' },
+  { key: 'creator', label: '创作', path: '/creator' },
+  { key: 'admin', label: '管理', path: '/admin' },
 ]
+
+function goNav(item: (typeof navItems)[number]) {
+  router.push({ path: item.path, query: item.query || {} })
+}
+
+function isActive(key: string) {
+  if (key === 'home') {
+    return route.path === '/' && route.query.channel !== '番剧'
+  }
+  if (key === 'bangumi') {
+    return route.path === '/' && route.query.channel === '番剧'
+  }
+  if (key === 'live') {
+    return route.path.startsWith('/live')
+  }
+  if (key === 'creator') {
+    return route.path.startsWith('/creator')
+  }
+  if (key === 'admin') {
+    return route.path.startsWith('/admin')
+  }
+  return false
+}
 
 function search() {
   router.push({ path: '/', query: keyword.value ? { keyword: keyword.value } : {} })
@@ -97,9 +122,9 @@ function logout() {
   position: sticky;
   top: 0;
   z-index: 30;
-  height: 68px;
+  height: 64px;
   padding: 0;
-  border-bottom: 1px solid rgba(20, 32, 51, 0.08);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(16px);
 }
@@ -109,7 +134,7 @@ function logout() {
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 24px;
-  width: min(1180px, calc(100% - 40px));
+  width: min(1320px, calc(100% - 48px));
   height: 100%;
   margin: 0 auto;
 }
@@ -124,40 +149,41 @@ function logout() {
 
 .brand {
   display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  color: #142033;
-  font-size: 18px;
-  font-weight: 800;
+  align-items: baseline;
+  gap: 6px;
+  color: #18191c;
 }
 
-.brand-mark {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border-radius: 8px;
-  background: #165dff;
-  color: #fff;
+.brand-script {
+  color: #fb7299;
+  font-size: 27px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.brand-name {
+  font-size: 19px;
+  font-weight: 800;
 }
 
 .nav {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
 }
 
 .nav button {
   height: 36px;
-  padding: 0 14px;
+  padding: 0 13px;
   border-radius: 8px;
-  color: #667085;
+  color: #61666d;
   font-size: 14px;
 }
 
-.nav button.active,
-.nav button:hover {
-  background: #eef4ff;
-  color: #165dff;
+.nav button:hover,
+.nav button.active {
+  background: #f1f2f3;
+  color: #00aeec;
 }
 
 .actions {
@@ -167,7 +193,18 @@ function logout() {
 }
 
 .search {
-  width: 240px;
+  width: min(360px, 28vw);
+}
+
+.round-action {
+  color: #61666d;
+}
+
+.login-btn {
+  min-width: 76px;
+  background: #00aeec;
+  border-color: #00aeec;
+  font-weight: 700;
 }
 
 .user-button {
@@ -177,10 +214,10 @@ function logout() {
 }
 
 .main {
-  padding: 28px 0 56px;
+  padding: 0 0 48px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 920px) {
   .topbar {
     height: auto;
   }
@@ -188,12 +225,13 @@ function logout() {
   .topbar-inner {
     grid-template-columns: 1fr auto;
     gap: 12px;
-    padding: 12px 0;
+    padding: 10px 0;
   }
 
   .nav {
     grid-column: 1 / -1;
     order: 3;
+    overflow-x: auto;
   }
 
   .search {

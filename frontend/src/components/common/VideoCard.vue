@@ -2,28 +2,30 @@
   <article class="video-card" @click="$emit('open')">
     <div class="cover">
       <img v-if="video.coverUrl" :src="mediaUrl(video.coverUrl)" :alt="video.title" />
-      <div v-else class="cover-fallback">Danmaku</div>
-      <span class="duration">{{ formatDuration(video.duration) }}</span>
+      <div v-else class="cover-fallback">
+        <span>Danmaku</span>
+      </div>
+      <div class="cover-mask">
+        <span><el-icon><VideoPlay /></el-icon>{{ formatCount(video.viewCount) }}</span>
+        <span><el-icon><ChatDotRound /></el-icon>{{ formatCount(video.danmakuCount) }}</span>
+        <strong>{{ formatDuration(video.duration) }}</strong>
+      </div>
     </div>
     <div class="body">
       <h3>{{ video.title }}</h3>
-      <div class="meta">
-        <span>{{ formatCount(video.viewCount) }} 播放</span>
-        <span>{{ formatCount(video.danmakuCount) }} 弹幕</span>
-      </div>
       <div class="author">
-        <el-avatar :size="24" :src="mediaUrl(video.author?.avatar)">
-          {{ video.author?.nickname?.slice(0, 1) || 'U' }}
-        </el-avatar>
+        <el-icon><User /></el-icon>
         <span>{{ video.author?.nickname || '匿名用户' }}</span>
+        <em>{{ formatTime(video.createdAt) }}</em>
       </div>
     </div>
   </article>
 </template>
 
 <script setup lang="ts">
+import { ChatDotRound, User, VideoPlay } from '@element-plus/icons-vue'
 import type { VideoInfo } from '@/types'
-import { formatCount, formatDuration, mediaUrl } from '@/utils/format'
+import { formatCount, formatDuration, formatTime, mediaUrl } from '@/utils/format'
 
 defineProps<{ video: VideoInfo }>()
 defineEmits<{ open: [] }>()
@@ -31,25 +33,16 @@ defineEmits<{ open: [] }>()
 
 <style scoped>
 .video-card {
-  overflow: hidden;
-  border: 1px solid rgba(20, 32, 51, 0.08);
-  border-radius: 10px;
-  background: #fff;
+  min-width: 0;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-.video-card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(22, 93, 255, 0.22);
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.1);
 }
 
 .cover {
   position: relative;
   overflow: hidden;
   aspect-ratio: 16 / 9;
-  background: #e8edf5;
+  border-radius: 8px;
+  background: #f1f2f3;
 }
 
 .cover img {
@@ -57,6 +50,11 @@ defineEmits<{ open: [] }>()
   height: 100%;
   display: block;
   object-fit: cover;
+  transition: transform 0.25s ease;
+}
+
+.video-card:hover .cover img {
+  transform: scale(1.04);
 }
 
 .cover-fallback {
@@ -64,47 +62,77 @@ defineEmits<{ open: [] }>()
   width: 100%;
   height: 100%;
   place-items: center;
-  color: #165dff;
-  font-weight: 800;
+  background:
+    linear-gradient(135deg, rgba(0, 174, 236, 0.16), rgba(251, 114, 153, 0.16)),
+    #f6f7f8;
+  color: #00aeec;
+  font-size: 18px;
+  font-weight: 900;
 }
 
-.duration {
+.cover-mask {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
-  padding: 3px 7px;
-  border-radius: 6px;
-  background: rgba(10, 16, 28, 0.78);
+  inset: auto 0 0;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 22px 8px 7px;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.72));
   color: #fff;
   font-size: 12px;
 }
 
+.cover-mask span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.cover-mask strong {
+  justify-self: end;
+  font-weight: 600;
+}
+
 .body {
-  display: grid;
-  gap: 10px;
-  padding: 14px;
+  padding: 9px 2px 0;
 }
 
 h3 {
-  min-height: 44px;
+  display: -webkit-box;
+  min-height: 42px;
   margin: 0;
-  color: #142033;
+  overflow: hidden;
+  color: #18191c;
   font-size: 15px;
+  font-weight: 600;
   line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
-.meta {
-  display: flex;
-  gap: 10px;
-  color: #667085;
-  font-size: 12px;
+.video-card:hover h3 {
+  color: #00aeec;
 }
 
 .author {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: #475467;
+  gap: 5px;
+  margin-top: 7px;
+  color: #9499a0;
   font-size: 13px;
+}
+
+.author span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.author em {
+  flex-shrink: 0;
+  font-style: normal;
 }
 </style>

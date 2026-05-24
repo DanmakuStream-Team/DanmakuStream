@@ -1,9 +1,8 @@
 :root {
-  color: #172033;
-  background: #f5f7fb;
+  color: #18191c;
+  background: #fff;
   font-family:
-    Inter, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial,
-    sans-serif;
+    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   font-size: 16px;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -21,9 +20,7 @@ body,
 }
 
 body {
-  background:
-    radial-gradient(circle at 10% -10%, rgba(22, 93, 255, 0.13), transparent 34rem),
-    linear-gradient(180deg, #fbfdff 0%, #eef3f8 100%);
+  background: #fff;
 }
 
 a {
@@ -31,16 +28,21 @@ a {
   text-decoration: none;
 }
 
+button,
+input,
+textarea {
+  font: inherit;
+}
+
 .page-shell {
-  width: min(1180px, calc(100% - 40px));
+  width: min(1320px, calc(100% - 48px));
   margin: 0 auto;
 }
 
 .soft-panel {
-  border: 1px solid rgba(20, 32, 51, 0.08);
+  border: 1px solid #f1f2f3;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.06);
+  background: #fff;
 }
 
 .section-head {
@@ -54,12 +56,12 @@ a {
 .section-head h1,
 .section-head h2 {
   margin: 0;
-  color: #142033;
+  color: #18191c;
   line-height: 1.2;
 }
 
 .section-head h1 {
-  font-size: 32px;
+  font-size: 30px;
 }
 
 .section-head h2 {
@@ -67,7 +69,7 @@ a {
 }
 
 .muted {
-  color: #667085;
+  color: #9499a0;
 }
 
 .empty-panel {
@@ -76,9 +78,22 @@ a {
   place-items: center;
 }
 
+.el-button--primary {
+  --el-button-bg-color: #00aeec;
+  --el-button-border-color: #00aeec;
+  --el-button-hover-bg-color: #33bdec;
+  --el-button-hover-border-color: #33bdec;
+  --el-button-active-bg-color: #0097d6;
+  --el-button-active-border-color: #0097d6;
+}
+
+.el-pagination.is-background .el-pager li.is-active {
+  background-color: #00aeec;
+}
+
 @media (max-width: 720px) {
   .page-shell {
-    width: min(100% - 24px, 1180px);
+    width: min(100% - 24px, 1320px);
   }
 
   .section-head {
