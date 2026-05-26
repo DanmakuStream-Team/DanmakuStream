@@ -1,140 +1,180 @@
 <template>
-  <div class="max-w-6xl mx-auto flex flex-col h-[calc(100vh-120px)]">
-    <div v-loading="loading" class="flex-1 flex flex-col min-h-0">
-      <div v-if="room" class="flex gap-4 flex-1 min-h-0">
-        <!-- Player -->
-        <div class="flex-1 min-w-0">
-          <div class="bg-black rounded-xl overflow-hidden aspect-video relative">
-            <div ref="playerContainer" class="w-full h-full" />
-            <div class="absolute top-3 left-3 flex items-center gap-2 z-10">
-              <el-tag type="danger" size="small">直播中</el-tag>
-              <span class="text-white text-xs bg-black/50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <el-icon><View /></el-icon>
-                {{ viewerCount }} 人在看
-              </span>
-            </div>
-          </div>
-        </div>
+  <main class="page-shell live-page">
+    <div class="section-head">
+      <div>
+        <h1>直播间 {{ roomId }}</h1>
+        <p class="muted">后端直播 API 暂未实现，这里只保留 WebSocket 弹幕入口。</p>
+      </div>
+      <el-tag :type="connected ? 'success' : 'info'">{{ connected ? '已连接' : '未连接' }}</el-tag>
+    </div>
 
-        <!-- Danmaku panel -->
-        <div class="w-72 flex flex-col border border-gray-200 rounded-xl overflow-hidden flex-shrink-0">
-          <div class="px-3 py-2.5 font-semibold bg-gray-50 border-b border-gray-200 flex items-center gap-2">
-            <span>弹幕列表</span>
-            <el-tag size="small" type="primary">{{ danmakuList.length }}</el-tag>
-          </div>
-          <div ref="danmakuListEl" class="flex-1 overflow-y-auto px-3 py-2 space-y-1.5 min-h-0">
-            <div
-              v-for="(d, i) in danmakuList"
-              :key="i"
-              class="text-sm leading-relaxed break-all"
-              :style="{ color: d.color }"
-            >
-              <span class="font-semibold opacity-80 mr-1">{{ d.username ?? '观众' }}:</span>
-              <span>{{ d.content }}</span>
-            </div>
-          </div>
+    <section class="live-grid">
+      <div class="stage soft-panel">
+        <div class="stage-content">
+          <el-icon><VideoPlay /></el-icon>
+          <strong>直播画面占位</strong>
+          <span>接入真实直播流后可替换为播放器</span>
         </div>
       </div>
 
-      <el-result
-        v-else-if="!loading"
-        icon="warning"
-        title="直播间不存在或尚未开播"
-      >
-        <template #extra>
-          <el-button type="primary" @click="$router.back()">返回</el-button>
-        </template>
-      </el-result>
-    </div>
-
-    <!-- Danmaku input -->
-    <div v-if="room" class="mt-3 bg-white border border-gray-200 rounded-xl px-4 py-3 flex gap-2 items-center">
-      <el-input
-        v-model="danmakuInput"
-        placeholder="发送弹幕..."
-        :maxlength="100"
-        class="flex-1"
-        :disabled="!authStore.isLoggedIn"
-        @keydown.enter="sendDanmaku"
-      />
-      <el-color-picker v-model="danmakuColor" size="small" />
-      <el-tooltip :content="authStore.isLoggedIn ? '' : '请先登录'" :disabled="authStore.isLoggedIn">
-        <el-button type="primary" :disabled="!authStore.isLoggedIn" @click="sendDanmaku">发送</el-button>
-      </el-tooltip>
-    </div>
-  </div>
+      <aside class="chat soft-panel">
+        <div class="chat-head">
+          <h2>实时弹幕</h2>
+          <el-tag>{{ messages.length }}</el-tag>
+        </div>
+        <div class="messages">
+          <div v-for="message in messages" :key="message.id" class="message" :style="{ color: message.color }">
+            {{ message.content }}
+          </div>
+          <el-empty v-if="!messages.length" description="暂无弹幕" />
+        </div>
+        <div class="send-box">
+          <el-input v-model="text" placeholder="发送弹幕" @keyup.enter="send" />
+          <el-color-picker v-model="color" />
+          <el-button type="primary" @click="send">发送</el-button>
+        </div>
+      </aside>
+    </section>
+  </main>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
-import { useAuthStore } from '@/store/auth'
+import { onMounted, onUnmounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { VideoPlay } from '@element-plus/icons-vue'
+import { useRoute, useRouter } from 'vue-router'
 import { DanmakuWebSocket } from '@/api/danmaku'
+import { useAuthStore } from '@/store/auth'
 import type { Danmaku } from '@/types'
 
-interface LiveRoom {
-  id: number
-  title: string
-  streamUrl?: string
-}
-
-interface DanmakuItem extends Partial<Danmaku> {
-  username?: string
-  content: string
-  color: string
-}
-
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
+const roomId = Number(route.params.id)
+const connected = ref(false)
+const text = ref('')
+const color = ref('#FFFFFF')
+const messages = ref<Danmaku[]>([])
+let ws: DanmakuWebSocket | null = null
 
-const playerContainer = ref<HTMLElement>()
-const danmakuListEl = ref<HTMLElement>()
-const loading = ref(true)
-const room = ref<LiveRoom | null>(null)
-const viewerCount = ref(0)
-const danmakuList = ref<DanmakuItem[]>([])
-const danmakuInput = ref('')
-const danmakuColor = ref('#FFFFFF')
-
-let wsClient: DanmakuWebSocket | null = null
-
-onMounted(async () => {
-  const id = Number(route.params.id)
-  await new Promise(r => setTimeout(r, 300))
-  room.value = { id, title: `直播间 ${id}` }
-  loading.value = false
-
-  wsClient = new DanmakuWebSocket({
-    roomId: id,
+onMounted(() => {
+  if (!authStore.isLoggedIn) return
+  ws = new DanmakuWebSocket({
+    roomId,
     token: authStore.token,
-    onMessage: (d: Danmaku) => {
-      danmakuList.value.push({ content: d.content, color: d.color ?? '#FFFFFF' })
-      scrollDanmakuList()
-    },
-    onViewerCount: (count: number) => { viewerCount.value = count },
+    onMessage: (item) => messages.value.push(item),
+    onViewerCount: () => {},
   })
-  wsClient.connect()
+  ws.connect()
+  connected.value = true
 })
 
-onUnmounted(() => { wsClient?.disconnect() })
+onUnmounted(() => ws?.disconnect())
 
-function sendDanmaku() {
-  const text = danmakuInput.value.trim()
-  if (!text || !authStore.isLoggedIn) return
-  wsClient?.send(text, danmakuColor.value)
-  danmakuList.value.push({
-    content: text,
-    color: danmakuColor.value,
-    username: authStore.userInfo?.username ?? '我',
-  })
-  danmakuInput.value = ''
-  scrollDanmakuList()
-}
-
-async function scrollDanmakuList() {
-  await nextTick()
-  if (danmakuListEl.value) {
-    danmakuListEl.value.scrollTop = danmakuListEl.value.scrollHeight
+function send() {
+  if (!authStore.isLoggedIn) {
+    ElMessage.warning('请先登录')
+    router.push('/login')
+    return
   }
+  if (!text.value.trim()) return
+  ws?.send(text.value.trim(), color.value)
+  messages.value.push({
+    id: Date.now(),
+    videoId: roomId,
+    userId: authStore.userInfo?.id || 0,
+    content: text.value.trim(),
+    time: 0,
+    color: color.value,
+    fontSize: 'medium',
+    type: 'scroll',
+  })
+  text.value = ''
 }
 </script>
+
+<style scoped>
+.live-page {
+  display: grid;
+  gap: 18px;
+}
+
+.section-head p {
+  margin: 8px 0 0;
+}
+
+.live-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 18px;
+}
+
+.stage {
+  display: grid;
+  min-height: 540px;
+  place-items: center;
+  background: linear-gradient(135deg, #165dff, #111827);
+  color: #fff;
+}
+
+.stage-content {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+}
+
+.stage-content .el-icon {
+  font-size: 62px;
+}
+
+.stage-content strong {
+  font-size: 26px;
+}
+
+.stage-content span {
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.chat {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 540px;
+  padding: 16px;
+}
+
+.chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-head h2 {
+  margin: 0;
+}
+
+.messages {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  overflow: auto;
+  padding: 16px 0;
+}
+
+.message {
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: #f7f9fc;
+}
+
+.send-box {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+}
+
+@media (max-width: 920px) {
+  .live-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

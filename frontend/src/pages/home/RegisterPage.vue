@@ -1,41 +1,30 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-    <div class="bg-white rounded-2xl shadow-lg w-96 p-10">
-      <div class="text-center mb-8">
-        <div class="text-3xl font-bold text-blue-600 mb-1">Danmaku</div>
-        <div class="text-gray-500 text-sm">创建你的账号</div>
-      </div>
-
-      <el-form :model="form" label-position="top" @submit.prevent="handleRegister">
+  <main class="auth-page">
+    <section class="auth-card soft-panel">
+      <el-tag type="success">创建账号</el-tag>
+      <h1>加入 DanmakuStream</h1>
+      <p>注册后可以上传视频、评论、发送弹幕和关注用户。</p>
+      <el-form label-position="top" @submit.prevent>
         <el-form-item label="昵称">
-          <el-input v-model="form.nickname" placeholder="请输入昵称" size="large" clearable />
+          <el-input v-model="form.nickname" placeholder="请输入昵称" />
         </el-form-item>
         <el-form-item label="密码">
-          <el-input v-model="form.password" type="password" placeholder="至少6位" size="large" show-password />
+          <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" />
         </el-form-item>
-        <el-button
-          type="primary"
-          native-type="submit"
-          class="w-full mt-2"
-          size="large"
-          :loading="loading"
-        >
-          注册
-        </el-button>
+        <el-button type="primary" size="large" :loading="loading" @click="submit" class="wide">注册</el-button>
       </el-form>
-
-      <div class="text-center mt-5 text-sm text-gray-500">
+      <div class="switch">
         已有账号？
-        <el-link type="primary" @click="router.push('/login')">立即登录</el-link>
+        <el-link type="primary" @click="router.push('/login')">去登录</el-link>
       </div>
-    </div>
-  </div>
+    </section>
+  </main>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 
 const router = useRouter()
@@ -43,23 +32,53 @@ const authStore = useAuthStore()
 const loading = ref(false)
 const form = reactive({ nickname: '', password: '' })
 
-async function handleRegister() {
+async function submit() {
+  if (!form.nickname.trim() || !form.password) {
+    ElMessage.warning('请填写昵称和密码')
+    return
+  }
+  loading.value = true
   try {
-    loading.value = true
-    await authStore.register(form.nickname, form.password)
+    await authStore.register(form.nickname.trim(), form.password)
     ElMessage.success('注册成功')
     router.push('/')
-  } catch (error) {
-    ElMessage.error(getErrorMessage(error, '注册失败，请重试'))
   } finally {
     loading.value = false
   }
 }
-
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) {
-    return error.message
-  }
-  return fallback
-}
 </script>
+
+<style scoped>
+.auth-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.auth-card {
+  width: min(420px, 100%);
+  padding: 28px;
+}
+
+h1 {
+  margin: 14px 0 8px;
+  color: #142033;
+  font-size: 30px;
+}
+
+p {
+  margin: 0 0 24px;
+  color: #667085;
+}
+
+.wide {
+  width: 100%;
+}
+
+.switch {
+  margin-top: 18px;
+  text-align: center;
+  color: #667085;
+}
+</style>

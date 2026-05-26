@@ -1,0 +1,195 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.12.1
+2 info using node@v24.15.0
+3 silly config load:file:C:\Program Files\nodejs\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\lenovo\Desktop\大二\大二下\软工基础\大作业\DanmakuStream\frontend\.npmrc
+5 silly config load:file:C:\Users\lenovo\.npmrc
+6 silly config load:file:C:\Users\lenovo\AppData\Roaming\npm\etc\npmrc
+7 verbose title npm install
+8 verbose argv "install" "--cache" ".\\.npm-cache"
+9 verbose logfile logs-max:10 dir:C:\Users\lenovo\Desktop\大二\大二下\软工基础\大作业\DanmakuStream\frontend\.npm-cache\_logs\2026-05-24T08_20_26_078Z-
+10 verbose logfile C:\Users\lenovo\Desktop\大二\大二下\软工基础\大作业\DanmakuStream\frontend\.npm-cache\_logs\2026-05-24T08_20_26_078Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+13 silly idealTree buildDeps
+14 silly fetch manifest vite@^6.4.2
+15 silly packumentCache full:https://registry.npmjs.org/vite cache-miss
+16 http fetch GET https://registry.npmjs.org/npm attempt 1 failed with EACCES
+17 http fetch GET https://registry.npmjs.org/vite attempt 1 failed with EACCES
+18 http fetch GET https://registry.npmjs.org/npm attempt 2 failed with EACCES
+19 http fetch GET https://registry.npmjs.org/vite attempt 2 failed with EACCES
+20 http fetch GET https://registry.npmjs.org/npm attempt 3 failed with EACCES
+21 http fetch GET https://registry.npmjs.org/vite attempt 3 failed with EACCES
+22 silly placeDep ROOT vite@ REPLACE for: danmaku-stream-frontend@0.1.0 want: ^6.4.2
+23 warn ERESOLVE overriding peer dependency {
+23 warn ERESOLVE   code: 'ERESOLVE',
+23 warn ERESOLVE   edge: {
+23 warn ERESOLVE     type: 'peer',
+23 warn ERESOLVE     name: 'vite',
+23 warn ERESOLVE     spec: '^5.0.0 || ^6.0.0',
+23 warn ERESOLVE     error: 'INVALID',
+23 warn ERESOLVE     from: {
+23 warn ERESOLVE       name: '@vitejs/plugin-vue',
+23 warn ERESOLVE       version: '5.2.4',
+23 warn ERESOLVE       location: 'node_modules/@vitejs/plugin-vue',
+23 warn ERESOLVE       isWorkspace: false,
+23 warn ERESOLVE       dependents: [Array]
+23 warn ERESOLVE     }
+23 warn ERESOLVE   },
+23 warn ERESOLVE   dep: {
+23 warn ERESOLVE     name: 'vite',
+23 warn ERESOLVE     version: undefined,
+23 warn ERESOLVE     errors: [ [FetchError] ],
+23 warn ERESOLVE     package: {},
+23 warn ERESOLVE     whileInstalling: {
+23 warn ERESOLVE       name: 'danmaku-stream-frontend',
+23 warn ERESOLVE       version: '0.1.0',
+23 warn ERESOLVE       path: 'C:\\Users\\lenovo\\Desktop\\大二\\大二下\\软工基础\\大作业\\DanmakuStream\\frontend'
+23 warn ERESOLVE     },
+23 warn ERESOLVE     location: 'node_modules/vite',
+23 warn ERESOLVE     isWorkspace: false,
+23 warn ERESOLVE     dependents: [ [Object] ]
+23 warn ERESOLVE   },
+23 warn ERESOLVE   force: false,
+23 warn ERESOLVE   isMine: true,
+23 warn ERESOLVE   strictPeerDeps: false,
+23 warn ERESOLVE   current: {
+23 warn ERESOLVE     name: 'vite',
+23 warn ERESOLVE     version: '8.0.8',
+23 warn ERESOLVE     location: 'node_modules/vite',
+23 warn ERESOLVE     isWorkspace: false,
+23 warn ERESOLVE     dependents: [ [Object], [Object] ]
+23 warn ERESOLVE   }
+23 warn ERESOLVE }
+24 silly fetch manifest @emnapi/core@^1.7.1
+25 silly packumentCache full:https://registry.npmjs.org/@emnapi%2fcore cache-miss
+26 http fetch GET https://registry.npmjs.org/@emnapi%2fcore attempt 1 failed with EACCES
+27 http fetch GET https://registry.npmjs.org/@emnapi%2fcore attempt 2 failed with EACCES
+28 http fetch GET https://registry.npmjs.org/@emnapi%2fcore attempt 3 failed with EACCES
+29 silly fetch manifest @emnapi/runtime@^1.7.1
+30 silly packumentCache full:https://registry.npmjs.org/@emnapi%2fruntime cache-miss
+31 http fetch GET https://registry.npmjs.org/@emnapi%2fruntime attempt 1 failed with EACCES
+32 http fetch GET https://registry.npmjs.org/@emnapi%2fruntime attempt 2 failed with EACCES
+33 http fetch GET https://registry.npmjs.org/@emnapi%2fruntime attempt 3 failed with EACCES
+34 silly placeDep ROOT @emnapi/core@ OK for: @napi-rs/wasm-runtime@1.1.4 want: ^1.7.1
+35 warn ERESOLVE overriding peer dependency {
+35 warn ERESOLVE   code: 'ERESOLVE',
+35 warn ERESOLVE   edge: {
+35 warn ERESOLVE     type: 'peer',
+35 warn ERESOLVE     name: '@emnapi/core',
+35 warn ERESOLVE     spec: '^1.7.1',
+35 warn ERESOLVE     error: 'INVALID',
+35 warn ERESOLVE     from: {
+35 warn ERESOLVE       name: '@napi-rs/wasm-runtime',
+35 warn ERESOLVE       version: '1.1.4',
+35 warn ERESOLVE       location: 'node_modules/@napi-rs/wasm-runtime',
+35 warn ERESOLVE       isWorkspace: false,
+35 warn ERESOLVE       dependents: [Array]
+35 warn ERESOLVE     }
+35 warn ERESOLVE   },
+35 warn ERESOLVE   dep: {
+35 warn ERESOLVE     name: '@emnapi/core',
+35 warn ERESOLVE     version: undefined,
+35 warn ERESOLVE     errors: [ [FetchError] ],
+35 warn ERESOLVE     package: {},
+35 warn ERESOLVE     whileInstalling: {
+35 warn ERESOLVE       name: '@napi-rs/wasm-runtime',
+35 warn ERESOLVE       version: '1.1.4',
+35 warn ERESOLVE       path: 'C:\\Users\\lenovo\\Desktop\\大二\\大二下\\软工基础\\大作业\\DanmakuStream\\frontend\\node_modules\\@napi-rs\\wasm-runtime'
+35 warn ERESOLVE     },
+35 warn ERESOLVE     location: 'node_modules/@emnapi/core',
+35 warn ERESOLVE     isWorkspace: false,
+35 warn ERESOLVE     dependents: [ [Object] ]
+35 warn ERESOLVE   },
+35 warn ERESOLVE   force: false,
+35 warn ERESOLVE   isMine: false,
+35 warn ERESOLVE   strictPeerDeps: false,
+35 warn ERESOLVE   current: {
+35 warn ERESOLVE     name: '@emnapi/core',
+35 warn ERESOLVE     version: undefined,
+35 warn ERESOLVE     errors: [ [FetchError] ],
+35 warn ERESOLVE     package: {},
+35 warn ERESOLVE     location: 'node_modules/@emnapi/core',
+35 warn ERESOLVE     isWorkspace: false,
+35 warn ERESOLVE     dependents: []
+35 warn ERESOLVE   }
+35 warn ERESOLVE }
+36 silly placeDep ROOT @emnapi/runtime@ OK for: @napi-rs/wasm-runtime@1.1.4 want: ^1.7.1
+37 warn ERESOLVE overriding peer dependency {
+37 warn ERESOLVE   code: 'ERESOLVE',
+37 warn ERESOLVE   edge: {
+37 warn ERESOLVE     type: 'peer',
+37 warn ERESOLVE     name: '@emnapi/runtime',
+37 warn ERESOLVE     spec: '^1.7.1',
+37 warn ERESOLVE     error: 'INVALID',
+37 warn ERESOLVE     from: {
+37 warn ERESOLVE       name: '@napi-rs/wasm-runtime',
+37 warn ERESOLVE       version: '1.1.4',
+37 warn ERESOLVE       location: 'node_modules/@napi-rs/wasm-runtime',
+37 warn ERESOLVE       isWorkspace: false,
+37 warn ERESOLVE       dependents: [Array]
+37 warn ERESOLVE     }
+37 warn ERESOLVE   },
+37 warn ERESOLVE   dep: {
+37 warn ERESOLVE     name: '@emnapi/runtime',
+37 warn ERESOLVE     version: undefined,
+37 warn ERESOLVE     errors: [ [FetchError] ],
+37 warn ERESOLVE     package: {},
+37 warn ERESOLVE     whileInstalling: {
+37 warn ERESOLVE       name: '@napi-rs/wasm-runtime',
+37 warn ERESOLVE       version: '1.1.4',
+37 warn ERESOLVE       path: 'C:\\Users\\lenovo\\Desktop\\大二\\大二下\\软工基础\\大作业\\DanmakuStream\\frontend\\node_modules\\@napi-rs\\wasm-runtime'
+37 warn ERESOLVE     },
+37 warn ERESOLVE     location: 'node_modules/@emnapi/runtime',
+37 warn ERESOLVE     isWorkspace: false,
+37 warn ERESOLVE     dependents: [ [Object] ]
+37 warn ERESOLVE   },
+37 warn ERESOLVE   force: false,
+37 warn ERESOLVE   isMine: false,
+37 warn ERESOLVE   strictPeerDeps: false,
+37 warn ERESOLVE   current: {
+37 warn ERESOLVE     name: '@emnapi/runtime',
+37 warn ERESOLVE     version: undefined,
+37 warn ERESOLVE     errors: [ [FetchError] ],
+37 warn ERESOLVE     package: {},
+37 warn ERESOLVE     location: 'node_modules/@emnapi/runtime',
+37 warn ERESOLVE     isWorkspace: false,
+37 warn ERESOLVE     dependents: []
+37 warn ERESOLVE   }
+37 warn ERESOLVE }
+38 verbose type system
+39 verbose stack FetchError: request to https://registry.npmjs.org/vite failed, reason: 
+39 verbose stack     at ClientRequest.<anonymous> (C:\Program Files\nodejs\node_modules\npm\node_modules\minipass-fetch\lib\index.js:130:14)
+39 verbose stack     at ClientRequest.emit (node:events:509:28)
+39 verbose stack     at emitErrorEvent (node:_http_client:109:11)
+39 verbose stack     at _destroy (node:_http_client:993:9)
+39 verbose stack     at onSocketNT (node:_http_client:1013:5)
+39 verbose stack     at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+40 error code EACCES
+41 error errno EACCES
+42 error FetchError: request to https://registry.npmjs.org/vite failed, reason: 
+42 error     at ClientRequest.<anonymous> (C:\Program Files\nodejs\node_modules\npm\node_modules\minipass-fetch\lib\index.js:130:14)
+42 error     at ClientRequest.emit (node:events:509:28)
+42 error     at emitErrorEvent (node:_http_client:109:11)
+42 error     at _destroy (node:_http_client:993:9)
+42 error     at onSocketNT (node:_http_client:1013:5)
+42 error     at process.processTicksAndRejections (node:internal/process/task_queues:91:21) {
+42 error   code: 'EACCES',
+42 error   errno: 'EACCES',
+42 error   type: 'system',
+42 error   requiredBy: '.'
+42 error }
+43 error
+43 error The operation was rejected by your operating system.
+43 error It's possible that the file was already in use (by a text editor or antivirus), or that you lack permissions to access it.
+43 error
+43 error If you believe this might be a permissions issue, please double-check the permissions of the file and its containing directories, or try running the command again as root/Administrator.
+44 silly unfinished npm timer reify 1779610827071
+45 silly unfinished npm timer reify:loadTrees 1779610827073
+46 verbose cwd C:\Users\lenovo\Desktop\大二\大二下\软工基础\大作业\DanmakuStream\frontend
+47 verbose os Windows_NT 10.0.26200
+48 verbose node v24.15.0
+49 verbose npm  v11.12.1
+50 verbose exit 1
+51 verbose code 1
+52 error A complete log of this run can be found in: C:\Users\lenovo\Desktop\大二\大二下\软工基础\大作业\DanmakuStream\frontend\.npm-cache\_logs\2026-05-24T08_20_26_078Z-debug-0.log

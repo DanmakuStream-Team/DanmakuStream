@@ -1,31 +1,48 @@
 import request from '@/utils/request'
-import type { VideoInfo, PageResult } from '@/types'
+import type { PageResult, VideoInfo, VideoStatus } from '@/types'
 
 export const videoApi = {
-  getVideoList(params: { page: number; pageSize: number; keyword?: string; tag?: string }) {
+  list(params: { page: number; pageSize: number; keyword?: string; tag?: string }) {
     return request.get<PageResult<VideoInfo>>('/videos', { params })
   },
-  getVideoDetail(id: number) {
+  detail(id: number) {
     return request.get<VideoInfo>(`/videos/${id}`)
   },
-  uploadVideo(formData: FormData, onProgress?: (percent: number) => void) {
-    return request.post<{ videoId: number }>('/videos/upload', formData, {
+  upload(formData: FormData, onProgress?: (percent: number) => void) {
+    return request.post<VideoInfo>('/videos/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      onUploadProgress: (e) => {
-        if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100))
+      onUploadProgress: (event) => {
+        if (event.total && onProgress) {
+          onProgress(Math.round((event.loaded / event.total) * 100))
+        }
       },
     })
   },
-  updateVideoMeta(id: number, data: Partial<Pick<VideoInfo, 'title' | 'description' | 'tags'>>) {
-    return request.put<void>(`/videos/${id}`, data)
+  update(id: number, data: { title?: string; description?: string; tags?: string }) {
+    return request.put<{ id: number }>(`/videos/${id}`, data)
   },
-  likeVideo(id: number) {
-    return request.post<void>(`/videos/${id}/like`)
+  updateCover(id: number, formData: FormData) {
+    return request.post<{ coverUrl: string }>(`/videos/${id}/cover`, formData)
   },
-  collectVideo(id: number) {
-    return request.post<void>(`/videos/${id}/collect`)
+  remove(id: number) {
+    return request.delete<{ id: number }>(`/videos/${id}`)
   },
-  deleteVideo(id: number) {
-    return request.delete<void>(`/videos/${id}`)
+  like(id: number) {
+    return request.post<{ liked: boolean }>(`/videos/${id}/like`)
+  },
+  collect(id: number) {
+    return request.post<{ collected: boolean }>(`/videos/${id}/collect`)
+  },
+  myVideos(params: { page: number; pageSize: number; status?: VideoStatus | '' }) {
+    return request.get<PageResult<VideoInfo>>('/users/me/videos', { params })
+  },
+  userVideos(userId: number, params: { page: number; pageSize: number }) {
+    return request.get<PageResult<VideoInfo>>(`/users/${userId}/videos`, { params })
+  },
+  adminList(params: { page: number; pageSize: number; status?: VideoStatus | ''; keyword?: string }) {
+    return request.get<PageResult<VideoInfo>>('/admin/videos', { params })
+  },
+  adminUpdateStatus(id: number, status: VideoStatus) {
+    return request.put<{ id: number; status: VideoStatus }>(`/admin/videos/${id}/status`, { status })
   },
 }

@@ -1,5 +1,103 @@
-@import "tailwindcss";
-
 :root {
-  --el-color-primary: #165dff;
+  color: #18191c;
+  background: #fff;
+  font-family:
+    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #fff;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+.page-shell {
+  width: min(1320px, calc(100% - 48px));
+  margin: 0 auto;
+}
+
+.soft-panel {
+  border: 1px solid #f1f2f3;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.section-head h1,
+.section-head h2 {
+  margin: 0;
+  color: #18191c;
+  line-height: 1.2;
+}
+
+.section-head h1 {
+  font-size: 30px;
+}
+
+.section-head h2 {
+  font-size: 24px;
+}
+
+.muted {
+  color: #9499a0;
+}
+
+.empty-panel {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+}
+
+.el-button--primary {
+  --el-button-bg-color: #00aeec;
+  --el-button-border-color: #00aeec;
+  --el-button-hover-bg-color: #33bdec;
+  --el-button-hover-border-color: #33bdec;
+  --el-button-active-bg-color: #0097d6;
+  --el-button-active-border-color: #0097d6;
+}
+
+.el-pagination.is-background .el-pager li.is-active {
+  background-color: #00aeec;
+}
+
+@media (max-width: 720px) {
+  .page-shell {
+    width: min(100% - 24px, 1320px);
+  }
+
+  .section-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
