@@ -10,7 +10,7 @@ Danmaku 是一个面向内容创作者与普通用户的综合视频社区，支
 
 | 层级 | 技术 |
 |---|---|
-| 前端 | Vue 3 · TypeScript · Arco Design · xgplayer · Pinia |
+| 前端 | Vue 3 · TypeScript · Element Plus · xgplayer · Pinia |
 | 后端 | Go · Gin · GORM · MySQL |
 | AI 服务 | Python · FastAPI · LangChain · DeepSeek |
 | 视频处理 | FFmpeg · HLS 分片 |
@@ -82,18 +82,19 @@ uvicorn app.main:app --reload --port 8000
 
 ### 用户端
 - 注册 / 登录 / 个人主页 / 关注关系
-- 视频首页浏览 · 关键词搜索 · 标签筛选
+- 视频首页浏览（精选大图 + 自适应网格）· 关键词搜索（列表布局展示）
 - 视频播放 · 拖拽进度 · 点赞 · 收藏
 - 实时弹幕发送（视频 & 直播间）
-- 评论区互动
+- 评论区互动 · 关注列表管理（侧边栏订阅区）
 
 ### 创作者端
-- 视频上传（HLS 分片转码）· 封面设置 · 元数据编辑
+- 视频上传（HLS 分片转码）· 封面设置（未上传时自动截取首帧）· 元数据编辑
 - 开启 / 关闭直播间
 
 ### 管理员端
 - 视频内容审核（通过 / 拒绝）
 - 违规弹幕屏蔽
+- 管理界面仅管理员可见（前端权限控制）
 
 ### AI 加分项
 - 视频课代表：自动生成三点式摘要
@@ -107,7 +108,8 @@ uvicorn app.main:app --reload --port 8000
 | POST | `/api/v1/auth/login` | 登录，返回 JWT | 公开 |
 | GET | `/api/v1/videos` | 视频列表 | 公开 |
 | GET | `/api/v1/videos/:id` | 视频详情 | 公开 |
-| POST | `/api/v1/videos/upload` | 上传视频（HLS 转码） | 登录 |
+| POST | `/api/v1/videos/upload` | 上传视频（HLS 转码 + 首帧封面） | 登录 |
+| GET | `/api/v1/users/following` | 获取当前用户关注列表 | 登录 |
 | GET | `/api/v1/danmaku/:videoId` | 拉取弹幕 | 公开 |
 | POST | `/api/v1/danmaku` | 发送弹幕 | 登录 |
 | POST | `/api/v1/live` | 开启直播间 | 登录 |
@@ -144,7 +146,7 @@ uvicorn app.main:app --reload --port 8000
 | comments | 评论（支持多级回复） |
 | live_rooms | 直播间（状态机：idle / live / ended） |
 | follows | 关注关系 |
-| likes / collects | 点赞 / 收藏记录 |
+| likes / collects / comment_likes | 点赞 / 收藏 / 评论点赞记录 |
 
 ## 开发规范
 
