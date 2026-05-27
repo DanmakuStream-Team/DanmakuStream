@@ -1,10 +1,15 @@
+@import url("https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont/style.css");
+@import "tailwindcss";
+
 :root {
+  --page-width: 94%;
+  --topbar-x: 2%;
   color: #18191c;
   background: #fff;
   font-family:
-    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
-  font-size: 16px;
-  font-synthesis: none;
+    "LXGW WenKai", "霞鹜文楷", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-size: 17px;
+  font-synthesis: weight;
   text-rendering: optimizeLegibility;
 }
 
@@ -21,6 +26,9 @@ body,
 
 body {
   background: #fff;
+  font-family:
+    "LXGW WenKai", "霞鹜文楷", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 500;
 }
 
 a {
@@ -34,8 +42,12 @@ textarea {
   font: inherit;
 }
 
+button {
+  font-weight: 700;
+}
+
 .page-shell {
-  width: min(1320px, calc(100% - 48px));
+  width: var(--page-width);
   margin: 0 auto;
 }
 
@@ -61,11 +73,13 @@ textarea {
 }
 
 .section-head h1 {
-  font-size: 30px;
+  font-size: 34px;
+  font-weight: 900;
 }
 
 .section-head h2 {
-  font-size: 24px;
+  font-size: 28px;
+  font-weight: 900;
 }
 
 .muted {
@@ -92,8 +106,9 @@ textarea {
 }
 
 @media (max-width: 720px) {
-  .page-shell {
-    width: min(100% - 24px, 1320px);
+  :root {
+    --page-width: 94%;
+    --topbar-x: 3%;
   }
 
   .section-head {

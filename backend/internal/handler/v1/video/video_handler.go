@@ -104,7 +104,7 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			Description: description,
 			Tags:        tags,
 			AuthorID:    userID,
-			Status:      "pending",
+			Status:      "approved",
 		}
 		if err := svcCtx.DB.Create(&video).Error; err != nil {
 			response.Fail(c, http.StatusInternalServerError, "创建视频记录失败")
@@ -154,6 +154,19 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			return
 		}
 
+		// Extract first frame as thumbnail
+		thumbnailName := "thumbnail.jpg"
+		thumbnailPath := filepath.Join(videoDir, thumbnailName)
+		thumbCmd := exec.Command("ffmpeg",
+			"-i", tmpPath,
+			"-frames:v", "1",
+			"-q:v", "2",
+			"-y",
+			thumbnailPath,
+		)
+		// ignore error; thumbnail is best-effort
+		thumbCmd.CombinedOutput()
+
 		// Remove temp file
 		os.Remove(tmpPath)
 
@@ -172,6 +185,13 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 					io.Copy(dst, src)
 					coverURL = fmt.Sprintf("/media/covers/%d/%s", video.ID, coverFile.Filename)
 				}
+			}
+		}
+
+		// Fallback to first-frame thumbnail if no cover uploaded
+		if coverURL == "" {
+			if _, err := os.Stat(thumbnailPath); err == nil {
+				coverURL = fmt.Sprintf("/media/videos/%d/%s", video.ID, thumbnailName)
 			}
 		}
 

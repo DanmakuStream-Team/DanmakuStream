@@ -8,6 +8,7 @@
           :poster="video.coverUrl"
           :danmakus="danmakus"
           @timeupdate="currentTime = $event"
+          @error="ElMessage.error($event)"
         />
 
         <div class="video-info">

@@ -330,6 +330,45 @@ func UpdateMeHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 	}
 }
 
+func FollowingListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint(middleware.CtxKeyUserID)
+
+		var followees []model.User
+		err := svcCtx.DB.
+			Table("users").
+			Select("users.id, users.nickname, users.avatar, users.role").
+			Joins("INNER JOIN follows ON follows.followee_id = users.id AND follows.deleted_at IS NULL").
+			Where("follows.follower_id = ?", userID).
+			Find(&followees).Error
+		if err != nil {
+			response.Fail(c, http.StatusInternalServerError, "关注列表加载失败")
+			return
+		}
+
+		type followeeInfo struct {
+			ID       uint   `json:"id"`
+			Nickname string `json:"nickname"`
+			Avatar   string `json:"avatar"`
+			Role     string `json:"role"`
+		}
+
+		list := make([]followeeInfo, 0, len(followees))
+		for _, u := range followees {
+			list = append(list, followeeInfo{
+				ID:       u.ID,
+				Nickname: u.Nickname,
+				Avatar:   u.Avatar,
+				Role:     u.Role,
+			})
+		}
+
+		response.Ok(c, gin.H{
+			"list": list,
+		})
+	}
+}
+
 func UploadAvatarHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetUint(middleware.CtxKeyUserID)

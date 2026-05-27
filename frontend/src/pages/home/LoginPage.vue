@@ -24,10 +24,11 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const loading = ref(false)
 const form = reactive({ nickname: '', password: '' })
@@ -41,7 +42,7 @@ async function submit() {
   try {
     await authStore.login(form.nickname.trim(), form.password)
     ElMessage.success('登录成功')
-    router.push('/')
+    router.push(String(route.query.redirect || '/'))
   } finally {
     loading.value = false
   }

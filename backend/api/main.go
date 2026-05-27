@@ -113,7 +113,8 @@ func main() {
 		// 删除一级评论时，回复是否一起删先不处理，第一版用软删除当前评论
 		auth.POST("/comments/:id/like", commenthandler.LikeHandler(svcCtx))
 		// 评论点赞接口
-		auth.POST("/users/:id/follow", userhandler.FollowHandler(svcCtx))
+		auth.GET("/users/following", userhandler.FollowingListHandler(svcCtx))
+				auth.POST("/users/:id/follow", userhandler.FollowHandler(svcCtx))
 		auth.GET("/live", notImplemented)
 		auth.POST("/live", notImplemented)
 		auth.PUT("/live/:id/end", notImplemented)

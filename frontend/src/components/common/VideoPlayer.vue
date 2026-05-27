@@ -4,30 +4,90 @@
       ref="videoRef"
       controls
       playsinline
-      :src="mediaUrl(url)"
       :poster="mediaUrl(poster)"
       @timeupdate="emitTime"
-      @error="$emit('error', '视频加载失败，请确认资源已转码完成')"
+      @error="handleVideoError"
     />
     <DanmakuLayer :items="danmakus" :current-time="currentTime" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import Hls from 'hls.js'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import type { Danmaku } from '@/types'
 import { mediaUrl } from '@/utils/format'
 import DanmakuLayer from './DanmakuLayer.vue'
 
-defineProps<{ url: string; poster?: string; danmakus: Danmaku[] }>()
+const props = defineProps<{ url: string; poster?: string; danmakus: Danmaku[] }>()
 const emit = defineEmits<{ timeupdate: [time: number]; error: [message: string] }>()
 
 const videoRef = ref<HTMLVideoElement>()
 const currentTime = ref(0)
+const sourceUrl = computed(() => mediaUrl(props.url))
+let hls: Hls | null = null
+
+watch(sourceUrl, setupSource, { immediate: true })
+
+onBeforeUnmount(destroyHls)
+
+async function setupSource(url: string) {
+  await nextTick()
+  const video = videoRef.value
+  if (!video) return
+
+  destroyHls()
+  video.removeAttribute('src')
+  video.load()
+  currentTime.value = 0
+
+  if (!url) return
+
+  if (isHlsSource(url)) {
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = url
+      video.load()
+      return
+    }
+
+    if (Hls.isSupported()) {
+      hls = new Hls()
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (data.fatal) {
+          emit('error', '视频加载失败，请确认资源已转码完成')
+          destroyHls()
+        }
+      })
+      hls.loadSource(url)
+      hls.attachMedia(video)
+      return
+    }
+
+    emit('error', '当前浏览器不支持 HLS 视频播放')
+    return
+  }
+
+  video.src = url
+  video.load()
+}
+
+function destroyHls() {
+  if (!hls) return
+  hls.destroy()
+  hls = null
+}
+
+function isHlsSource(url: string) {
+  return /\.m3u8($|\?)/i.test(url)
+}
 
 function emitTime() {
   currentTime.value = videoRef.value?.currentTime || 0
   emit('timeupdate', currentTime.value)
+}
+
+function handleVideoError() {
+  emit('error', '视频加载失败，请确认资源已转码完成')
 }
 
 defineExpose({

@@ -1,16 +1,10 @@
 <template>
-  <main class="home-page">
-    <section class="home-banner">
-      <div class="banner-inner">
-        <div class="banner-brand">DanmakuStream</div>
-        <p>在线视频 · 实时弹幕 · 创作投稿</p>
-      </div>
-    </section>
+  <main class="home-page bg-white">
 
-    <section class="page-shell feature-wrap">
-      <div class="feature-heading">
-        <button type="button" @click="resetFilter">功能入口</button>
-        <p>围绕视频、弹幕、投稿、审核和直播组织页面</p>
+    <section v-if="!isSearching" class="page-shell grid grid-cols-1 gap-4 border-b border-[#f1f2f3] py-5">
+      <div class="flex items-baseline justify-between gap-4">
+        <button class="border-0 bg-transparent text-lg font-extrabold text-[#18191c] hover:text-[#00aeec]" type="button" @click="resetFilter">功能入口</button>
+        <p class="m-0 text-sm text-[#9499a0]">围绕视频、弹幕、投稿、审核和直播组织页面</p>
       </div>
       <div class="features">
         <button
@@ -24,22 +18,22 @@
           <span>{{ item.desc }}</span>
         </button>
       </div>
-      <div class="quick-links">
-        <button type="button" @click="router.push('/creator/upload')">上传视频</button>
-        <button type="button" @click="router.push('/creator')">我的投稿</button>
-        <button type="button" @click="router.push('/live/1')">进入直播</button>
-        <button type="button" @click="router.push('/admin/videos')">视频审核</button>
-        <button type="button" @click="router.push('/admin/danmaku')">弹幕管理</button>
+      <div class="flex flex-wrap gap-3">
+        <button class="rounded-full border border-[#e5e7eb] bg-white px-4 py-2 text-sm font-extrabold text-[#18191c] hover:border-[#00aeec] hover:text-[#00aeec]" type="button" @click="goUpload">上传视频</button>
+        <button class="rounded-full border border-[#e5e7eb] bg-white px-4 py-2 text-sm font-extrabold text-[#18191c] hover:border-[#00aeec] hover:text-[#00aeec]" type="button" @click="router.push('/creator')">我的投稿</button>
+        <button class="rounded-full border border-[#e5e7eb] bg-white px-4 py-2 text-sm font-extrabold text-[#18191c] hover:border-[#00aeec] hover:text-[#00aeec]" type="button" @click="router.push('/live/1')">进入直播</button>
+        <button v-if="authStore.isAdmin" class="rounded-full border border-[#e5e7eb] bg-white px-4 py-2 text-sm font-extrabold text-[#18191c] hover:border-[#00aeec] hover:text-[#00aeec]" type="button" @click="router.push('/admin/videos')">视频审核</button>
+        <button v-if="authStore.isAdmin" class="rounded-full border border-[#e5e7eb] bg-white px-4 py-2 text-sm font-extrabold text-[#18191c] hover:border-[#00aeec] hover:text-[#00aeec]" type="button" @click="router.push('/admin/danmaku')">弹幕管理</button>
       </div>
     </section>
 
-    <section class="page-shell feed-section">
-      <div class="feed-head">
+    <section class="page-shell pt-6">
+      <div v-if="!isSearching" class="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2>推荐视频</h2>
-          <p>{{ loadError || activeFeatureText }}</p>
+          <h2 class="m-0 text-[28px] font-black text-[#18191c]">推荐视频</h2>
+          <p class="m-0 mt-1 text-[#9499a0]">{{ loadError || activeFeatureText }}</p>
         </div>
-        <div class="feed-tools">
+        <div class="flex flex-wrap items-center gap-3">
           <el-input
             v-model="keyword"
             class="inline-search"
@@ -51,7 +45,38 @@
         </div>
       </div>
 
-      <div v-loading="videoStore.loading" class="feed-layout">
+      <!-- 搜索模式：列表布局 -->
+      <div v-if="isSearching" v-loading="videoStore.loading" class="search-layout">
+        <div class="search-header">
+          <h2 class="search-result-title">搜索结果</h2>
+        </div>
+        <article
+          v-for="video in videoStore.videoList"
+          :key="video.id"
+          class="search-item"
+          @click="router.push(`/video/${video.id}`)"
+        >
+          <div class="search-cover">
+            <img v-if="video.coverUrl" :src="mediaUrl(video.coverUrl)" :alt="video.title" />
+            <div v-else class="search-cover-fallback">DanmakuStream</div>
+            <strong class="search-duration">{{ formatDuration(video.duration) }}</strong>
+          </div>
+          <div class="search-body">
+            <h3>{{ video.title }}</h3>
+            <p class="search-author">
+              <span>{{ video.author?.nickname || '匿名用户' }}</span>
+              <em>{{ formatCount(video.viewCount) }} 播放</em>
+            </p>
+            <p class="search-desc">{{ video.description || '暂无简介' }}</p>
+          </div>
+        </article>
+        <div v-if="!videoStore.videoList.length" class="empty-card">
+          <el-empty description="未找到相关视频" />
+        </div>
+      </div>
+
+      <!-- 正常模式：精选+网格 -->
+      <div v-else v-loading="videoStore.loading" class="feed-layout">
         <article v-if="featuredVideo" class="feature-card" @click="router.push(`/video/${featuredVideo.id}`)">
           <div class="feature-cover">
             <img v-if="featuredVideo.coverUrl" :src="mediaUrl(featuredVideo.coverUrl)" :alt="featuredVideo.title" />
@@ -63,14 +88,12 @@
           </div>
         </article>
 
-        <div v-if="videoStore.videoList.length" class="video-grid">
-          <VideoCard
-            v-for="video in gridVideos"
-            :key="video.id"
-            :video="video"
-            @open="router.push(`/video/${video.id}`)"
-          />
-        </div>
+        <VideoCard
+          v-for="video in gridVideos"
+          :key="video.id"
+          :video="video"
+          @open="router.push(`/video/${video.id}`)"
+        />
 
         <div v-if="!videoStore.videoList.length" class="empty-card">
           <el-empty :description="loadError ? '后端暂未连接，或接口返回失败' : '暂无已审核视频'" />
@@ -93,13 +116,16 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import VideoCard from '@/components/common/VideoCard.vue'
+import { useAuthStore } from '@/store/auth'
 import { useVideoStore } from '@/store/video'
-import { mediaUrl } from '@/utils/format'
+import { formatCount, formatDuration, mediaUrl } from '@/utils/format'
 
 const router = useRouter()
 const route = useRoute()
+const authStore = useAuthStore()
 const videoStore = useVideoStore()
 const page = ref(1)
 const pageSize = 20
@@ -107,19 +133,25 @@ const keyword = ref(String(route.query.keyword || ''))
 const activeFeature = ref(String(route.query.feature || 'video'))
 const loadError = ref('')
 
-const backendFeatures = [
-  { key: 'video', label: '视频浏览', desc: '列表 / 搜索 / 详情' },
-  { key: 'upload', label: '投稿上传', desc: '视频 / 封面 / 转码' },
-  { key: 'comment', label: '评论互动', desc: '评论 / 回复 / 点赞' },
-  { key: 'danmaku', label: '弹幕系统', desc: '拉取 / 发送 / 屏蔽' },
-  { key: 'live', label: '直播间', desc: '播放 / 实时弹幕 / 互动' },
-  { key: 'user', label: '用户主页', desc: '资料 / 作品 / 关注' },
-  { key: 'audit', label: '审核后台', desc: '视频审核 / 弹幕治理' },
-]
+const backendFeatures = computed(() => {
+  const items = [
+    { key: 'video', label: '视频浏览', desc: '列表 / 搜索 / 详情' },
+    { key: 'upload', label: '投稿上传', desc: '视频 / 封面 / 转码' },
+    { key: 'comment', label: '评论互动', desc: '评论 / 回复 / 点赞' },
+    { key: 'danmaku', label: '弹幕系统', desc: '拉取 / 发送 / 屏蔽' },
+    { key: 'live', label: '直播间', desc: '播放 / 实时弹幕 / 互动' },
+    { key: 'user', label: '用户主页', desc: '资料 / 作品 / 关注' },
+  ]
+  if (authStore.isAdmin) {
+    items.push({ key: 'audit', label: '审核后台', desc: '视频审核 / 弹幕治理' })
+  }
+  return items
+})
+const isSearching = computed(() => Boolean(keyword.value.trim()))
 const featuredVideo = computed(() => videoStore.videoList[0])
 const gridVideos = computed(() => videoStore.videoList.slice(featuredVideo.value ? 1 : 0))
 const activeFeatureText = computed(() => {
-  const item = backendFeatures.find((feature) => feature.key === activeFeature.value)
+  const item = backendFeatures.value.find((feature) => feature.key === activeFeature.value)
   return item ? `${item.label}：${item.desc}` : '展示后端返回的已审核视频。'
 })
 
@@ -136,14 +168,19 @@ async function loadVideos() {
   }
 }
 
-function selectFeature(item: (typeof backendFeatures)[number]) {
+function selectFeature(item: { key: string; label: string; desc: string }) {
   activeFeature.value = item.key
   if (item.key === 'upload') {
-    router.push('/creator/upload')
+    goUpload()
     return
   }
   if (item.key === 'user') {
-    router.push('/login')
+    if (authStore.isLoggedIn) {
+      router.push(`/user/${authStore.userInfo?.id}`)
+    } else {
+      ElMessage.warning('请先登录后再查看个人主页')
+      router.push('/login')
+    }
     return
   }
   if (item.key === 'audit') {
@@ -155,6 +192,15 @@ function selectFeature(item: (typeof backendFeatures)[number]) {
     return
   }
   router.push({ path: '/', query: { feature: item.key } })
+}
+
+function goUpload() {
+  if (authStore.isLoggedIn) {
+    router.push('/creator/upload')
+    return
+  }
+  ElMessage.warning('请先登录后再投稿')
+  router.push({ path: '/login', query: { redirect: '/creator/upload' } })
 }
 
 function resetFilter() {
@@ -179,85 +225,13 @@ watch(() => route.query.feature, (value) => {
 </script>
 
 <style scoped>
-.home-page {
-  background: #fff;
-}
-
-.home-banner {
-  height: 174px;
-  margin-top: -64px;
-  padding-top: 64px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0) 45%, #fff 100%),
-    linear-gradient(120deg, rgba(0, 174, 236, 0.42), rgba(251, 114, 153, 0.28)),
-    url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80");
-  background-position: center;
-  background-size: cover;
-}
-
-.banner-inner {
-  display: grid;
-  align-content: end;
-  width: min(1320px, calc(100% - 48px));
-  height: 100%;
-  margin: 0 auto;
-  padding-bottom: 22px;
-  color: #fff;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.28);
-}
-
-.banner-brand {
-  font-size: 38px;
-  font-weight: 900;
-}
-
-.banner-inner p {
-  margin: 4px 0 0;
-  font-size: 15px;
-}
-
-.feature-wrap {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-  padding: 18px 0 20px;
-  border-bottom: 1px solid #f1f2f3;
-}
-
-.feature-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.feature-heading button {
-  border: 0;
-  background: transparent;
-  color: #18191c;
-  cursor: pointer;
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.feature-heading button:hover {
-  color: #00aeec;
-}
-
-.feature-heading p {
-  margin: 0;
-  color: #9499a0;
-  font-size: 13px;
-}
-
 .features {
   display: grid;
   grid-template-columns: repeat(7, minmax(120px, 1fr));
   gap: 12px;
 }
 
-.features button,
-.quick-links button {
+.features button {
   border: 0;
   border-radius: 8px;
   background: #f6f7f8;
@@ -283,15 +257,8 @@ watch(() => route.query.feature, (value) => {
   font-size: 12px;
 }
 
-.quick-links button {
-  height: 34px;
-  padding: 0 12px;
-  font-size: 14px;
-}
-
 .features button:hover,
-.features button.active,
-.quick-links button:hover {
+.features button.active {
   background: #e3f6ff;
   color: #00aeec;
 }
@@ -301,79 +268,20 @@ watch(() => route.query.feature, (value) => {
   color: #00aeec;
 }
 
-.quick-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-/*
-.channels button,
-.channel-right button {
-  height: 34px;
-  border: 0;
-  border-radius: 7px;
-  background: #f6f7f8;
-  color: #61666d;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.channels button:hover,
-.channels button.active,
-.channel-right button:hover {
-  background: #e3f6ff;
-  color: #00aeec;
-}
-
-.channel-right {
-  display: grid;
-  grid-template-columns: repeat(3, auto);
-  gap: 12px;
-}
-*/
-
-.feed-section {
-  padding-top: 26px;
-}
-
-.feed-head {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 18px;
-}
-
-.feed-head h2 {
-  margin: 0;
-  color: #18191c;
-  font-size: 24px;
-}
-
-.feed-head p {
-  margin: 8px 0 0;
-  color: #9499a0;
-}
-
-.feed-tools {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
 .inline-search {
   width: 280px;
 }
 
 .feed-layout {
   display: grid;
-  grid-template-columns: 430px minmax(0, 1fr);
-  gap: 22px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
   min-height: 360px;
 }
 
 .feature-card {
+  grid-column: span 2;
+  grid-row: span 2;
   cursor: pointer;
 }
 
@@ -381,7 +289,6 @@ watch(() => route.query.feature, (value) => {
   position: relative;
   overflow: hidden;
   height: 100%;
-  min-height: 320px;
   border-radius: 10px;
   background: #f1f2f3;
 }
@@ -423,10 +330,123 @@ watch(() => route.query.feature, (value) => {
   color: rgba(255, 255, 255, 0.76);
 }
 
-.video-grid {
+.search-layout {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 20px 18px;
+  gap: 16px;
+  min-height: 360px;
+}
+
+.search-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 8px;
+}
+
+.search-result-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 900;
+  color: #18191c;
+}
+
+.search-item {
+  display: grid;
+  grid-template-columns: 432px minmax(0, 1fr);
+  gap: 28px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+
+.search-cover {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  background: #f1f2f3;
+  flex-shrink: 0;
+}
+
+.search-cover img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.search-cover-fallback {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  background: linear-gradient(135deg, #e3f6ff, #fff0f5);
+  color: #00aeec;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.search-duration {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.search-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+.search-body h3 {
+  margin: 0 0 8px;
+  font-size: 21px;
+  font-weight: 800;
+  color: #18191c;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.search-item:hover .search-body h3 {
+  color: #00aeec;
+}
+
+.search-author {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 10px;
+  font-size: 15px;
+  color: #9499a0;
+}
+
+.search-author em {
+  font-style: normal;
+}
+
+.search-desc {
+  margin: 0;
+  font-size: 14px;
+  color: #61666d;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .empty-card {
@@ -434,9 +454,6 @@ watch(() => route.query.feature, (value) => {
   display: grid;
   min-height: 360px;
   place-items: center;
-  border: 1px solid #f1f2f3;
-  border-radius: 10px;
-  background: #fff;
 }
 
 .pager {
@@ -450,31 +467,27 @@ watch(() => route.query.feature, (value) => {
     grid-template-columns: 1fr;
   }
 
+  .feature-card {
+    grid-column: span 1;
+    grid-row: span 1;
+  }
+
   .features {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 760px) {
-  .feature-heading {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .features,
-  .video-grid {
+  .features {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .feed-head,
-  .feed-tools {
-    align-items: stretch;
-    flex-direction: column;
   }
 
   .inline-search {
     width: 100%;
+  }
+
+  .search-item {
+    grid-template-columns: 1fr;
   }
 }
 </style>
