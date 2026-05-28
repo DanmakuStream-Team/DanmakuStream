@@ -5,7 +5,7 @@
       <div v-if="!isSearching" class="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 class="m-0 text-[28px] font-black text-[#18191c]">推荐视频</h2>
-          <p class="m-0 mt-1 text-[#9499a0]">{{ loadError || activeFeatureText }}</p>
+          <p class="m-0 mt-1 text-[#9499a0]">{{ loadError || '发现更多精彩视频' }}</p>
         </div>
       </div>
 
@@ -80,36 +80,19 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import VideoCard from '@/components/common/VideoCard.vue'
-import { useAuthStore } from '@/store/auth'
 import { useVideoStore } from '@/store/video'
 import { formatCount, formatDuration, mediaUrl } from '@/utils/format'
 
 const router = useRouter()
 const route = useRoute()
-const authStore = useAuthStore()
 const videoStore = useVideoStore()
 const page = ref(1)
 const pageSize = 21
 const keyword = ref(String(route.query.keyword || ''))
-const activeFeature = ref(String(route.query.feature || 'video'))
 const loadError = ref('')
 
-const backendFeatures = computed(() => {
-  const items = [
-    { key: 'video', label: '视频浏览', desc: '列表 / 搜索 / 详情' },
-    { key: 'upload', label: '投稿上传', desc: '视频 / 封面 / 转码' },
-    { key: 'comment', label: '评论互动', desc: '评论 / 回复 / 点赞' },
-    { key: 'live', label: '直播间', desc: '播放 / 实时弹幕 / 互动' },
-    { key: 'user', label: '用户主页', desc: '资料 / 作品 / 关注' },
-  ]
-  if (authStore.isAdmin) {
-    items.push({ key: 'audit', label: '审核后台', desc: '视频审核 / 弹幕治理' })
-  }
-  return items
-})
 const isSearching = computed(() => Boolean(keyword.value.trim()))
 const featuredVideo = computed(() => videoStore.videoList[0])
 const gridVideos = computed(() => videoStore.videoList.slice(featuredVideo.value ? 1 : 0))
@@ -128,47 +111,7 @@ async function loadVideos() {
   }
 }
 
-function selectFeature(item: { key: string; label: string; desc: string }) {
-  activeFeature.value = item.key
-  if (item.key === 'upload') {
-    goUpload()
-    return
-  }
-  if (item.key === 'user') {
-    if (authStore.isLoggedIn) {
-      router.push(`/user/${authStore.userInfo?.id}`)
-    } else {
-      ElMessage.warning('请先登录后再查看个人主页')
-      router.push('/login')
-    }
-    return
-  }
-  if (item.key === 'audit') {
-    router.push('/admin')
-    return
-  }
-  if (item.key === 'live') {
-    router.push('/live/1')
-    return
-  }
-  router.push({ path: '/', query: { feature: item.key } })
-}
 
-function goUpload() {
-  if (authStore.isLoggedIn) {
-    router.push('/creator/upload')
-    return
-  }
-  ElMessage.warning('请先登录后再投稿')
-  router.push({ path: '/login', query: { redirect: '/creator/upload' } })
-}
-
-function resetFilter() {
-  activeFeature.value = 'video'
-  keyword.value = ''
-  page.value = 1
-  router.push({ path: '/', query: { feature: 'video' } })
-}
 
 onMounted(loadVideos)
 watch(() => route.query.keyword, (value) => {
@@ -177,8 +120,7 @@ watch(() => route.query.keyword, (value) => {
   loadVideos()
 })
 
-watch(() => route.query.feature, (value) => {
-  activeFeature.value = String(value || 'video')
+watch(() => route.query.feature, () => {
   page.value = 1
   loadVideos()
 })
