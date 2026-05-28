@@ -19,9 +19,12 @@ const props = defineProps<{ items: Danmaku[]; currentTime: number }>()
 
 const visibleItems = computed(() => {
   return props.items
-    .filter((item) => Math.abs(item.time - props.currentTime) < 1.2)
-    .slice(0, 6)
-    .map((item, index) => ({ ...item, row: index % 5 }))
+    .filter((item) => {
+      const elapsed = props.currentTime - item.time
+      return elapsed > -0.5 && elapsed < 6
+    })
+    .slice(0, 12)
+    .map((item) => ({ ...item, row: item.id % 5 }))
 })
 </script>
 
