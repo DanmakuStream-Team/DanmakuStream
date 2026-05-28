@@ -5,6 +5,18 @@
       <div v-if="!isSearching" class="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 class="m-0 text-[28px] font-black text-[#18191c]">推荐视频</h2>
+          <!-- 视频分类标签栏 -->
+          <div class="category-tabs mt-3 flex flex-wrap gap-2">
+            <button
+              v-for="cat in categoryList"
+              :key="cat.value"
+              class="category-btn"
+              :class="{ active: activeCategory === cat.value }"
+              @click="selectCategory(cat.value)"
+            >
+              {{ cat.label }}
+            </button>
+          </div>
           <p class="m-0 mt-1 text-[#9499a0]">{{ loadError || activeFeatureText }}</p>
         </div>
       </div>
@@ -93,6 +105,16 @@ const authStore = useAuthStore()
 const videoStore = useVideoStore()
 const page = ref(1)
 const pageSize = 21
+const categoryList = ref([
+  { label: '全部', value: '' },
+  { label: '游戏', value: 'game' },
+  { label: '科技', value: 'tech' },
+  { label: '生活', value: 'life' },
+  { label: '音乐', value: 'music' },
+  { label: '动漫', value: 'anime' },
+  { label: '知识', value: 'knowledge' },
+])
+const activeCategory = ref('')
 const keyword = ref(String(route.query.keyword || ''))
 const activeFeature = ref(String(route.query.feature || 'video'))
 const loadError = ref('')
@@ -110,6 +132,12 @@ const backendFeatures = computed(() => {
   }
   return items
 })
+
+const activeFeatureText = computed(() => {
+  const feature = backendFeatures.value.find(f => f.key === activeFeature.value)
+  return feature?.desc || '视频浏览'
+})
+
 const isSearching = computed(() => Boolean(keyword.value.trim()))
 const featuredVideo = computed(() => videoStore.videoList[0])
 const gridVideos = computed(() => videoStore.videoList.slice(featuredVideo.value ? 1 : 0))
@@ -122,6 +150,7 @@ async function loadVideos() {
       page: page.value,
       pageSize,
       keyword: keyword.value.trim() || undefined,
+      category: activeCategory.value || undefined,
     })
   } catch (error: any) {
     loadError.value = '后端服务暂未连接，当前只显示空状态。'
@@ -163,6 +192,12 @@ function goUpload() {
   router.push({ path: '/login', query: { redirect: '/creator/upload' } })
 }
 
+function selectCategory(catValue: string) {
+  activeCategory.value = catValue
+  page.value = 1
+  loadVideos()
+}
+
 function resetFilter() {
   activeFeature.value = 'video'
   keyword.value = ''
@@ -189,6 +224,21 @@ watch(() => route.query.feature, (value) => {
   display: grid;
   grid-template-columns: repeat(7, minmax(120px, 1fr));
   gap: 12px;
+}
+
+/* 视频分类标签样式 */
+.category-btn {
+  padding: 6px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+.category-btn.active {
+  background: #00aeec;
+  color: #fff;
+  border-color: #00aeec;
 }
 
 .features button {
