@@ -1,47 +1,11 @@
 <template>
   <main class="home-page bg-white">
 
-    <section v-if="!isSearching" class="page-shell grid grid-cols-1 gap-4 border-b border-[#f1f2f3] py-5">
-      <div class="flex items-baseline justify-between gap-4">
-        <button class="border-0 bg-transparent text-lg font-extrabold text-[#18191c] hover:text-[#00aeec]" type="button" @click="resetFilter">功能入口</button>
-        <p class="m-0 text-sm text-[#9499a0]">围绕视频、弹幕、投稿、审核和直播组织页面</p>
-      </div>
-      <div class="features">
-        <button
-          v-for="item in backendFeatures"
-          :key="item.key"
-          type="button"
-          :class="{ active: activeFeature === item.key }"
-          @click="selectFeature(item)"
-        >
-          <strong>{{ item.label }}</strong>
-          <span>{{ item.desc }}</span>
-        </button>
-      </div>
-      <div class="flex flex-wrap gap-3">
-        <button class="rounded-full border border-[#e5e7eb] bg-white px-4 py-2 text-sm font-extrabold text-[#18191c] hover:border-[#00aeec] hover:text-[#00aeec]" type="button" @click="goUpload">上传视频</button>
-        <button class="rounded-full border border-[#e5e7eb] bg-white px-4 py-2 text-sm font-extrabold text-[#18191c] hover:border-[#00aeec] hover:text-[#00aeec]" type="button" @click="router.push('/creator')">我的投稿</button>
-        <button class="rounded-full border border-[#e5e7eb] bg-white px-4 py-2 text-sm font-extrabold text-[#18191c] hover:border-[#00aeec] hover:text-[#00aeec]" type="button" @click="router.push('/live/1')">进入直播</button>
-        <button v-if="authStore.isAdmin" class="rounded-full border border-[#e5e7eb] bg-white px-4 py-2 text-sm font-extrabold text-[#18191c] hover:border-[#00aeec] hover:text-[#00aeec]" type="button" @click="router.push('/admin/videos')">视频审核</button>
-        <button v-if="authStore.isAdmin" class="rounded-full border border-[#e5e7eb] bg-white px-4 py-2 text-sm font-extrabold text-[#18191c] hover:border-[#00aeec] hover:text-[#00aeec]" type="button" @click="router.push('/admin/danmaku')">弹幕管理</button>
-      </div>
-    </section>
-
     <section class="page-shell pt-6">
       <div v-if="!isSearching" class="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 class="m-0 text-[28px] font-black text-[#18191c]">推荐视频</h2>
           <p class="m-0 mt-1 text-[#9499a0]">{{ loadError || activeFeatureText }}</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-3">
-          <el-input
-            v-model="keyword"
-            class="inline-search"
-            placeholder="关键词搜索"
-            clearable
-            @keyup.enter="loadVideos"
-          />
-          <el-button type="primary" @click="loadVideos">刷新内容</el-button>
         </div>
       </div>
 
@@ -138,7 +102,6 @@ const backendFeatures = computed(() => {
     { key: 'video', label: '视频浏览', desc: '列表 / 搜索 / 详情' },
     { key: 'upload', label: '投稿上传', desc: '视频 / 封面 / 转码' },
     { key: 'comment', label: '评论互动', desc: '评论 / 回复 / 点赞' },
-    { key: 'danmaku', label: '弹幕系统', desc: '拉取 / 发送 / 屏蔽' },
     { key: 'live', label: '直播间', desc: '播放 / 实时弹幕 / 互动' },
     { key: 'user', label: '用户主页', desc: '资料 / 作品 / 关注' },
   ]
@@ -150,10 +113,7 @@ const backendFeatures = computed(() => {
 const isSearching = computed(() => Boolean(keyword.value.trim()))
 const featuredVideo = computed(() => videoStore.videoList[0])
 const gridVideos = computed(() => videoStore.videoList.slice(featuredVideo.value ? 1 : 0))
-const activeFeatureText = computed(() => {
-  const item = backendFeatures.value.find((feature) => feature.key === activeFeature.value)
-  return item ? `${item.label}：${item.desc}` : '展示后端返回的已审核视频。'
-})
+
 
 async function loadVideos() {
   loadError.value = ''
