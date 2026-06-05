@@ -15,6 +15,14 @@ services:
       interval: 10s
       retries: 5
 
+  # ── Live Streaming (SRS) ──────────────────────────────────────────
+  srs:
+    image: ossrs/srs:5
+    ports:
+      - "1935:1935"
+      - "1985:1985"
+      - "8081:8080"
+
   # ── Backend (Go) ──────────────────────────────────────────────────
   backend:
     build:
@@ -25,6 +33,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      srs:
+        condition: service_started
     environment:
       - TZ=Asia/Shanghai
     volumes:

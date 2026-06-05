@@ -58,6 +58,23 @@ export interface Comment {
   createdAt: string
 }
 
+export interface LiveRoom {
+  id: number
+  title: string
+  coverUrl: string
+  streamKey?: string
+  publishUrl?: string
+  playUrl: string
+  streamUrl: string
+  status: 'idle' | 'live' | 'ended'
+  viewerCount: number
+  ownerId: number
+  owner?: UserInfo
+  startedAt?: string
+  endedAt?: string
+  createdAt: string
+}
+
 export interface PageResult<T> {
   list: T[]
   total: number

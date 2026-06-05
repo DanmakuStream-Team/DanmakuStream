@@ -12,6 +12,7 @@ import (
 	authhandler "danmakustream/backend/internal/handler/v1/auth"
 	commenthandler "danmakustream/backend/internal/handler/v1/comment"
 	danmakuhandler "danmakustream/backend/internal/handler/v1/danmaku"
+	livehandler "danmakustream/backend/internal/handler/v1/live"
 	userhandler "danmakustream/backend/internal/handler/v1/user"
 	videohandler "danmakustream/backend/internal/handler/v1/video"
 	wshandler "danmakustream/backend/internal/handler/ws"
@@ -80,6 +81,8 @@ func main() {
 		v1.GET("/comments/:videoId", commenthandler.ListHandler(svcCtx))
 		// 获取视频评论列表，支持分页；未登录也可访问，若携带有效 Bearer Token，额外返回当前用户对每条评论是否已点赞以及点赞数
 		//现在是返回所有评论，后面再加分页和排序功能
+		v1.GET("/live", livehandler.ListHandler(svcCtx))
+		v1.GET("/live/:id", livehandler.DetailHandler(svcCtx))
 	}
 
 	// Auth-required routes
@@ -114,10 +117,9 @@ func main() {
 		auth.POST("/comments/:id/like", commenthandler.LikeHandler(svcCtx))
 		// 评论点赞接口
 		auth.GET("/users/following", userhandler.FollowingListHandler(svcCtx))
-				auth.POST("/users/:id/follow", userhandler.FollowHandler(svcCtx))
-		auth.GET("/live", notImplemented)
-		auth.POST("/live", notImplemented)
-		auth.PUT("/live/:id/end", notImplemented)
+		auth.POST("/users/:id/follow", userhandler.FollowHandler(svcCtx))
+		auth.POST("/live", livehandler.CreateHandler(svcCtx))
+		auth.PUT("/live/:id/end", livehandler.EndHandler(svcCtx))
 	}
 
 	// Admin routes
