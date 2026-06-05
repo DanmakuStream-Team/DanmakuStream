@@ -2,6 +2,7 @@
   <div class="player">
     <video
       ref="videoRef"
+      :autoplay="autoplay"
       controls
       playsinline
       :poster="mediaUrl(poster)"
@@ -19,7 +20,7 @@ import type { Danmaku } from '@/types'
 import { mediaUrl } from '@/utils/format'
 import DanmakuLayer from './DanmakuLayer.vue'
 
-const props = defineProps<{ url: string; poster?: string; danmakus: Danmaku[] }>()
+const props = defineProps<{ url: string; poster?: string; danmakus: Danmaku[]; autoplay?: boolean }>()
 const emit = defineEmits<{ timeupdate: [time: number]; error: [message: string] }>()
 
 const videoRef = ref<HTMLVideoElement>()
@@ -58,6 +59,9 @@ async function setupSource(url: string) {
           destroyHls()
         }
       })
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        if (props.autoplay) video.play().catch(() => {})
+      })
       hls.loadSource(url)
       hls.attachMedia(video)
       return
@@ -69,6 +73,7 @@ async function setupSource(url: string) {
 
   video.src = url
   video.load()
+  if (props.autoplay) video.play().catch(() => {})
 }
 
 function destroyHls() {

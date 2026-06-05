@@ -35,7 +35,10 @@ export class DanmakuWebSocket {
     this.ws = new WebSocket(`${protocol}://${location.host}/ws/live/${this.options.roomId}?token=${this.options.token}`)
     this.ws.onmessage = (event) => {
       const data = JSON.parse(event.data)
-      if (data.type === 'danmaku') this.options.onMessage(data.payload)
+      if (data.type === 'danmaku') {
+        const p = data.payload
+        this.options.onMessage({ ...p, type: p.danmakuType || 'scroll' })
+      }
       if (data.type === 'viewer_count') this.options.onViewerCount(data.payload)
     }
     this.ws.onclose = () => {
@@ -43,9 +46,9 @@ export class DanmakuWebSocket {
     }
   }
 
-  send(content: string, color = '#FFFFFF') {
+  send(content: string, color = '#FFFFFF', fontSize = 'medium', danmakuType = 'scroll') {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type: 'danmaku', content, color }))
+      this.ws.send(JSON.stringify({ type: 'danmaku', content, color, fontSize, danmakuType }))
     }
   }
 

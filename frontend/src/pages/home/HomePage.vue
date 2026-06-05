@@ -92,16 +92,13 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import VideoCard from '@/components/common/VideoCard.vue'
-import { useAuthStore } from '@/store/auth'
 import { useVideoStore } from '@/store/video'
 import { formatCount, formatDuration, mediaUrl } from '@/utils/format'
 
 const router = useRouter()
 const route = useRoute()
-const authStore = useAuthStore()
 const videoStore = useVideoStore()
 const page = ref(1)
 const pageSize = 21
@@ -116,7 +113,6 @@ const categoryList = ref([
 ])
 const activeCategory = ref('')
 const keyword = ref(String(route.query.keyword || ''))
-const activeFeature = ref(String(route.query.feature || 'video'))
 const loadError = ref('')
 
 const backendFeatures = computed(() => {
@@ -157,40 +153,6 @@ async function loadVideos() {
   }
 }
 
-function selectFeature(item: { key: string; label: string; desc: string }) {
-  activeFeature.value = item.key
-  if (item.key === 'upload') {
-    goUpload()
-    return
-  }
-  if (item.key === 'user') {
-    if (authStore.isLoggedIn) {
-      router.push(`/user/${authStore.userInfo?.id}`)
-    } else {
-      ElMessage.warning('请先登录后再查看个人主页')
-      router.push('/login')
-    }
-    return
-  }
-  if (item.key === 'audit') {
-    router.push('/admin')
-    return
-  }
-  if (item.key === 'live') {
-    router.push('/live/1')
-    return
-  }
-  router.push({ path: '/', query: { feature: item.key } })
-}
-
-function goUpload() {
-  if (authStore.isLoggedIn) {
-    router.push('/creator/upload')
-    return
-  }
-  ElMessage.warning('请先登录后再投稿')
-  router.push({ path: '/login', query: { redirect: '/creator/upload' } })
-}
 
 function selectCategory(catValue: string) {
   activeCategory.value = catValue
@@ -212,8 +174,7 @@ watch(() => route.query.keyword, (value) => {
   loadVideos()
 })
 
-watch(() => route.query.feature, (value) => {
-  activeFeature.value = String(value || 'video')
+watch(() => route.query.feature, () => {
   page.value = 1
   loadVideos()
 })

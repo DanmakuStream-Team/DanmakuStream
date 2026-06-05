@@ -26,6 +26,7 @@
           <div class="actions">
             <el-button @click="toggleLike">点赞 {{ formatCount(video.likeCount) }}</el-button>
             <el-button @click="toggleCollect">收藏 {{ formatCount(video.collectCount) }}</el-button>
+            <el-button @click="downloadVideo">下载</el-button>
           </div>
           <div class="tags">
             <el-tag v-for="tag in normalizeTags(video.tags)" :key="tag">{{ tag }}</el-tag>
@@ -77,8 +78,17 @@
         <div class="soft-panel danmaku-box">
           <h3>发送弹幕</h3>
           <el-input v-model="danmakuText" placeholder="此刻想说什么" @keyup.enter="sendDanmaku" />
+          <div class="danmaku-colors">
+            <span
+              v-for="c in DANMAKU_COLORS"
+              :key="c"
+              class="color-dot"
+              :class="{ active: danmakuColor === c }"
+              :style="{ background: c }"
+              @click="danmakuColor = c"
+            />
+          </div>
           <div class="danmaku-actions">
-            <el-color-picker v-model="danmakuColor" />
             <el-button type="primary" @click="sendDanmaku">发送</el-button>
           </div>
         </div>
@@ -105,6 +115,7 @@ import { useCommentStore } from '@/store/comment'
 import { useVideoStore } from '@/store/video'
 import type { Comment, Danmaku } from '@/types'
 import { formatCount, formatTime, mediaUrl, normalizeTags } from '@/utils/format'
+import { removeUserLibraryRecord, upsertUserLibraryRecord } from '@/utils/userLibrary'
 
 let touchStartY = 0
 const SWIPE_THRESHOLD = 50
@@ -118,7 +129,8 @@ const loading = ref(false)
 const currentTime = ref(0)
 const danmakus = ref<Danmaku[]>([])
 const danmakuText = ref('')
-const danmakuColor = ref('#FFFFFF')
+const DANMAKU_COLORS = ['#FFFFFF', '#FF5555', '#55FF55', '#5555FF', '#FFFF55', '#FF55FF', '#55FFFF', '#FF8C00', '#FF69B4', '#00CED1', '#FFD700', '#FF6347']
+const danmakuColor = ref(DANMAKU_COLORS[0])
 const commentText = ref('')
 const replyTarget = ref<Comment | null>(null)
 const video = computed(() => videoStore.currentVideo)
@@ -145,6 +157,7 @@ function goToNextVideo() {
 
 onMounted(load)
 onUnmounted(() => {
+  saveHistory()
   videoStore.clearCurrent()
   commentStore.clearComments()
 })
@@ -159,6 +172,7 @@ async function load() {
       commentStore.fetchComments(id),
     ])
     danmakus.value = danmakuRes.data
+    saveHistory()
   } finally {
     loading.value = false
   }
@@ -167,7 +181,12 @@ async function load() {
 async function toggleLike() {
   if (!ensureLogin()) return
   if (!video.value) return
-  await videoApi.like(video.value.id)
+  const res = await videoApi.like(video.value.id)
+  if (res.data.liked) {
+    upsertUserLibraryRecord('liked', video.value)
+  } else {
+    removeUserLibraryRecord('liked', video.value.id)
+  }
   await videoStore.fetchVideoDetail(video.value.id)
 }
 
@@ -176,6 +195,21 @@ async function toggleCollect() {
   if (!video.value) return
   await videoApi.collect(video.value.id)
   await videoStore.fetchVideoDetail(video.value.id)
+}
+
+function downloadVideo() {
+  if (!ensureLogin()) return
+  if (!video.value?.videoUrl) {
+    ElMessage.warning('当前视频没有可下载地址')
+    return
+  }
+  upsertUserLibraryRecord('downloads', video.value)
+  const link = document.createElement('a')
+  link.href = mediaUrl(video.value.videoUrl)
+  link.download = `${video.value.title || 'danmaku-video'}.mp4`
+  link.target = '_blank'
+  link.rel = 'noreferrer'
+  link.click()
 }
 
 async function sendDanmaku() {
@@ -213,6 +247,13 @@ function ensureLogin() {
   ElMessage.warning('请先登录')
   router.push('/login')
   return false
+}
+
+function saveHistory() {
+  if (!authStore.isLoggedIn || !video.value) return
+  const duration = video.value.duration || 0
+  const progress = duration > 0 ? Math.min(100, Math.round((currentTime.value / duration) * 100)) : 0
+  upsertUserLibraryRecord('history', video.value, progress)
 }
 </script>
 
@@ -295,6 +336,31 @@ function ensureLogin() {
 .danmaku-box {
   display: grid;
   gap: 12px;
+}
+
+.danmaku-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.color-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.color-dot:hover {
+  transform: scale(1.15);
+}
+
+.color-dot.active {
+  border-color: #165dff;
+  transform: scale(1.1);
 }
 
 .danmaku-box h3,
