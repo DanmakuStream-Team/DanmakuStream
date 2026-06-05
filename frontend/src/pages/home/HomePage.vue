@@ -5,7 +5,19 @@
       <div v-if="!isSearching" class="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 class="m-0 text-[28px] font-black text-[#18191c]">推荐视频</h2>
-          <p class="m-0 mt-1 text-[#9499a0]">{{ loadError || '发现更多精彩视频' }}</p>
+          <!-- 视频分类标签栏 -->
+          <div class="category-tabs mt-3 flex flex-wrap gap-2">
+            <button
+              v-for="cat in categoryList"
+              :key="cat.value"
+              class="category-btn"
+              :class="{ active: activeCategory === cat.value }"
+              @click="selectCategory(cat.value)"
+            >
+              {{ cat.label }}
+            </button>
+          </div>
+          <p class="m-0 mt-1 text-[#9499a0]">{{ loadError || activeFeatureText }}</p>
         </div>
       </div>
 
@@ -90,8 +102,37 @@ const route = useRoute()
 const videoStore = useVideoStore()
 const page = ref(1)
 const pageSize = 21
+const categoryList = ref([
+  { label: '全部', value: '' },
+  { label: '游戏', value: 'game' },
+  { label: '科技', value: 'tech' },
+  { label: '生活', value: 'life' },
+  { label: '音乐', value: 'music' },
+  { label: '动漫', value: 'anime' },
+  { label: '知识', value: 'knowledge' },
+])
+const activeCategory = ref('')
 const keyword = ref(String(route.query.keyword || ''))
 const loadError = ref('')
+
+const backendFeatures = computed(() => {
+  const items = [
+    { key: 'video', label: '视频浏览', desc: '列表 / 搜索 / 详情' },
+    { key: 'upload', label: '投稿上传', desc: '视频 / 封面 / 转码' },
+    { key: 'comment', label: '评论互动', desc: '评论 / 回复 / 点赞' },
+    { key: 'live', label: '直播间', desc: '播放 / 实时弹幕 / 互动' },
+    { key: 'user', label: '用户主页', desc: '资料 / 作品 / 关注' },
+  ]
+  if (authStore.isAdmin) {
+    items.push({ key: 'audit', label: '审核后台', desc: '视频审核 / 弹幕治理' })
+  }
+  return items
+})
+
+const activeFeatureText = computed(() => {
+  const feature = backendFeatures.value.find(f => f.key === activeFeature.value)
+  return feature?.desc || '视频浏览'
+})
 
 const isSearching = computed(() => Boolean(keyword.value.trim()))
 const featuredVideo = computed(() => videoStore.videoList[0])
@@ -105,6 +146,7 @@ async function loadVideos() {
       page: page.value,
       pageSize,
       keyword: keyword.value.trim() || undefined,
+      category: activeCategory.value || undefined,
     })
   } catch (error: any) {
     loadError.value = '后端服务暂未连接，当前只显示空状态。'
@@ -112,6 +154,18 @@ async function loadVideos() {
 }
 
 
+function selectCategory(catValue: string) {
+  activeCategory.value = catValue
+  page.value = 1
+  loadVideos()
+}
+
+function resetFilter() {
+  activeFeature.value = 'video'
+  keyword.value = ''
+  page.value = 1
+  router.push({ path: '/', query: { feature: 'video' } })
+}
 
 onMounted(loadVideos)
 watch(() => route.query.keyword, (value) => {
@@ -131,6 +185,21 @@ watch(() => route.query.feature, () => {
   display: grid;
   grid-template-columns: repeat(7, minmax(120px, 1fr));
   gap: 12px;
+}
+
+/* 视频分类标签样式 */
+.category-btn {
+  padding: 6px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+.category-btn.active {
+  background: #00aeec;
+  color: #fff;
+  border-color: #00aeec;
 }
 
 .features button {

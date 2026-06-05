@@ -1,5 +1,9 @@
 <template>
-  <main class="page-shell detail-page">
+  <main 
+    class="page-shell detail-page"
+    @touchstart="handleTouchStart"
+    @touchend="handleTouchEnd"
+  >
     <section v-loading="loading" class="watch-grid">
       <div v-if="video" class="main-col">
         <VideoPlayer
@@ -113,6 +117,8 @@ import type { Comment, Danmaku } from '@/types'
 import { formatCount, formatTime, mediaUrl, normalizeTags } from '@/utils/format'
 import { removeUserLibraryRecord, upsertUserLibraryRecord } from '@/utils/userLibrary'
 
+let touchStartY = 0
+const SWIPE_THRESHOLD = 50
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
@@ -128,6 +134,26 @@ const danmakuColor = ref(DANMAKU_COLORS[0])
 const commentText = ref('')
 const replyTarget = ref<Comment | null>(null)
 const video = computed(() => videoStore.currentVideo)
+
+function handleTouchStart(e: TouchEvent) {
+  touchStartY = e.touches[0].clientY
+}
+
+function handleTouchEnd(e: TouchEvent) {
+  const touchEndY = e.changedTouches[0].clientY
+  const diff = touchStartY - touchEndY
+
+  if (diff > SWIPE_THRESHOLD) {
+    goToNextVideo()
+  }
+}
+
+function goToNextVideo() {
+  if (!video.value) return
+  const nextId = video.value.id + 1
+  ElMessage.success('上滑切换到下一个视频')
+  router.push(`/video/${nextId}`)
+}
 
 onMounted(load)
 onUnmounted(() => {
@@ -234,6 +260,7 @@ function saveHistory() {
 <style scoped>
 .detail-page {
   display: grid;
+  min-height: 100vh;
 }
 
 .watch-grid {

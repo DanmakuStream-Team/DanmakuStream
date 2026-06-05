@@ -23,6 +23,7 @@ type VideoListReq struct {
 	PageSize int    `form:"pageSize"`
 	Keyword  string `form:"keyword"`
 	Tag      string `form:"tag"`
+	Category string `form:"category"`
 }
 
 type PageResult[T any] struct {
@@ -73,6 +74,10 @@ func (l *ListVideoLogic) List(req *VideoListReq) (*PageResult[VideoInfo], error)
 
 	if req.Tag != "" {
 		db = db.Where("FIND_IN_SET(?, tags)", req.Tag)
+	}
+
+	if req.Category != "" {
+    	db = db.Where("category = ?", req.Category)
 	}
 
 	var total int64
