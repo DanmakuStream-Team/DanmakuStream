@@ -109,10 +109,12 @@ const (
 )
 
 type IncomingMessage struct {
-	Type    string `json:"type"`
-	Content string `json:"content"`
-	Color   string `json:"color"`
-	Time    int    `json:"time"`
+	Type        string `json:"type"`
+	Content     string `json:"content"`
+	Color       string `json:"color"`
+	Time        int    `json:"time"`
+	FontSize    string `json:"fontSize"`
+	DanmakuType string `json:"danmakuType"`
 }
 
 func (c *Client) ReadPump() {
@@ -143,14 +145,22 @@ func (c *Client) ReadPump() {
 		}
 
 		// Persist danmaku directly to MySQL
+		fontSize := incoming.FontSize
+		if fontSize == "" {
+			fontSize = "medium"
+		}
+		danmakuType := incoming.DanmakuType
+		if danmakuType == "" {
+			danmakuType = "scroll"
+		}
 		danmaku := model.Danmaku{
 			VideoID:  c.RoomID,
 			UserID:   c.UserID,
 			Content:  incoming.Content,
 			Color:    incoming.Color,
 			Time:     incoming.Time,
-			FontSize: "medium",
-			Type:     "scroll",
+			FontSize: fontSize,
+			Type:     danmakuType,
 		}
 		c.Hub.svcCtx.DB.Create(&danmaku)
 
@@ -158,10 +168,13 @@ func (c *Client) ReadPump() {
 		outgoing, _ := json.Marshal(map[string]any{
 			"type": "danmaku",
 			"payload": map[string]any{
-				"userId":  c.UserID,
-				"content": incoming.Content,
-				"color":   incoming.Color,
-				"time":    incoming.Time,
+				"id":          danmaku.ID,
+				"userId":      c.UserID,
+				"content":     incoming.Content,
+				"color":       incoming.Color,
+				"time":        incoming.Time,
+				"fontSize":    fontSize,
+				"danmakuType": danmakuType,
 			},
 		})
 		c.Hub.Broadcast <- &RoomMessage{RoomID: c.RoomID, Payload: outgoing}

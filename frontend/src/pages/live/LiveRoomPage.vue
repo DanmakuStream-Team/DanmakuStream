@@ -30,8 +30,17 @@
         </div>
         <div class="send-box">
           <el-input v-model="text" placeholder="发送弹幕" @keyup.enter="send" />
-          <el-color-picker v-model="color" />
           <el-button type="primary" @click="send">发送</el-button>
+        </div>
+        <div class="danmaku-colors">
+          <span
+            v-for="c in DANMAKU_COLORS"
+            :key="c"
+            class="color-dot"
+            :class="{ active: color === c }"
+            :style="{ background: c }"
+            @click="color = c"
+          />
         </div>
       </aside>
     </section>
@@ -54,6 +63,7 @@ const roomId = Number(route.params.id)
 const connected = ref(false)
 const text = ref('')
 const color = ref('#FFFFFF')
+const DANMAKU_COLORS = ['#FFFFFF', '#FF5555', '#55FF55', '#5555FF', '#FFFF55', '#FF55FF', '#55FFFF', '#FF8C00', '#FF69B4', '#00CED1', '#FFD700', '#FF6347']
 const messages = ref<Danmaku[]>([])
 let ws: DanmakuWebSocket | null = null
 
@@ -168,8 +178,33 @@ function send() {
 
 .send-box {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto;
   gap: 8px;
+}
+
+.danmaku-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.color-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.color-dot:hover {
+  transform: scale(1.15);
+}
+
+.color-dot.active {
+  border-color: #165dff;
+  transform: scale(1.1);
 }
 
 @media (max-width: 920px) {

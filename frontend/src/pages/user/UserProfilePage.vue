@@ -30,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import VideoCard from '@/components/common/VideoCard.vue'
@@ -48,6 +48,7 @@ const user = ref<UserInfo | null>(null)
 const videos = ref<VideoInfo[]>([])
 
 onMounted(load)
+watch(() => route.params.id, () => load())
 
 async function load() {
   const id = Number(route.params.id)
