@@ -13,6 +13,14 @@
           {{ room?.status === 'live' ? '直播中' : '未开播' }}
         </el-tag>
         <el-tag type="info">{{ viewerCount }} 人观看</el-tag>
+        <el-button
+          v-if="canManageRoom"
+          type="danger"
+          :loading="ending"
+          @click="endLiveRoom"
+        >
+          结束直播
+        </el-button>
       </div>
     </div>
 
@@ -80,6 +88,7 @@ const authStore = useAuthStore()
 const roomId = Number(route.params.id)
 const connected = ref(false)
 const loading = ref(false)
+const ending = ref(false)
 const room = ref<LiveRoom>()
 const text = ref('')
 const color = ref('#FFFFFF')
@@ -92,6 +101,10 @@ let streamTimer: ReturnType<typeof setInterval> | null = null
 let lastPlayerErrorAt = 0
 
 const streamUrl = computed(() => room.value?.streamUrl || room.value?.playUrl || '')
+const canManageRoom = computed(() => {
+  if (!room.value || !authStore.userInfo) return false
+  return room.value.ownerId === authStore.userInfo.id || authStore.isAdmin
+})
 
 onMounted(async () => {
   await loadRoom()
@@ -141,6 +154,22 @@ function stopStreamProbe() {
   if (!streamTimer) return
   clearInterval(streamTimer)
   streamTimer = null
+}
+
+async function endLiveRoom() {
+  if (!room.value) return
+  ending.value = true
+  try {
+    await liveApi.end(room.value.id)
+    ws?.disconnect()
+    stopStreamProbe()
+    ElMessage.success('直播已结束')
+    router.push('/live')
+  } catch {
+    ElMessage.error('结束直播失败')
+  } finally {
+    ending.value = false
+  }
 }
 
 async function checkStreamReady() {

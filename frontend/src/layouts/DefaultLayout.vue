@@ -2,39 +2,79 @@
   <el-container class="app-layout">
     <el-header class="topbar">
       <div class="topbar-inner">
-        <button class="brand" type="button" @click="router.push('/')">
-          <span class="brand-script">Danmaku</span>
-          <span class="brand-name">Stream</span>
-        </button>
-
-        <nav class="nav">
-          <button
-            v-for="item in navItems"
-            :key="item.key"
-            v-show="item.key !== 'admin' || authStore.isAdmin"
-            type="button"
-            :class="{ active: isActive(item.key) }"
-            @click="goNav(item)"
-          >
-            {{ item.label }}
+        <div class="topbar-left">
+          <button class="brand" type="button" @click="router.push('/')">
+            <span class="brand-script">Danmaku</span>
+            <span class="brand-name">Stream</span>
           </button>
-        </nav>
 
-        <div class="actions">
+          <nav class="nav">
+            <button
+              v-for="item in navItems"
+              :key="item.key"
+              v-show="item.key !== 'admin' || authStore.isAdmin"
+              type="button"
+              :class="{ active: isActive(item.key) }"
+              @click="goNav(item)"
+            >
+              {{ item.label }}
+            </button>
+          </nav>
+        </div>
+
+        <div class="search-wrap">
           <el-input
             v-model="keyword"
             class="search"
-            placeholder="搜索视频、弹幕、创作者"
+            placeholder="搜索视频、创作者"
             clearable
+            @focus="isSearchFocused = true"
+            @blur="isSearchFocused = false"
             @keyup.enter="search"
           >
             <template #suffix>
               <el-icon><Search /></el-icon>
             </template>
           </el-input>
-          <el-button class="round-action" circle title="投稿" @click="goUpload">
-            <el-icon><Upload /></el-icon>
-          </el-button>
+          <div v-if="showSearchPanel" class="search-panel">
+            <div
+              v-for="item in visibleSearchHistory"
+              :key="item"
+              class="search-history-row"
+            >
+              <button
+                class="search-history-item"
+                type="button"
+                @mousedown.prevent="useSearchHistory(item)"
+              >
+                <el-icon><Clock /></el-icon>
+                <span>{{ item }}</span>
+              </button>
+              <button
+                aria-label="删除搜索历史"
+                class="search-history-remove"
+                type="button"
+                title="删除"
+                @mousedown.stop.prevent="removeSearchHistory(item)"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <el-dropdown trigger="click">
+            <el-button class="round-action" circle title="创作">
+              <el-icon><Upload /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item @click="goUpload">上传视频</el-dropdown-item>
+                <el-dropdown-item @click="goLiveStart">开始直播</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
           <el-dropdown v-if="authStore.isLoggedIn" trigger="click">
             <button class="user-button" type="button">
               <el-avatar :size="34" :src="authStore.userInfo?.avatar">
@@ -55,24 +95,31 @@
       </div>
     </el-header>
 
-    <div class="layout-body">
-      <aside class="sidebar">
+    <div class="layout-body" :class="{ collapsed: isSidebarCollapsed }">
+      <aside class="sidebar" :class="{ collapsed: isSidebarCollapsed }">
+        <button
+          class="collapse-toggle"
+          type="button"
+          :title="isSidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
+          @click="isSidebarCollapsed = !isSidebarCollapsed"
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+
         <section class="side-section primary-section">
           <button class="side-item" :class="{ active: isActive('home') }" type="button" @click="router.push('/')">
             <el-icon><HomeFilled /></el-icon>
             <span>首页</span>
           </button>
-          <button class="side-item" :class="{ active: isActive('live') }" type="button" @click="router.push('/live/1')">
+          <button class="side-item" :class="{ active: isActive('live') }" type="button" @click="router.push('/live')">
             <el-icon><VideoCameraFilled /></el-icon>
             <span>直播</span>
           </button>
           <button class="side-item" :class="{ active: isActive('video') }" type="button" @click="router.push({ path: '/', query: { feature: 'video' } })">
             <el-icon><VideoCamera /></el-icon>
             <span>视频</span>
-          </button>
-          <button class="side-item" :class="{ active: isActive('danmaku') }" type="button" @click="router.push({ path: '/', query: { feature: 'danmaku' } })">
-            <el-icon><Bell /></el-icon>
-            <span>弹幕</span>
           </button>
           <button class="side-item" :class="{ active: isActive('creator') }" type="button" @click="goUpload">
             <el-icon><Upload /></el-icon>
@@ -110,8 +157,12 @@
             <span>历史记录</span>
           </button>
           <button class="side-item" :class="{ active: isActive('liked') }" type="button" @click="router.push('/me/liked')">
-            <el-icon><Star /></el-icon>
+            <el-icon><ThumbUpIcon /></el-icon>
             <span>赞过的视频</span>
+          </button>
+          <button class="side-item" :class="{ active: isActive('collections') }" type="button" @click="router.push('/me/collections')">
+            <el-icon><Star /></el-icon>
+            <span>收藏内容</span>
           </button>
           <button class="side-item" :class="{ active: isActive('downloads') }" type="button" @click="router.push('/me/downloads')">
             <el-icon><Download /></el-icon>
@@ -120,7 +171,7 @@
         </section>
 
         <section v-if="authStore.isLoggedIn" class="side-section">
-          <button class="side-title action-title" type="button" @click="router.push({ path: '/', query: { feature: 'video' } })">
+          <button class="side-title action-title" :class="{ active: isActive('subscriptions') }" type="button" @click="router.push('/subscriptions')">
             <span>订阅</span>
             <el-icon><ArrowRight /></el-icon>
           </button>
@@ -145,21 +196,6 @@
           </button>
         </section>
 
-        <section class="side-section">
-          <h2 class="side-title">探索</h2>
-          <button class="side-item" type="button">
-            <el-icon><Headset /></el-icon>
-            <span>音乐</span>
-          </button>
-          <button class="side-item" type="button">
-            <el-icon><Collection /></el-icon>
-            <span>影视</span>
-          </button>
-          <button class="side-item more-item" type="button">
-            <el-icon><ArrowDown /></el-icon>
-            <span>展开</span>
-          </button>
-        </section>
       </aside>
 
       <el-main class="main">
@@ -175,11 +211,8 @@ import { ElMessage } from 'element-plus'
 import {
   ArrowDown,
   ArrowRight,
-  Bell,
   Clock,
-  Collection,
   Download,
-  Headset,
   HomeFilled,
   Notebook,
   Search,
@@ -193,14 +226,21 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { userApi } from '@/api/user'
 import type { FolloweeInfo } from '@/api/user'
+import ThumbUpIcon from '@/components/icons/ThumbUpIcon.vue'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const keyword = ref('')
+const isSearchFocused = ref(false)
+const isSidebarCollapsed = ref(false)
+const searchHistory = ref<string[]>([])
 const subscriptions = ref<FolloweeInfo[]>([])
 const displayCount = ref(5)
+const searchHistoryKey = 'danmaku:search-history'
 const visibleSubscriptions = computed(() => subscriptions.value.slice(0, displayCount.value))
+const visibleSearchHistory = computed(() => searchHistory.value.slice(0, 8))
+const showSearchPanel = computed(() => isSearchFocused.value && visibleSearchHistory.value.length > 0)
 
 async function loadFollowing() {
   if (!authStore.isLoggedIn) return
@@ -212,17 +252,56 @@ async function loadFollowing() {
   }
 }
 
-onMounted(loadFollowing)
+function loadSearchHistory() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(searchHistoryKey) || '[]')
+    searchHistory.value = Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string' && Boolean(item.trim())).slice(0, 20)
+      : []
+  } catch {
+    searchHistory.value = []
+  }
+}
+
+function saveSearchHistory(value: string) {
+  const normalized = value.trim()
+  if (!normalized) return
+  searchHistory.value = [
+    normalized,
+    ...searchHistory.value.filter(item => item !== normalized),
+  ].slice(0, 20)
+  localStorage.setItem(searchHistoryKey, JSON.stringify(searchHistory.value))
+}
+
+function removeSearchHistory(value: string) {
+  searchHistory.value = searchHistory.value.filter(item => item !== value)
+  localStorage.setItem(searchHistoryKey, JSON.stringify(searchHistory.value))
+}
+
+function useSearchHistory(value: string) {
+  keyword.value = value
+  search()
+}
+
+onMounted(() => {
+  loadFollowing()
+  loadSearchHistory()
+  keyword.value = String(route.query.keyword || '')
+})
+
 watch(() => authStore.isLoggedIn, (loggedIn) => {
   if (loggedIn) loadFollowing()
   else subscriptions.value = []
 })
 
+watch(() => route.query.keyword, (value) => {
+  keyword.value = String(value || '')
+})
+
 const navItems = [
   { key: 'home', label: '首页', path: '/' },
   { key: 'video', label: '视频', path: '/', query: { feature: 'video' } },
-  { key: 'danmaku', label: '弹幕', path: '/', query: { feature: 'danmaku' } },
-  { key: 'live', label: '直播', path: '/live/1' },
+  { key: 'live', label: '直播', path: '/live' },
   { key: 'creator', label: '投稿', path: '/creator/upload' },
   { key: 'admin', label: '审核', path: '/admin' },
 ]
@@ -237,9 +316,6 @@ function isActive(key: string) {
   }
   if (key === 'video') {
     return route.path === '/' && route.query.feature === 'video'
-  }
-  if (key === 'danmaku') {
-    return route.path === '/' && route.query.feature === 'danmaku'
   }
   if (key === 'live') {
     return route.path.startsWith('/live')
@@ -256,14 +332,23 @@ function isActive(key: string) {
   if (key === 'liked') {
     return route.path === '/me/liked'
   }
+  if (key === 'collections') {
+    return route.path === '/me/collections'
+  }
   if (key === 'downloads') {
     return route.path === '/me/downloads'
+  }
+  if (key === 'subscriptions') {
+    return route.path === '/subscriptions'
   }
   return false
 }
 
 function search() {
-  router.push({ path: '/', query: keyword.value ? { keyword: keyword.value } : {} })
+  const value = keyword.value.trim()
+  saveSearchHistory(value)
+  isSearchFocused.value = false
+  router.push({ path: '/', query: value ? { keyword: value } : {} })
 }
 
 function goUpload() {
@@ -273,6 +358,15 @@ function goUpload() {
   }
   ElMessage.warning('请先登录后再投稿')
   router.push({ path: '/login', query: { redirect: '/creator/upload' } })
+}
+
+function goLiveStart() {
+  if (authStore.isLoggedIn) {
+    router.push({ path: '/live', query: { create: '1' } })
+    return
+  }
+  ElMessage.warning('请先登录后再开播')
+  router.push({ path: '/login', query: { redirect: '/live?create=1' } })
 }
 
 function logout() {
@@ -300,12 +394,19 @@ function logout() {
 
 .topbar-inner {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 640px) minmax(92px, 1fr);
   align-items: center;
   gap: 24px;
   width: 100%;
   height: 100%;
   padding: 0 var(--topbar-x);
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-width: 0;
 }
 
 .brand,
@@ -319,19 +420,21 @@ function logout() {
 .brand {
   display: inline-flex;
   align-items: baseline;
+  flex-shrink: 0;
   gap: 6px;
+  white-space: nowrap;
   color: #18191c;
 }
 
 .brand-script {
   color: #fb7299;
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 900;
   letter-spacing: 0;
 }
 
 .brand-name {
-  font-size: 23px;
+  font-size: 21px;
   font-weight: 900;
 }
 
@@ -339,15 +442,19 @@ function logout() {
   display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .nav button {
+  flex-shrink: 0;
   height: 40px;
   padding: 0 13px;
   border-radius: 8px;
   color: #61666d;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .nav button:hover,
@@ -360,12 +467,113 @@ function logout() {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: nowrap;
   gap: 10px;
+  min-width: 92px;
   width: 100%;
 }
 
+.search-wrap {
+  position: relative;
+  width: min(100%, 640px);
+  justify-self: center;
+}
+
 .search {
-  width: 62%;
+  width: 100%;
+}
+
+.search :deep(.el-input__wrapper) {
+  min-height: 42px;
+  border-radius: 999px;
+  padding: 0 16px;
+}
+
+.search-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  width: 100%;
+  max-height: 294px;
+  overflow: hidden;
+  padding: 8px 0;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 14px 38px rgba(15, 23, 42, 0.14);
+}
+
+.search-panel::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 34px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff);
+  content: '';
+}
+
+.search-history-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 8px 0 14px;
+}
+
+.search-history-row:hover {
+  background: #f6f7f8;
+}
+
+.search-history-item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #18191c;
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-history-item .el-icon {
+  color: #9499a0;
+  font-size: 16px;
+}
+
+.search-history-item span {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-history-remove {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  justify-self: center;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #9499a0;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.search-history-remove:hover {
+  background: #e7e7e7;
+  color: #18191c;
 }
 
 .round-action {
@@ -376,7 +584,7 @@ function logout() {
   min-width: 76px;
   background: #00aeec;
   border-color: #00aeec;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 900;
 }
 
@@ -391,6 +599,12 @@ function logout() {
   grid-template-columns: 13% minmax(0, 1fr);
   gap: 1.5%;
   width: 100%;
+  transition: grid-template-columns 0.18s ease;
+}
+
+.layout-body.collapsed {
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 0;
 }
 
 .sidebar {
@@ -398,10 +612,74 @@ function logout() {
   top: 68px;
   align-self: start;
   height: calc(100vh - 68px);
-  padding: 18px 4% 28px 5%;
+  padding: 22px 4% 28px 5%;
   overflow-y: auto;
   border-right: 1px solid #f1f2f3;
   background: #fff;
+  scrollbar-color: rgba(251, 114, 153, 0.34) transparent;
+  scrollbar-width: thin;
+  transition: padding 0.18s ease;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: rgba(251, 114, 153, 0.28);
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(251, 114, 153, 0.56);
+}
+
+.sidebar.collapsed {
+  padding: 22px 8px 24px;
+  overflow-x: hidden;
+}
+
+.collapse-toggle {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  right: -18px;
+  z-index: 2;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  width: 36px;
+  height: 36px;
+  padding: 0 9px;
+  border: 1px solid rgba(251, 114, 153, 0.22);
+  border-radius: 50%;
+  background: #fff;
+  color: #fb7299;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.1);
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.collapse-toggle:hover {
+  border-color: rgba(251, 114, 153, 0.42);
+  background: rgba(251, 114, 153, 0.08);
+  box-shadow: 0 6px 18px rgba(251, 114, 153, 0.16);
+}
+
+.collapse-toggle span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
 }
 
 .side-section {
@@ -437,6 +715,40 @@ function logout() {
   cursor: pointer;
 }
 
+.sidebar.collapsed .side-item,
+.sidebar.collapsed .subscribe-item,
+.sidebar.collapsed .action-title {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  gap: 0;
+  min-height: 46px;
+  padding: 0;
+}
+
+.sidebar.collapsed .side-item span,
+.sidebar.collapsed .subscribe-item span,
+.sidebar.collapsed .side-title,
+.sidebar.collapsed .action-title span,
+.sidebar.collapsed .action-title .el-icon,
+.sidebar.collapsed .login-section p {
+  display: none;
+}
+
+.sidebar.collapsed .login-section {
+  padding: 16px 0;
+}
+
+.sidebar.collapsed .side-login {
+  justify-self: center;
+  width: 46px;
+  min-width: 0;
+  padding: 0;
+}
+
+.sidebar.collapsed .side-login span {
+  display: none;
+}
+
 .side-item:hover,
 .subscribe-item:hover,
 .action-title:hover,
@@ -451,14 +763,14 @@ function logout() {
 .side-item .el-icon {
   justify-self: center;
   color: #111;
-  font-size: 27px;
+  font-size: 25px;
 }
 
 .side-item span,
 .subscribe-item span,
 .side-title {
   overflow: hidden;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -476,13 +788,13 @@ function logout() {
 }
 
 .action-title span {
-  font-size: 21px;
+  font-size: 19px;
   font-weight: 900;
 }
 
 .action-title .el-icon {
   color: #111;
-  font-size: 17px;
+  font-size: 16px;
 }
 
 .login-section {
@@ -493,7 +805,7 @@ function logout() {
 .login-section p {
   margin: 0;
   color: #333;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   line-height: 1.7;
 }
@@ -503,7 +815,7 @@ function logout() {
   height: 44px;
   padding: 0 18px;
   border-radius: 999px;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 900;
 }
 
@@ -512,8 +824,12 @@ function logout() {
   min-height: 50px;
 }
 
+.sidebar.collapsed .subscribe-item {
+  grid-template-columns: 1fr;
+}
+
 .subscribe-item span {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -553,14 +869,21 @@ function logout() {
     padding: 10px var(--topbar-x);
   }
 
-  .nav {
-    grid-column: 1 / -1;
-    order: 3;
-    overflow-x: auto;
+  .topbar-left {
+    gap: 16px;
+    min-width: 0;
   }
 
-  .search {
-    display: none;
+  .search-wrap {
+    grid-column: 1 / -1;
+    order: 3;
+    width: 100%;
+  }
+
+  .nav {
+    grid-column: 1 / -1;
+    order: 4;
+    overflow-x: auto;
   }
 
   .layout-body {

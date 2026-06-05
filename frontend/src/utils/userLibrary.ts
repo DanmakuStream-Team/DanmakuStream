@@ -1,6 +1,6 @@
 import type { VideoInfo } from '@/types'
 
-export type UserLibraryKind = 'history' | 'liked' | 'downloads'
+export type UserLibraryKind = 'history' | 'liked' | 'collections' | 'downloads'
 
 export interface UserLibraryRecord {
   video: VideoInfo
@@ -11,6 +11,7 @@ export interface UserLibraryRecord {
 const STORAGE_KEYS: Record<UserLibraryKind, string> = {
   history: 'danmaku:user-library:history',
   liked: 'danmaku:user-library:liked',
+  collections: 'danmaku:user-library:collections',
   downloads: 'danmaku:user-library:downloads',
 }
 

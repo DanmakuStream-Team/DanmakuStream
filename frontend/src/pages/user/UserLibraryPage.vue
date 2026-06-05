@@ -66,7 +66,7 @@ const records = ref<UserLibraryRecord[]>([])
 
 const kind = computed<UserLibraryKind>(() => {
   const value = route.params.kind
-  return value === 'liked' || value === 'downloads' ? value : 'history'
+  return value === 'liked' || value === 'collections' || value === 'downloads' ? value : 'history'
 })
 
 const activeMeta = computed(() => {
@@ -82,6 +82,12 @@ const activeMeta = computed(() => {
       title: '赞过的视频',
       description: '这里会收纳你在本机点赞过的视频，方便回看。',
       empty: '暂无赞过的视频',
+    },
+    collections: {
+      tag: '收藏夹',
+      title: '收藏内容',
+      description: '这里会收纳你在本机收藏过的视频，方便集中查看。',
+      empty: '暂无收藏内容',
     },
     downloads: {
       tag: '离线内容',
@@ -147,7 +153,7 @@ function downloadVideo(video: VideoInfo) {
 .library-head h1 {
   margin: 10px 0 8px;
   color: #18191c;
-  font-size: 34px;
+  font-size: 32px;
   font-weight: 900;
   line-height: 1.2;
 }
@@ -206,36 +212,38 @@ function downloadVideo(video: VideoInfo) {
 }
 
 .item-main h2 {
-  display: -webkit-box;
+  display: block;
   margin: 0 0 6px;
   overflow: hidden;
   color: #18191c;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
   line-height: 1.35;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .item-main p {
   display: -webkit-box;
   overflow: hidden;
-  font-size: 14px;
+  font-size: 13px;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
 .meta-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 12px;
+  overflow: hidden;
   color: #9499a0;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .meta-row span {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 4px;
 }
 

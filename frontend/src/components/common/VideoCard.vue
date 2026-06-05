@@ -66,7 +66,7 @@ defineEmits<{ open: [] }>()
     linear-gradient(135deg, rgba(0, 174, 236, 0.16), rgba(251, 114, 153, 0.16)),
     #f6f7f8;
   color: #00aeec;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 900;
 }
 
@@ -80,7 +80,7 @@ defineEmits<{ open: [] }>()
   padding: 22px 8px 7px;
   background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.72));
   color: #fff;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .cover-mask span {
@@ -99,16 +99,16 @@ defineEmits<{ open: [] }>()
 }
 
 h3 {
-  display: -webkit-box;
-  min-height: 42px;
+  display: block;
+  min-height: 22px;
   margin: 0;
   overflow: hidden;
   color: #18191c;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.45;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .video-card:hover h3 {
@@ -121,7 +121,7 @@ h3 {
   gap: 5px;
   margin-top: 7px;
   color: #9499a0;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .author span {

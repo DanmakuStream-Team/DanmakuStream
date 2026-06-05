@@ -9,9 +9,11 @@ const routes: RouteRecordRaw[] = [
     children: [
       { path: '', name: 'Home', component: () => import('@/pages/home/HomePage.vue') },
       { path: 'video/:id', name: 'VideoDetail', component: () => import('@/pages/video/VideoDetailPage.vue') },
+      { path: 'live', name: 'LiveList', component: () => import('@/pages/live/LiveListPage.vue') },
       { path: 'live/:id', name: 'LiveRoom', component: () => import('@/pages/live/LiveRoomPage.vue') },
       { path: 'user/:id', name: 'UserProfile', component: () => import('@/pages/user/UserProfilePage.vue') },
-      { path: 'me/:kind(history|liked|downloads)', name: 'UserLibrary', component: () => import('@/pages/user/UserLibraryPage.vue'), meta: { requiresAuth: true } },
+      { path: 'subscriptions', name: 'Subscriptions', component: () => import('@/pages/user/SubscriptionPage.vue'), meta: { requiresAuth: true } },
+      { path: 'me/:kind(history|liked|collections|downloads)', name: 'UserLibrary', component: () => import('@/pages/user/UserLibraryPage.vue'), meta: { requiresAuth: true } },
       { path: 'creator', name: 'CreatorDashboard', component: () => import('@/pages/user/CreatorDashboardPage.vue'), meta: { requiresAuth: true } },
       { path: 'creator/upload', name: 'VideoUpload', component: () => import('@/pages/video/VideoUploadPage.vue'), meta: { requiresAuth: true } },
       { path: 'admin', name: 'AdminDashboard', component: () => import('@/pages/admin/AdminDashboardPage.vue') },

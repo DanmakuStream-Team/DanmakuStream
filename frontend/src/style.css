@@ -8,13 +8,31 @@
   background: #fff;
   font-family:
     "LXGW WenKai", "霞鹜文楷", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
-  font-size: 17px;
+  font-size: 16px;
   font-synthesis: weight;
   text-rendering: optimizeLegibility;
 }
 
 * {
   box-sizing: border-box;
+}
+
+body,
+button,
+input,
+textarea,
+.el-button,
+.el-input__inner,
+.el-dropdown-menu__item {
+  white-space: nowrap;
+}
+
+p,
+textarea,
+.search-desc,
+.login-section p,
+.comment-content {
+  white-space: normal;
 }
 
 html,
@@ -73,12 +91,12 @@ button {
 }
 
 .section-head h1 {
-  font-size: 34px;
+  font-size: 32px;
   font-weight: 900;
 }
 
 .section-head h2 {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 900;
 }
 

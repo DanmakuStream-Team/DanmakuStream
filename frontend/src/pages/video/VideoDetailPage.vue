@@ -193,7 +193,12 @@ async function toggleLike() {
 async function toggleCollect() {
   if (!ensureLogin()) return
   if (!video.value) return
-  await videoApi.collect(video.value.id)
+  const res = await videoApi.collect(video.value.id)
+  if (res.data.collected) {
+    upsertUserLibraryRecord('collections', video.value)
+  } else {
+    removeUserLibraryRecord('collections', video.value.id)
+  }
   await videoStore.fetchVideoDetail(video.value.id)
 }
 
