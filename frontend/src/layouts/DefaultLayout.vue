@@ -62,6 +62,10 @@
             <el-icon><HomeFilled /></el-icon>
             <span>首页</span>
           </button>
+          <button class="side-item" :class="{ active: isActive('live') }" type="button" @click="router.push('/live/1')">
+            <el-icon><VideoCameraFilled /></el-icon>
+            <span>直播</span>
+          </button>
           <button class="side-item" :class="{ active: isActive('video') }" type="button" @click="router.push({ path: '/', query: { feature: 'video' } })">
             <el-icon><VideoCamera /></el-icon>
             <span>视频</span>
@@ -101,15 +105,15 @@
             <el-icon><Upload /></el-icon>
             <span>发布视频</span>
           </button>
-          <button class="side-item" type="button">
+          <button class="side-item" :class="{ active: isActive('history') }" type="button" @click="router.push('/me/history')">
             <el-icon><Clock /></el-icon>
             <span>历史记录</span>
           </button>
-          <button class="side-item" type="button">
+          <button class="side-item" :class="{ active: isActive('liked') }" type="button" @click="router.push('/me/liked')">
             <el-icon><Star /></el-icon>
             <span>赞过的视频</span>
           </button>
-          <button class="side-item" type="button">
+          <button class="side-item" :class="{ active: isActive('downloads') }" type="button" @click="router.push('/me/downloads')">
             <el-icon><Download /></el-icon>
             <span>下载内容</span>
           </button>
@@ -150,10 +154,6 @@
           <button class="side-item" type="button">
             <el-icon><Collection /></el-icon>
             <span>影视</span>
-          </button>
-          <button class="side-item" :class="{ active: isActive('live') }" type="button" @click="router.push('/live/1')">
-            <el-icon><VideoCameraFilled /></el-icon>
-            <span>直播</span>
           </button>
           <button class="side-item more-item" type="button">
             <el-icon><ArrowDown /></el-icon>
@@ -249,6 +249,15 @@ function isActive(key: string) {
   }
   if (key === 'admin') {
     return route.path.startsWith('/admin')
+  }
+  if (key === 'history') {
+    return route.path === '/me/history'
+  }
+  if (key === 'liked') {
+    return route.path === '/me/liked'
+  }
+  if (key === 'downloads') {
+    return route.path === '/me/downloads'
   }
   return false
 }
