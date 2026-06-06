@@ -16,6 +16,11 @@ type Config struct {
 
 	VideoDir string `yaml:"VideoDir"`
 
+	Live struct {
+		RTMPHost string `yaml:"RTMPHost"`
+		HTTPHost string `yaml:"HTTPHost"`
+	} `yaml:"Live"`
+
 	Log struct {
 		Mode  string `yaml:"Mode"`
 		Level string `yaml:"Level"`

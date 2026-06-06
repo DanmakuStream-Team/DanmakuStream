@@ -20,9 +20,7 @@ import (
 )
 
 const (
-	liveApp        = "live"
-	publicRTMPHost = "localhost:1935"
-	publicHTTPHost = "localhost:8081"
+	liveApp = "live"
 )
 
 type createLiveRoomReq struct {
@@ -70,7 +68,7 @@ func ListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 
 		list := make([]liveRoomInfo, 0, len(rooms))
 		for _, room := range rooms {
-			list = append(list, toLiveRoomInfo(room, false))
+			list = append(list, toLiveRoomInfo(room, false, svcCtx.Config.Live.RTMPHost, svcCtx.Config.Live.HTTPHost))
 		}
 
 		response.Ok(c, gin.H{
@@ -103,7 +101,7 @@ func DetailHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			return
 		}
 
-		response.Ok(c, toLiveRoomInfo(room, false))
+		response.Ok(c, toLiveRoomInfo(room, false, svcCtx.Config.Live.RTMPHost, svcCtx.Config.Live.HTTPHost))
 	}
 }
 
@@ -175,7 +173,7 @@ func CreateHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			return
 		}
 
-		response.Ok(c, toLiveRoomInfo(room, true))
+		response.Ok(c, toLiveRoomInfo(room, true, svcCtx.Config.Live.RTMPHost, svcCtx.Config.Live.HTTPHost))
 	}
 }
 
@@ -219,7 +217,7 @@ func EndHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		room.Status = "ended"
 		room.ViewerCount = 0
 		room.EndedAt = &now
-		response.Ok(c, toLiveRoomInfo(room, true))
+		response.Ok(c, toLiveRoomInfo(room, true, svcCtx.Config.Live.RTMPHost, svcCtx.Config.Live.HTTPHost))
 	}
 }
 
@@ -243,8 +241,8 @@ func generateStreamKey() (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
-func toLiveRoomInfo(room model.LiveRoom, includeStreamKey bool) liveRoomInfo {
-	playURL := fmt.Sprintf("http://%s/%s/%s.m3u8", publicHTTPHost, liveApp, room.StreamKey)
+func toLiveRoomInfo(room model.LiveRoom, includeStreamKey bool, rtmpHost, httpHost string) liveRoomInfo {
+	playURL := fmt.Sprintf("http://%s/%s/%s.m3u8", httpHost, liveApp, room.StreamKey)
 	info := liveRoomInfo{
 		ID:          room.ID,
 		Title:       room.Title,
@@ -271,7 +269,7 @@ func toLiveRoomInfo(room model.LiveRoom, includeStreamKey bool) liveRoomInfo {
 	}
 	if includeStreamKey {
 		info.StreamKey = room.StreamKey
-		info.PublishURL = fmt.Sprintf("rtmp://%s/%s/%s", publicRTMPHost, liveApp, room.StreamKey)
+		info.PublishURL = fmt.Sprintf("rtmp://%s/%s/%s", rtmpHost, liveApp, room.StreamKey)
 	}
 	return info
 }

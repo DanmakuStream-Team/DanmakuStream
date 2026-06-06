@@ -11,6 +11,10 @@ Database:
 
 VideoDir: "data"
 
+Live:
+  RTMPHost: "localhost:1935"
+  HTTPHost: "localhost:8081"
+
 Log:
   Mode: console
   Level: info
