@@ -85,6 +85,12 @@ func (h *Hub) broadcastViewerCount(roomID uint) {
 	count := len(h.rooms[roomID])
 	h.mu.RUnlock()
 
+	// Sync viewer count to MySQL
+	go func() {
+		h.svcCtx.DB.Model(&model.LiveRoom{}).Where("id = ? AND status = ?", roomID, "live").
+			Update("viewer_count", count)
+	}()
+
 	payload, _ := json.Marshal(map[string]any{
 		"type":    "viewer_count",
 		"payload": count,

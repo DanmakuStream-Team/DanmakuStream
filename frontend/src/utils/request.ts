@@ -35,6 +35,8 @@ request.interceptors.response.use(
       const authStore = useAuthStore()
       authStore.logout()
       ElMessage.warning('请先登录')
+    } else {
+      ElMessage.error(message || '请求失败')
     }
     return Promise.reject(new Error(message))
   }
