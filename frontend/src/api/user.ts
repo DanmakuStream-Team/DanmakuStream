@@ -18,4 +18,7 @@ export const userApi = {
   following() {
     return request.get<{ list: FolloweeInfo[] }>('/users/following')
   },
+  search(params: { q: string; page?: number; pageSize?: number }) {
+    return request.get<{ list: UserInfo[]; total: number; page: number; pageSize: number }>('/search/users', { params })
+  },
 }

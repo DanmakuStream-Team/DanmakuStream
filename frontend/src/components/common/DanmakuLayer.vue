@@ -1,5 +1,5 @@
 <template>
-  <div ref="layerRef" class="danmaku-layer">
+  <div ref="layerRef" class="danmaku-layer" :class="{ paused }">
     <span
       v-for="item in visibleItems"
       :key="item.id"
@@ -15,7 +15,7 @@
 import { computed, ref } from 'vue'
 import type { Danmaku } from '@/types'
 
-const props = defineProps<{ items: Danmaku[]; currentTime: number }>()
+const props = defineProps<{ items: Danmaku[]; currentTime: number; paused?: boolean }>()
 
 const layerRef = ref<HTMLElement>()
 
@@ -138,6 +138,10 @@ function getStyle(item: VisibleDanmaku) {
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+}
+
+.danmaku-layer.paused .danmaku {
+  animation-play-state: paused;
 }
 
 .danmaku {

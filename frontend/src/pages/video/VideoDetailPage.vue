@@ -181,25 +181,29 @@ async function load() {
 async function toggleLike() {
   if (!ensureLogin()) return
   if (!video.value) return
+  const current = video.value
   const res = await videoApi.like(video.value.id)
   if (res.data.liked) {
-    upsertUserLibraryRecord('liked', video.value)
+    current.likeCount += 1
+    upsertUserLibraryRecord('liked', current)
   } else {
-    removeUserLibraryRecord('liked', video.value.id)
+    current.likeCount = Math.max(0, current.likeCount - 1)
+    removeUserLibraryRecord('liked', current.id)
   }
-  await videoStore.fetchVideoDetail(video.value.id)
 }
 
 async function toggleCollect() {
   if (!ensureLogin()) return
   if (!video.value) return
+  const current = video.value
   const res = await videoApi.collect(video.value.id)
   if (res.data.collected) {
-    upsertUserLibraryRecord('collections', video.value)
+    current.collectCount += 1
+    upsertUserLibraryRecord('collections', current)
   } else {
-    removeUserLibraryRecord('collections', video.value.id)
+    current.collectCount = Math.max(0, current.collectCount - 1)
+    removeUserLibraryRecord('collections', current.id)
   }
-  await videoStore.fetchVideoDetail(video.value.id)
 }
 
 function downloadVideo() {
