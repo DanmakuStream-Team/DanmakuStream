@@ -339,6 +339,49 @@ func CollectHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 	}
 }
 
+func ReactionHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint(middleware.CtxKeyUserID)
+
+		videoID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || videoID == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的视频 ID")
+			return
+		}
+
+		var video model.Video
+		if err := svcCtx.DB.Select("id", "status").First(&video, videoID).Error; err != nil {
+			response.Fail(c, http.StatusNotFound, "视频不存在")
+			return
+		}
+		if video.Status != "approved" {
+			response.Fail(c, http.StatusForbidden, "视频未通过审核")
+			return
+		}
+
+		var likeCount int64
+		if err := svcCtx.DB.Model(&model.Like{}).
+			Where("user_id = ? AND video_id = ?", userID, videoID).
+			Count(&likeCount).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "点赞状态加载失败")
+			return
+		}
+
+		var collectCount int64
+		if err := svcCtx.DB.Model(&model.Collect{}).
+			Where("user_id = ? AND video_id = ?", userID, videoID).
+			Count(&collectCount).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "收藏状态加载失败")
+			return
+		}
+
+		response.Ok(c, gin.H{
+			"liked":     likeCount > 0,
+			"collected": collectCount > 0,
+		})
+	}
+}
+
 func AdminListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req adminVideoListReq

@@ -21,6 +21,12 @@ type createCommentReq struct {
 	ParentID *uint  `json:"parentId"`
 }
 
+type commentListReq struct {
+	Page     int    `form:"page"`
+	PageSize int    `form:"pageSize"`
+	Sort     string `form:"sort"`
+}
+
 type commentItem struct {
 	ID        uint            `json:"id"`
 	VideoID   uint            `json:"videoId"`
@@ -41,11 +47,23 @@ func ListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			return
 		}
 
+		var req commentListReq
+		if err := c.ShouldBindQuery(&req); err != nil {
+			response.Fail(c, http.StatusBadRequest, "参数错误")
+			return
+		}
+		page, pageSize := normalizePage(req.Page, req.PageSize)
+
+		order := "created_at ASC"
+		if req.Sort == "hot" {
+			order = "like_count DESC, created_at ASC"
+		}
+
 		var comments []model.Comment
 		err = svcCtx.DB.
 			Preload("User").
 			Where("video_id = ?", videoID).
-			Order("created_at ASC").
+			Order(order).
 			Find(&comments).Error
 		if err != nil {
 			response.Fail(c, http.StatusInternalServerError, "评论加载失败")
@@ -74,8 +92,42 @@ func ListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			}
 		}
 
-		response.Ok(c, buildCommentTree(comments, likedMap))
+		tree := buildCommentTree(comments, likedMap)
+		total := int64(len(tree))
+		tree = paginateCommentTree(tree, page, pageSize)
+
+		response.Ok(c, gin.H{
+			"list":     tree,
+			"total":    total,
+			"page":     page,
+			"pageSize": pageSize,
+		})
 	}
+}
+
+func normalizePage(page, pageSize int) (int, int) {
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	return page, pageSize
+}
+
+func paginateCommentTree(tree []*commentItem, page, pageSize int) []*commentItem {
+	start := (page - 1) * pageSize
+	if start >= len(tree) {
+		return []*commentItem{}
+	}
+	end := start + pageSize
+	if end > len(tree) {
+		end = len(tree)
+	}
+	return tree[start:end]
 }
 
 func buildCommentTree(comments []model.Comment, likedMap map[uint]bool) []*commentItem {

@@ -13,6 +13,7 @@ import (
 	commenthandler "danmakustream/backend/internal/handler/v1/comment"
 	danmakuhandler "danmakustream/backend/internal/handler/v1/danmaku"
 	livehandler "danmakustream/backend/internal/handler/v1/live"
+	searchhandler "danmakustream/backend/internal/handler/v1/search"
 	userhandler "danmakustream/backend/internal/handler/v1/user"
 	videohandler "danmakustream/backend/internal/handler/v1/video"
 	wshandler "danmakustream/backend/internal/handler/ws"
@@ -71,6 +72,7 @@ func main() {
 		// Public routes
 		v1.POST("/auth/login", authhandler.LoginHandler(svcCtx))
 		v1.POST("/auth/register", authhandler.RegisterHandler(svcCtx))
+		v1.GET("/search", searchhandler.Handler(svcCtx))
 		v1.GET("/videos", videohandler.ListHandler(svcCtx))
 		v1.GET("/videos/:id", videohandler.DetailHandler(svcCtx))
 		v1.GET("/danmaku/:videoId", danmakuhandler.ListHandler(svcCtx))
@@ -78,9 +80,12 @@ func main() {
 		// 获取用户主页信息；未登录也可访问，若携带有效 Bearer Token，额外返回当前用户是否已关注该用户 followed。
 		v1.GET("/users/:id/videos", userhandler.VideosHandler(svcCtx))
 		// 获取用户发布的视频
+		v1.GET("/users/:id/following", userhandler.PublicFollowingListHandler(svcCtx))
+		// 获取指定用户关注列表
+		v1.GET("/users/:id/followers", userhandler.FollowersListHandler(svcCtx))
+		// 获取指定用户粉丝列表
 		v1.GET("/comments/:videoId", commenthandler.ListHandler(svcCtx))
-		// 获取视频评论列表，支持分页；未登录也可访问，若携带有效 Bearer Token，额外返回当前用户对每条评论是否已点赞以及点赞数
-		//现在是返回所有评论，后面再加分页和排序功能
+		// 获取视频评论列表，支持分页和热度排序
 		v1.GET("/live", livehandler.ListHandler(svcCtx))
 		v1.GET("/live/:id", livehandler.DetailHandler(svcCtx))
 	}
@@ -107,6 +112,8 @@ func main() {
 		// 有孤儿数据，但不影响功能，后面再改
 		auth.POST("/videos/:id/like", videohandler.LikeHandler(svcCtx))
 		auth.POST("/videos/:id/collect", videohandler.CollectHandler(svcCtx))
+		auth.GET("/videos/:id/reaction", videohandler.ReactionHandler(svcCtx))
+		// 获取当前用户对视频的点赞和收藏状态
 		auth.POST("/danmaku", danmakuhandler.SendHandler(svcCtx))
 		auth.POST("/comments", commenthandler.CreateHandler(svcCtx))
 		auth.DELETE("/comments/:id", commenthandler.DeleteHandler(svcCtx))
@@ -128,9 +135,17 @@ func main() {
 	{
 		admin.GET("/admin/videos", videohandler.AdminListHandler(svcCtx))
 		admin.PUT("/admin/videos/:id/status", videohandler.AdminUpdateStatusHandler(svcCtx))
+		admin.GET("/admin/users", userhandler.AdminListHandler(svcCtx))
+		// 管理员查看用户列表
+		admin.PUT("/admin/users/:id/role", userhandler.AdminUpdateRoleHandler(svcCtx))
+		// 管理员修改用户角色
 		admin.GET("/admin/danmaku", danmakuhandler.AdminListHandler(svcCtx))
 		admin.PUT("/admin/danmaku/:id/block", danmakuhandler.BlockHandler(svcCtx))
 		// 管理员可查看所有弹幕。这个功能直接分开好了
+		admin.GET("/admin/live", livehandler.AdminListHandler(svcCtx))
+		// 管理员查看直播列表
+		admin.PUT("/admin/live/:id/end", livehandler.EndHandler(svcCtx))
+		// 管理员结束直播
 	}
 
 	// WebSocket

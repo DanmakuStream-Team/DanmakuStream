@@ -41,6 +41,17 @@ type publicUserVideoListReq struct {
 	PageSize int `form:"pageSize"`
 }
 
+type userListReq struct {
+	Page     int    `form:"page"`
+	PageSize int    `form:"pageSize"`
+	Keyword  string `form:"keyword"`
+	Role     string `form:"role"`
+}
+
+type updateUserRoleReq struct {
+	Role string `json:"role" binding:"required"`
+}
+
 type meVideoListReq struct {
 	Page     int    `form:"page"`
 	PageSize int    `form:"pageSize"`
@@ -52,8 +63,25 @@ type updateMeReq struct {
 	Bio      string `json:"bio"`
 }
 
+type userListItem struct {
+	ID          uint   `json:"id"`
+	Username    string `json:"username"`
+	Nickname    string `json:"nickname"`
+	Avatar      string `json:"avatar"`
+	Bio         string `json:"bio"`
+	Role        string `json:"role"`
+	FollowCount int64  `json:"followCount"`
+	FanCount    int64  `json:"fanCount"`
+	VideoCount  int64  `json:"videoCount"`
+	CreatedAt   string `json:"createdAt"`
+}
+
 func isValidVideoStatus(status string) bool {
 	return status == "pending" || status == "approved" || status == "rejected"
+}
+
+func isValidUserRole(role string) bool {
+	return role == "user" || role == "creator" || role == "admin"
 }
 
 func ProfileHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
@@ -367,6 +395,213 @@ func FollowingListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			"list": list,
 		})
 	}
+}
+
+func PublicFollowingListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return publicFollowListHandler(svcCtx, "following")
+}
+
+func FollowersListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return publicFollowListHandler(svcCtx, "followers")
+}
+
+func publicFollowListHandler(svcCtx *svc.ServiceContext, listType string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || userID == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的用户 ID")
+			return
+		}
+
+		var req publicUserVideoListReq
+		if err := c.ShouldBindQuery(&req); err != nil {
+			response.Fail(c, http.StatusBadRequest, "参数错误")
+			return
+		}
+		page, pageSize := normalizePage(req.Page, req.PageSize)
+
+		var userCount int64
+		if err := svcCtx.DB.Model(&model.User{}).Where("id = ?", userID).Count(&userCount).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "用户加载失败")
+			return
+		}
+		if userCount == 0 {
+			response.Fail(c, http.StatusNotFound, "用户不存在")
+			return
+		}
+
+		var users []model.User
+		var total int64
+		db := svcCtx.DB.Table("users").
+			Where("users.deleted_at IS NULL")
+		if listType == "followers" {
+			db = db.Joins("INNER JOIN follows ON follows.follower_id = users.id AND follows.deleted_at IS NULL").
+				Where("follows.followee_id = ?", userID)
+		} else {
+			db = db.Joins("INNER JOIN follows ON follows.followee_id = users.id AND follows.deleted_at IS NULL").
+				Where("follows.follower_id = ?", userID)
+		}
+
+		if err := db.Count(&total).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "关注列表加载失败")
+			return
+		}
+
+		if err := db.
+			Select("users.*").
+			Order("users.id DESC").
+			Offset((page - 1) * pageSize).
+			Limit(pageSize).
+			Find(&users).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "关注列表加载失败")
+			return
+		}
+
+		response.Ok(c, gin.H{
+			"list":     toUserListItems(svcCtx, users),
+			"total":    total,
+			"page":     page,
+			"pageSize": pageSize,
+		})
+	}
+}
+
+func AdminListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req userListReq
+		if err := c.ShouldBindQuery(&req); err != nil {
+			response.Fail(c, http.StatusBadRequest, "参数错误")
+			return
+		}
+		page, pageSize := normalizePage(req.Page, req.PageSize)
+
+		db := svcCtx.DB.Model(&model.User{})
+		if req.Keyword != "" {
+			keyword := "%" + strings.TrimSpace(req.Keyword) + "%"
+			db = db.Where("username LIKE ? OR nickname LIKE ? OR bio LIKE ?", keyword, keyword, keyword)
+		}
+		if req.Role != "" {
+			if !isValidUserRole(req.Role) {
+				response.Fail(c, http.StatusBadRequest, "无效的用户角色")
+				return
+			}
+			db = db.Where("role = ?", req.Role)
+		}
+
+		var total int64
+		if err := db.Count(&total).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "用户列表加载失败")
+			return
+		}
+
+		var users []model.User
+		if err := db.
+			Order("created_at DESC").
+			Offset((page - 1) * pageSize).
+			Limit(pageSize).
+			Find(&users).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "用户列表加载失败")
+			return
+		}
+
+		response.Ok(c, gin.H{
+			"list":     toUserListItems(svcCtx, users),
+			"total":    total,
+			"page":     page,
+			"pageSize": pageSize,
+		})
+	}
+}
+
+func AdminUpdateRoleHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || userID == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的用户 ID")
+			return
+		}
+
+		var req updateUserRoleReq
+		if err := c.ShouldBindJSON(&req); err != nil {
+			response.Fail(c, http.StatusBadRequest, "参数错误")
+			return
+		}
+		if !isValidUserRole(req.Role) {
+			response.Fail(c, http.StatusBadRequest, "无效的用户角色")
+			return
+		}
+
+		result := svcCtx.DB.Model(&model.User{}).
+			Where("id = ?", userID).
+			Update("role", req.Role)
+		if result.Error != nil {
+			response.Fail(c, http.StatusInternalServerError, "用户角色更新失败")
+			return
+		}
+		if result.RowsAffected == 0 {
+			response.Fail(c, http.StatusNotFound, "用户不存在")
+			return
+		}
+
+		response.Ok(c, gin.H{
+			"id":   userID,
+			"role": req.Role,
+		})
+	}
+}
+
+func normalizePage(page, pageSize int) (int, int) {
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	return page, pageSize
+}
+
+func toUserListItems(svcCtx *svc.ServiceContext, users []model.User) []userListItem {
+	userIDs := make([]uint, 0, len(users))
+	for _, user := range users {
+		userIDs = append(userIDs, user.ID)
+	}
+
+	videoCounts := make(map[uint]int64, len(users))
+	if len(userIDs) > 0 {
+		type videoCountRow struct {
+			AuthorID uint
+			Count    int64
+		}
+		var rows []videoCountRow
+		_ = svcCtx.DB.Model(&model.Video{}).
+			Select("author_id, COUNT(*) AS count").
+			Where("author_id IN ? AND status = ?", userIDs, "approved").
+			Group("author_id").
+			Scan(&rows).Error
+		for _, row := range rows {
+			videoCounts[row.AuthorID] = row.Count
+		}
+	}
+
+	list := make([]userListItem, 0, len(users))
+	for _, user := range users {
+		list = append(list, userListItem{
+			ID:          user.ID,
+			Username:    user.Username,
+			Nickname:    user.Nickname,
+			Avatar:      user.Avatar,
+			Bio:         user.Bio,
+			Role:        user.Role,
+			FollowCount: user.FollowCount,
+			FanCount:    user.FanCount,
+			VideoCount:  videoCounts[user.ID],
+			CreatedAt:   user.CreatedAt.Format("2006-01-02 15:04:05"),
+		})
+	}
+	return list
 }
 
 func UploadAvatarHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {

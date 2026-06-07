@@ -30,6 +30,13 @@ type createLiveRoomReq struct {
 	CoverURL string `json:"coverUrl"`
 }
 
+type adminLiveListReq struct {
+	Page     int    `form:"page"`
+	PageSize int    `form:"pageSize"`
+	Status   string `form:"status"`
+	Keyword  string `form:"keyword"`
+}
+
 type liveRoomInfo struct {
 	ID          uint            `json:"id"`
 	Title       string          `json:"title"`
@@ -104,6 +111,60 @@ func DetailHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		}
 
 		response.Ok(c, toLiveRoomInfo(room, false))
+	}
+}
+
+func AdminListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req adminLiveListReq
+		if err := c.ShouldBindQuery(&req); err != nil {
+			response.Fail(c, http.StatusBadRequest, "参数错误")
+			return
+		}
+
+		page, pageSize := normalizePage(req.Page, req.PageSize)
+		db := svcCtx.DB.Model(&model.LiveRoom{}).Preload("Owner")
+
+		if req.Status != "" {
+			if req.Status != "idle" && req.Status != "live" && req.Status != "ended" {
+				response.Fail(c, http.StatusBadRequest, "无效的直播状态")
+				return
+			}
+			db = db.Where("status = ?", req.Status)
+		}
+
+		if req.Keyword != "" {
+			keyword := "%" + strings.TrimSpace(req.Keyword) + "%"
+			db = db.Where("title LIKE ?", keyword)
+		}
+
+		var total int64
+		if err := db.Count(&total).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "直播列表加载失败")
+			return
+		}
+
+		var rooms []model.LiveRoom
+		if err := db.
+			Order("created_at DESC").
+			Offset((page - 1) * pageSize).
+			Limit(pageSize).
+			Find(&rooms).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "直播列表加载失败")
+			return
+		}
+
+		list := make([]liveRoomInfo, 0, len(rooms))
+		for _, room := range rooms {
+			list = append(list, toLiveRoomInfo(room, true))
+		}
+
+		response.Ok(c, gin.H{
+			"list":     list,
+			"total":    total,
+			"page":     page,
+			"pageSize": pageSize,
+		})
 	}
 }
 
@@ -226,6 +287,10 @@ func EndHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 func getPage(c *gin.Context) (int, int) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
+	return normalizePage(page, pageSize)
+}
+
+func normalizePage(page, pageSize int) (int, int) {
 	if page < 1 {
 		page = 1
 	}

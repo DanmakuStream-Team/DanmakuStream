@@ -11,6 +11,7 @@ export const videoApi = {
   upload(formData: FormData, onProgress?: (percent: number) => void) {
     return request.post<VideoInfo>('/videos/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
       onUploadProgress: (event) => {
         if (event.total && onProgress) {
           onProgress(Math.round((event.loaded / event.total) * 100))
