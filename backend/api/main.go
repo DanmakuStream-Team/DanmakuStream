@@ -14,6 +14,7 @@ import (
 	danmakuhandler "danmakustream/backend/internal/handler/v1/danmaku"
 	dynamichandler "danmakustream/backend/internal/handler/v1/dynamic"
 	livehandler "danmakustream/backend/internal/handler/v1/live"
+	mediahandler "danmakustream/backend/internal/handler/v1/media"
 	notificationhandler "danmakustream/backend/internal/handler/v1/notification"
 	userhandler "danmakustream/backend/internal/handler/v1/user"
 	videohandler "danmakustream/backend/internal/handler/v1/video"
@@ -62,6 +63,7 @@ func main() {
 	r.Static("/media/videos", svcCtx.VideoDir+"/videos")
 	r.Static("/media/covers", svcCtx.VideoDir+"/covers")
 	r.Static("/media/avatars", svcCtx.VideoDir+"/avatars")
+	r.Static("/media/images", svcCtx.VideoDir+"/images")
 
 	authMW := middleware.AuthMiddleware(c.Auth.AccessSecret)
 
@@ -100,6 +102,7 @@ func main() {
 		auth.GET("/users/me/videos", userhandler.MeVideosHandler(svcCtx))
 		auth.GET("/users/following", userhandler.FollowingListHandler(svcCtx))
 		auth.POST("/users/:id/follow", userhandler.FollowHandler(svcCtx))
+		auth.POST("/images/upload", mediahandler.UploadImageHandler(svcCtx))
 
 		auth.POST("/videos/upload", videohandler.UploadHandler(svcCtx))
 		auth.PUT("/videos/:id", videohandler.UpdateHandler(svcCtx))
