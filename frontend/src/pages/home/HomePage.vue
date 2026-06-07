@@ -5,7 +5,19 @@
       <div v-if="!isSearching" class="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 class="m-0 text-[28px] font-black text-[#18191c]">推荐视频</h2>
-          <p class="m-0 mt-1 text-[#9499a0]">{{ loadError || '发现更多精彩视频' }}</p>
+          <!-- 视频分类标签栏 -->
+          <div class="category-tabs mt-3 flex flex-wrap gap-2">
+            <button
+              v-for="cat in categoryList"
+              :key="cat.value"
+              class="category-btn"
+              :class="{ active: activeCategory === cat.value }"
+              @click="selectCategory(cat.value)"
+            >
+              {{ cat.label }}
+            </button>
+          </div>
+          <p class="m-0 mt-1 text-[#9499a0]">{{ loadError || activeFeatureText }}</p>
         </div>
       </div>
 
@@ -40,7 +52,7 @@
       </div>
 
       <!-- 正常模式：精选+网格 -->
-      <div v-else v-loading="videoStore.loading" class="feed-layout">
+      <div v-else ref="feedLayoutRef" v-loading="videoStore.loading" class="feed-layout">
         <article v-if="featuredVideo" class="feature-card" @click="router.push(`/video/${featuredVideo.id}`)">
           <div class="feature-cover">
             <img v-if="featuredVideo.coverUrl" :src="mediaUrl(featuredVideo.coverUrl)" :alt="featuredVideo.title" />
@@ -67,7 +79,7 @@
       <div class="pager">
         <el-pagination
           v-model:current-page="page"
-          :page-size="pageSize"
+          :page-size="currentPageSize"
           :total="videoStore.total"
           background
           layout="prev, pager, next"
@@ -79,7 +91,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import VideoCard from '@/components/common/VideoCard.vue'
 import { useVideoStore } from '@/store/video'
@@ -89,13 +101,56 @@ const router = useRouter()
 const route = useRoute()
 const videoStore = useVideoStore()
 const page = ref(1)
-const pageSize = 21
+const feedLayoutRef = ref<HTMLElement>()
+const feedColumnCount = ref(4)
+let resizeObserver: ResizeObserver | undefined
+const categoryList = ref([
+  { label: '全部', value: '' },
+  { label: '游戏', value: 'game' },
+  { label: '科技', value: 'tech' },
+  { label: '生活', value: 'life' },
+  { label: '音乐', value: 'music' },
+  { label: '动漫', value: 'anime' },
+  { label: '知识', value: 'knowledge' },
+])
+const activeCategory = ref('')
 const keyword = ref(String(route.query.keyword || ''))
 const loadError = ref('')
+
+const featureDescriptions: Record<string, string> = {
+  video: '列表 / 搜索 / 详情',
+  danmaku: '弹幕互动 / 实时评论 / 视频交流',
+}
+
+const activeFeature = computed(() => String(route.query.feature || 'video'))
+
+const activeFeatureText = computed(() => {
+  const category = categoryList.value.find(cat => cat.value === activeCategory.value)
+  if (category?.value) return `${category.label}频道`
+  return featureDescriptions[activeFeature.value] || '视频浏览'
+})
 
 const isSearching = computed(() => Boolean(keyword.value.trim()))
 const featuredVideo = computed(() => videoStore.videoList[0])
 const gridVideos = computed(() => videoStore.videoList.slice(featuredVideo.value ? 1 : 0))
+const currentPageSize = computed(() => {
+  const columns = Math.max(feedColumnCount.value, 1)
+  if (isSearching.value || columns < 2) return columns * 6
+  const rows = columns >= 5 ? 4 : 5
+  return Math.max(columns * rows - 3, columns)
+})
+
+function updateFeedColumnCount() {
+  const el = feedLayoutRef.value
+  if (!el) return
+
+  const columns = getComputedStyle(el)
+    .gridTemplateColumns
+    .split(' ')
+    .filter(Boolean).length
+
+  feedColumnCount.value = Math.max(columns, 1)
+}
 
 
 async function loadVideos() {
@@ -103,8 +158,9 @@ async function loadVideos() {
   try {
     await videoStore.fetchVideoList({
       page: page.value,
-      pageSize,
+      pageSize: currentPageSize.value,
       keyword: keyword.value.trim() || undefined,
+      category: activeCategory.value || undefined,
     })
   } catch (error: any) {
     loadError.value = '后端服务暂未连接，当前只显示空状态。'
@@ -112,8 +168,32 @@ async function loadVideos() {
 }
 
 
+function selectCategory(catValue: string) {
+  activeCategory.value = catValue
+  page.value = 1
+  loadVideos()
+}
 
-onMounted(loadVideos)
+onMounted(async () => {
+  await nextTick()
+  updateFeedColumnCount()
+  if (feedLayoutRef.value) {
+    resizeObserver = new ResizeObserver(() => {
+      const previousPageSize = currentPageSize.value
+      updateFeedColumnCount()
+      if (currentPageSize.value !== previousPageSize) {
+        page.value = 1
+        loadVideos()
+      }
+    })
+    resizeObserver.observe(feedLayoutRef.value)
+  }
+  loadVideos()
+})
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+})
 watch(() => route.query.keyword, (value) => {
   keyword.value = String(value || '')
   page.value = 1
@@ -131,6 +211,22 @@ watch(() => route.query.feature, () => {
   display: grid;
   grid-template-columns: repeat(7, minmax(120px, 1fr));
   gap: 12px;
+}
+
+/* 视频分类标签样式 */
+.category-btn {
+  padding: 6px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.category-btn.active {
+  background: #00aeec;
+  color: #fff;
+  border-color: #00aeec;
 }
 
 .features button {
@@ -151,12 +247,12 @@ watch(() => route.query.feature, () => {
 
 .features strong {
   color: #18191c;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .features span {
   color: #9499a0;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .features button:hover,
@@ -209,7 +305,7 @@ watch(() => route.query.feature, () => {
   place-items: center;
   background: linear-gradient(135deg, #e3f6ff, #fff0f5);
   color: #00aeec;
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 900;
 }
 
@@ -223,13 +319,19 @@ watch(() => route.query.feature, () => {
 
 .feature-title h3 {
   margin: 0;
-  font-size: 22px;
+  overflow: hidden;
+  font-size: 20px;
   line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .feature-title p {
+  overflow: hidden;
   margin: 8px 0 0;
   color: rgba(255, 255, 255, 0.76);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .search-layout {
@@ -249,7 +351,7 @@ watch(() => route.query.feature, () => {
 
 .search-result-title {
   margin: 0;
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 900;
   color: #18191c;
 }
@@ -289,7 +391,7 @@ watch(() => route.query.feature, () => {
   place-items: center;
   background: linear-gradient(135deg, #e3f6ff, #fff0f5);
   color: #00aeec;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 900;
 }
 
@@ -301,7 +403,7 @@ watch(() => route.query.feature, () => {
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.72);
   color: #fff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
 }
 
@@ -314,13 +416,12 @@ watch(() => route.query.feature, () => {
 
 .search-body h3 {
   margin: 0 0 8px;
-  font-size: 21px;
+  overflow: hidden;
+  font-size: 19px;
   font-weight: 800;
   color: #18191c;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .search-item:hover .search-body h3 {
@@ -332,7 +433,7 @@ watch(() => route.query.feature, () => {
   align-items: center;
   gap: 12px;
   margin: 0 0 10px;
-  font-size: 15px;
+  font-size: 14px;
   color: #9499a0;
 }
 
@@ -342,7 +443,7 @@ watch(() => route.query.feature, () => {
 
 .search-desc {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   color: #61666d;
   line-height: 1.55;
   display: -webkit-box;

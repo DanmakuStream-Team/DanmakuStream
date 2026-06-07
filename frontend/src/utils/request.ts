@@ -30,11 +30,17 @@ request.interceptors.response.use(
     return response
   },
   (error) => {
+    if (axios.isCancel(error) || error.code === 'ERR_CANCELED') {
+      return Promise.reject(error)
+    }
+
     const message = getErrorMessage(error)
     if (error.response?.status === 401) {
       const authStore = useAuthStore()
       authStore.logout()
       ElMessage.warning('请先登录')
+    } else {
+      ElMessage.error(message || '请求失败')
     }
     return Promise.reject(new Error(message))
   }

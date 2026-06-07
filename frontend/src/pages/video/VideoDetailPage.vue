@@ -1,5 +1,9 @@
 <template>
-  <main class="page-shell detail-page">
+  <main 
+    class="page-shell detail-page"
+    @touchstart="handleTouchStart"
+    @touchend="handleTouchEnd"
+  >
     <section v-loading="loading" class="watch-grid">
       <div v-if="video" class="main-col">
         <VideoPlayer
@@ -22,6 +26,7 @@
           <div class="actions">
             <el-button @click="toggleLike">点赞 {{ formatCount(video.likeCount) }}</el-button>
             <el-button @click="toggleCollect">收藏 {{ formatCount(video.collectCount) }}</el-button>
+            <el-button @click="downloadVideo">下载</el-button>
           </div>
           <div class="tags">
             <el-tag v-for="tag in normalizeTags(video.tags)" :key="tag">{{ tag }}</el-tag>
@@ -110,7 +115,10 @@ import { useCommentStore } from '@/store/comment'
 import { useVideoStore } from '@/store/video'
 import type { Comment, Danmaku } from '@/types'
 import { formatCount, formatTime, mediaUrl, normalizeTags } from '@/utils/format'
+import { removeUserLibraryRecord, upsertUserLibraryRecord } from '@/utils/userLibrary'
 
+let touchStartY = 0
+const SWIPE_THRESHOLD = 50
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
@@ -127,8 +135,29 @@ const commentText = ref('')
 const replyTarget = ref<Comment | null>(null)
 const video = computed(() => videoStore.currentVideo)
 
+function handleTouchStart(e: TouchEvent) {
+  touchStartY = e.touches[0].clientY
+}
+
+function handleTouchEnd(e: TouchEvent) {
+  const touchEndY = e.changedTouches[0].clientY
+  const diff = touchStartY - touchEndY
+
+  if (diff > SWIPE_THRESHOLD) {
+    goToNextVideo()
+  }
+}
+
+function goToNextVideo() {
+  if (!video.value) return
+  const nextId = video.value.id + 1
+  ElMessage.success('上滑切换到下一个视频')
+  router.push(`/video/${nextId}`)
+}
+
 onMounted(load)
 onUnmounted(() => {
+  saveHistory()
   videoStore.clearCurrent()
   commentStore.clearComments()
 })
@@ -143,6 +172,7 @@ async function load() {
       commentStore.fetchComments(id),
     ])
     danmakus.value = danmakuRes.data
+    saveHistory()
   } finally {
     loading.value = false
   }
@@ -151,15 +181,40 @@ async function load() {
 async function toggleLike() {
   if (!ensureLogin()) return
   if (!video.value) return
-  await videoApi.like(video.value.id)
+  const res = await videoApi.like(video.value.id)
+  if (res.data.liked) {
+    upsertUserLibraryRecord('liked', video.value)
+  } else {
+    removeUserLibraryRecord('liked', video.value.id)
+  }
   await videoStore.fetchVideoDetail(video.value.id)
 }
 
 async function toggleCollect() {
   if (!ensureLogin()) return
   if (!video.value) return
-  await videoApi.collect(video.value.id)
+  const res = await videoApi.collect(video.value.id)
+  if (res.data.collected) {
+    upsertUserLibraryRecord('collections', video.value)
+  } else {
+    removeUserLibraryRecord('collections', video.value.id)
+  }
   await videoStore.fetchVideoDetail(video.value.id)
+}
+
+function downloadVideo() {
+  if (!ensureLogin()) return
+  if (!video.value?.videoUrl) {
+    ElMessage.warning('当前视频没有可下载地址')
+    return
+  }
+  upsertUserLibraryRecord('downloads', video.value)
+  const link = document.createElement('a')
+  link.href = mediaUrl(video.value.videoUrl)
+  link.download = `${video.value.title || 'danmaku-video'}.mp4`
+  link.target = '_blank'
+  link.rel = 'noreferrer'
+  link.click()
 }
 
 async function sendDanmaku() {
@@ -198,11 +253,19 @@ function ensureLogin() {
   router.push('/login')
   return false
 }
+
+function saveHistory() {
+  if (!authStore.isLoggedIn || !video.value) return
+  const duration = video.value.duration || 0
+  const progress = duration > 0 ? Math.min(100, Math.round((currentTime.value / duration) * 100)) : 0
+  upsertUserLibraryRecord('history', video.value, progress)
+}
 </script>
 
 <style scoped>
 .detail-page {
   display: grid;
+  min-height: 100vh;
 }
 
 .watch-grid {

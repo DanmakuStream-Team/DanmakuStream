@@ -33,6 +33,7 @@ type Video struct {
 	AuthorID     uint   `gorm:"not null;index"`
 	Author       User   `gorm:"foreignKey:AuthorID"`
 	Tags         string `gorm:"size:500"` // comma-separated
+	Category     string `gorm:"column:category;type:varchar(32)" json:"category"`
 }
 
 type Danmaku struct {

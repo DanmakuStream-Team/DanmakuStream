@@ -9,7 +9,15 @@ export const useVideoStore = defineStore('video', () => {
   const total = ref(0)
   const loading = ref(false)
 
-  async function fetchVideoList(params: { page: number; pageSize: number; keyword?: string; tag?: string }) {
+  async function fetchVideoList(
+    params: { 
+      page: number; 
+      pageSize: number; 
+      keyword?: string; 
+      tag?: string 
+      category?: string
+    }
+  ) {
     loading.value = true
     try {
       const res = await videoApi.list(params)
