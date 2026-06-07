@@ -30,6 +30,10 @@ request.interceptors.response.use(
     return response
   },
   (error) => {
+    if (axios.isCancel(error) || error.code === 'ERR_CANCELED') {
+      return Promise.reject(error)
+    }
+
     const message = getErrorMessage(error)
     if (error.response?.status === 401) {
       const authStore = useAuthStore()
