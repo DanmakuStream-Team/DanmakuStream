@@ -97,14 +97,12 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			return
 		}
 
-		// Create video record first to get ID
-		// TODO: 接入审核后改回 "pending"，由 admin 审核接口（PUT /admin/videos/:id/status）置为 approved
 		video := model.Video{
 			Title:       title,
 			Description: description,
 			Tags:        tags,
 			AuthorID:    userID,
-			Status:      "approved",
+			Status:      "pending",
 		}
 		if err := svcCtx.DB.Create(&video).Error; err != nil {
 			response.Fail(c, http.StatusInternalServerError, "创建视频记录失败")
@@ -113,7 +111,10 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 
 		// Save uploaded video to temp path
 		videoDir := filepath.Join(svcCtx.VideoDir, "videos", strconv.FormatUint(uint64(video.ID), 10))
-		os.MkdirAll(videoDir, 0755)
+		if err := os.MkdirAll(videoDir, 0755); err != nil {
+			response.Fail(c, http.StatusInternalServerError, "创建视频目录失败")
+			return
+		}
 
 		tmpPath := filepath.Join(videoDir, "upload"+filepath.Ext(videoFile.Filename))
 		src, err := videoFile.Open()
@@ -134,81 +135,83 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			response.Fail(c, http.StatusInternalServerError, "保存上传文件失败")
 			return
 		}
-
-		// Run ffmpeg to generate HLS
-		playlistPath := filepath.Join(videoDir, "playlist.m3u8")
-		segmentPattern := filepath.Join(videoDir, "segment_%05d.ts")
-		cmd := exec.Command("ffmpeg",
-			"-i", tmpPath,
-			"-c:v", "libx264",
-			"-c:a", "aac",
-			"-hls_time", "10",
-			"-hls_list_size", "0",
-			"-hls_segment_filename", segmentPattern,
-			"-f", "hls",
-			playlistPath,
-		)
-		if output, err := cmd.CombinedOutput(); err != nil {
-			os.RemoveAll(videoDir)
-			response.Fail(c, http.StatusInternalServerError, fmt.Sprintf("视频转码失败: %s", string(output)))
-			return
-		}
-
-		// Extract first frame as thumbnail
-		thumbnailName := "thumbnail.jpg"
-		thumbnailPath := filepath.Join(videoDir, thumbnailName)
-		thumbCmd := exec.Command("ffmpeg",
-			"-i", tmpPath,
-			"-frames:v", "1",
-			"-q:v", "2",
-			"-y",
-			thumbnailPath,
-		)
-		// ignore error; thumbnail is best-effort
-		thumbCmd.CombinedOutput()
-
-		// Remove temp file
-		os.Remove(tmpPath)
+		src.Close()
+		dst.Close()
 
 		// Save cover image if provided
 		coverURL := ""
 		if coverFile, err := c.FormFile("cover"); err == nil {
 			coverDir := filepath.Join(svcCtx.VideoDir, "covers", strconv.FormatUint(uint64(video.ID), 10))
-			os.MkdirAll(coverDir, 0755)
+			if err := os.MkdirAll(coverDir, 0755); err != nil {
+				response.Fail(c, http.StatusInternalServerError, "创建封面目录失败")
+				return
+			}
 			coverPath := filepath.Join(coverDir, coverFile.Filename)
 			src, _ := coverFile.Open()
 			if src != nil {
-				defer src.Close()
 				dst, _ := os.Create(coverPath)
 				if dst != nil {
-					defer dst.Close()
 					io.Copy(dst, src)
+					dst.Close()
 					coverURL = fmt.Sprintf("/media/covers/%d/%s", video.ID, coverFile.Filename)
 				}
+				src.Close()
 			}
 		}
 
-		// Fallback to first-frame thumbnail if no cover uploaded
-		if coverURL == "" {
-			if _, err := os.Stat(thumbnailPath); err == nil {
-				coverURL = fmt.Sprintf("/media/videos/%d/%s", video.ID, thumbnailName)
-			}
-		}
-
-		// Update video record with paths
-		relativePlaylist := fmt.Sprintf("/media/videos/%d/playlist.m3u8", video.ID)
-		updates := map[string]interface{}{
-			"video_url": relativePlaylist,
-		}
 		if coverURL != "" {
-			updates["cover_url"] = coverURL
+			video.CoverURL = coverURL
+			svcCtx.DB.Model(&video).Update("cover_url", coverURL)
 		}
-		svcCtx.DB.Model(&video).Updates(updates)
 
-		video.VideoURL = relativePlaylist
-		video.CoverURL = coverURL
+		go transcodeVideoAsync(svcCtx, video.ID, videoDir, tmpPath, coverURL)
+
 		response.Ok(c, video)
 	}
+}
+
+func transcodeVideoAsync(svcCtx *svc.ServiceContext, videoID uint, videoDir, tmpPath, coverURL string) {
+	playlistPath := filepath.Join(videoDir, "playlist.m3u8")
+	segmentPattern := filepath.Join(videoDir, "segment_%05d.ts")
+	cmd := exec.Command("ffmpeg",
+		"-y",
+		"-i", tmpPath,
+		"-c:v", "libx264",
+		"-preset", "veryfast",
+		"-c:a", "aac",
+		"-hls_time", "10",
+		"-hls_list_size", "0",
+		"-hls_segment_filename", segmentPattern,
+		"-f", "hls",
+		playlistPath,
+	)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		fmt.Printf("video %d transcode failed: %s\n", videoID, string(output))
+		return
+	}
+
+	thumbnailName := "thumbnail.jpg"
+	thumbnailPath := filepath.Join(videoDir, thumbnailName)
+	thumbCmd := exec.Command("ffmpeg",
+		"-y",
+		"-i", tmpPath,
+		"-frames:v", "1",
+		"-q:v", "2",
+		thumbnailPath,
+	)
+	thumbCmd.CombinedOutput()
+	os.Remove(tmpPath)
+
+	relativePlaylist := fmt.Sprintf("/media/videos/%d/playlist.m3u8", videoID)
+	updates := map[string]any{
+		"video_url": relativePlaylist,
+	}
+	if coverURL == "" {
+		if _, err := os.Stat(thumbnailPath); err == nil {
+			updates["cover_url"] = fmt.Sprintf("/media/videos/%d/%s", videoID, thumbnailName)
+		}
+	}
+	svcCtx.DB.Model(&model.Video{}).Where("id = ?", videoID).Updates(updates)
 }
 
 func LikeHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
@@ -440,6 +443,22 @@ func AdminUpdateStatusHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		if !isValidVideoStatus(req.Status) {
 			response.Fail(c, http.StatusBadRequest, "无效的视频状态")
 			return
+		}
+
+		if req.Status == "approved" {
+			var video model.Video
+			if err := svcCtx.DB.Select("id", "video_url").First(&video, videoID).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					response.Fail(c, http.StatusNotFound, "视频不存在")
+					return
+				}
+				response.Fail(c, http.StatusInternalServerError, "视频加载失败")
+				return
+			}
+			if video.VideoURL == "" {
+				response.Fail(c, http.StatusForbidden, "视频仍在转码，暂时不能审核通过")
+				return
+			}
 		}
 
 		result := svcCtx.DB.Model(&model.Video{}).

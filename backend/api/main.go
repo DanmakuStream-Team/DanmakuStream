@@ -44,6 +44,7 @@ func main() {
 	svcCtx := svc.NewServiceContext(c)
 
 	r := gin.Default()
+	r.MaxMultipartMemory = 8 << 20 // Keep large uploads on disk instead of buffering too much in memory.
 
 	// CORS
 	r.Use(func(ctx *gin.Context) {
