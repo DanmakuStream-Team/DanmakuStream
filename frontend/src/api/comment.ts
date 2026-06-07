@@ -2,8 +2,8 @@ import request from '@/utils/request'
 import type { Comment } from '@/types'
 
 export const commentApi = {
-  list(videoId: number) {
-    return request.get<Comment[]>(`/comments/${videoId}`)
+  list(videoId: number, params?: { sort?: 'date' | 'like' }) {
+    return request.get<Comment[]>(`/comments/${videoId}`, { params })
   },
   create(data: { videoId: number; content: string; parentId?: number }) {
     return request.post<Comment>('/comments', data)

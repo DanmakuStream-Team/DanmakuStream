@@ -36,6 +36,31 @@ type profileInfo struct {
 	CreatedAt   string `json:"createdAt"`
 }
 
+type searchUserReq struct {
+	Q        string `form:"q"`
+	Page     int    `form:"page"`
+	PageSize int    `form:"pageSize"`
+}
+
+type searchUserItem struct {
+	ID          uint   `json:"id"`
+	Username    string `json:"username"`
+	Nickname    string `json:"nickname"`
+	Avatar      string `json:"avatar"`
+	Bio         string `json:"bio"`
+	Role        string `json:"role"`
+	FollowCount int64  `json:"followCount"`
+	FanCount    int64  `json:"fanCount"`
+	CreatedAt   string `json:"createdAt"`
+}
+
+type searchUserResult struct {
+	List     []searchUserItem `json:"list"`
+	Total    int64            `json:"total"`
+	Page     int              `json:"page"`
+	PageSize int              `json:"pageSize"`
+}
+
 type publicUserVideoListReq struct {
 	Page     int `form:"page"`
 	PageSize int `form:"pageSize"`
@@ -54,6 +79,75 @@ type updateMeReq struct {
 
 func isValidVideoStatus(status string) bool {
 	return status == "pending" || status == "approved" || status == "rejected"
+}
+
+func SearchHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req searchUserReq
+		if err := c.ShouldBindQuery(&req); err != nil {
+			response.Fail(c, http.StatusBadRequest, "参数错误")
+			return
+		}
+
+		keyword := strings.TrimSpace(req.Q)
+		if keyword == "" {
+			response.Fail(c, http.StatusBadRequest, "搜索关键字不能为空")
+			return
+		}
+
+		if req.Page <= 0 {
+			req.Page = 1
+		}
+		if req.PageSize <= 0 {
+			req.PageSize = 10
+		}
+		if req.PageSize > 50 {
+			req.PageSize = 50
+		}
+
+		likeKeyword := "%" + keyword + "%"
+		db := svcCtx.DB.Model(&model.User{}).
+			Where("username LIKE ? OR nickname LIKE ? OR bio LIKE ?", likeKeyword, likeKeyword, likeKeyword)
+
+		var total int64
+		if err := db.Count(&total).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "用户搜索失败")
+			return
+		}
+
+		var users []model.User
+		if err := db.
+			Select("id", "username", "nickname", "avatar", "bio", "role", "follow_count", "fan_count", "created_at").
+			Order("fan_count DESC, id DESC").
+			Offset((req.Page - 1) * req.PageSize).
+			Limit(req.PageSize).
+			Find(&users).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "用户搜索失败")
+			return
+		}
+
+		list := make([]searchUserItem, 0, len(users))
+		for _, u := range users {
+			list = append(list, searchUserItem{
+				ID:          u.ID,
+				Username:    u.Username,
+				Nickname:    u.Nickname,
+				Avatar:      u.Avatar,
+				Bio:         u.Bio,
+				Role:        u.Role,
+				FollowCount: u.FollowCount,
+				FanCount:    u.FanCount,
+				CreatedAt:   u.CreatedAt.Format("2006-01-02 15:04:05"),
+			})
+		}
+
+		response.Ok(c, searchUserResult{
+			List:     list,
+			Total:    total,
+			Page:     req.Page,
+			PageSize: req.PageSize,
+		})
+	}
 }
 
 func ProfileHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {

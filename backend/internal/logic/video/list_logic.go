@@ -2,6 +2,7 @@ package videologic
 
 import (
 	"context"
+	"fmt"
 
 	model "danmakustream/backend/internal/model/mysql"
 	"danmakustream/backend/internal/svc"
@@ -24,6 +25,7 @@ type VideoListReq struct {
 	Keyword  string `form:"keyword"`
 	Tag      string `form:"tag"`
 	Category string `form:"category"`
+	Sort     string `form:"sort"`
 }
 
 type PageResult[T any] struct {
@@ -60,6 +62,9 @@ func (l *ListVideoLogic) List(req *VideoListReq) (*PageResult[VideoInfo], error)
 	if req.PageSize > 100 {
 		req.PageSize = 100
 	}
+	if req.Sort == "" {
+		req.Sort = "hot"
+	}
 
 	db := l.svcCtx.DB.Model(&model.Video{}).
 		Preload("Author").
@@ -77,7 +82,7 @@ func (l *ListVideoLogic) List(req *VideoListReq) (*PageResult[VideoInfo], error)
 	}
 
 	if req.Category != "" {
-    	db = db.Where("category = ?", req.Category)
+		db = db.Where("category = ?", req.Category)
 	}
 
 	var total int64
@@ -88,15 +93,20 @@ func (l *ListVideoLogic) List(req *VideoListReq) (*PageResult[VideoInfo], error)
 	const hotScoreExpr = "(like_count * 5 + collect_count * 3 + danmaku_count * 2 + view_count) " +
 		"/ POW(GREATEST(TIMESTAMPDIFF(HOUR, created_at, NOW()), 0) + 2, 1.2)"
 
+	sortExpr, err := videoSortExpr(req.Sort, hotScoreExpr)
+	if err != nil {
+		return nil, err
+	}
+
 	var orderExpr string
 	if req.Keyword != "" {
 		orderExpr = "CASE " +
 			"WHEN title = ? THEN 0 " +
 			"WHEN title LIKE ? THEN 1 " +
 			"WHEN title LIKE ? THEN 2 " +
-			"ELSE 3 END ASC, " + hotScoreExpr + " DESC"
+			"ELSE 3 END ASC, " + sortExpr
 	} else {
-		orderExpr = hotScoreExpr + " DESC"
+		orderExpr = sortExpr
 	}
 
 	var videos []model.Video
@@ -142,4 +152,19 @@ func (l *ListVideoLogic) List(req *VideoListReq) (*PageResult[VideoInfo], error)
 		Page:     req.Page,
 		PageSize: req.PageSize,
 	}, nil
+}
+
+func videoSortExpr(sort string, hotScoreExpr string) (string, error) {
+	switch sort {
+	case "", "hot":
+		return hotScoreExpr + " DESC, created_at DESC", nil
+	case "date":
+		return "created_at DESC", nil
+	case "like":
+		return "like_count DESC, created_at DESC", nil
+	case "collect":
+		return "collect_count DESC, created_at DESC", nil
+	default:
+		return "", fmt.Errorf("无效的视频排序方式")
+	}
 }
