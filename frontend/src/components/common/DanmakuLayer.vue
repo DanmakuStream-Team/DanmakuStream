@@ -1,192 +1,306 @@
 <template>
-  <div ref="layerRef" class="danmaku-layer">
-    <span
-      v-for="item in visibleItems"
-      :key="item.id"
-      :class="['danmaku', `danmaku-${item._fontSize}`, `danmaku-${item._type}`]"
-      :style="getStyle(item)"
-    >
-      {{ item.content }}
-    </span>
-  </div>
+  <canvas ref="canvasRef" class="danmaku-layer" />
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import type { Danmaku } from '@/types'
 
 const props = defineProps<{ items: Danmaku[]; currentTime: number }>()
 
-const layerRef = ref<HTMLElement>()
+const canvasRef = ref<HTMLCanvasElement>()
+let ctx: CanvasRenderingContext2D | null = null
+let rafId: number | null = null
+let activeDanmakus: ActiveDanmaku[] = []
+let lastTime = 0
+
+interface ActiveDanmaku extends Danmaku {
+  x: number
+  y: number
+  speed: number
+  duration: number
+  width: number
+  fontSizePx: number
+  startTime?: number
+}
 
 const PRESET_COLORS = [
   '#FFFFFF', '#FF5555', '#55FF55', '#5555FF', '#FFFF55',
   '#FF55FF', '#55FFFF', '#FF8C00', '#FF69B4', '#00CED1',
-  '#FFD700', '#7FFFD4', '#FF6347', '#98FB98', '#DDA0DD',
+  '#FFD700', '#7FFFD4', '#FF6347', '#98FB98', '#DDA0DD'
 ]
 
+const FONT_SIZE_MAP = { small: 12, medium: 16, large: 20 }
 const ROW_HEIGHT = 32
 const TOP_PADDING = 8
+const MAX_ROWS = 12
+const MAX_ACTIVE = 40
 
-interface VisibleDanmaku extends Danmaku {
-  _row: number
-  _fontSize: string
-  _type: string
-  _color: string
-  _duration: number
+function getFontSize(fontSize?: string): number {
+  return FONT_SIZE_MAP[fontSize as keyof typeof FONT_SIZE_MAP] || 16
 }
 
-const visibleItems = computed<VisibleDanmaku[]>(() => {
-  if (!layerRef.value) return []
+function getColor(item: Danmaku): string {
+  if (item.color) return item.color
+  return PRESET_COLORS[item.id % PRESET_COLORS.length]
+}
 
-  const containerHeight = layerRef.value.clientHeight
-  const totalRows = Math.max(3, Math.floor((containerHeight - TOP_PADDING * 2) / ROW_HEIGHT * 0.5))
-  const rowOccupiedUntil = new Array<number>(totalRows).fill(0)
-  const result: VisibleDanmaku[] = []
+function getSpeed(content: string, fontSizePx: number): number {
+  const baseSpeed = 250 + fontSizePx * 2
+  return Math.min(500, Math.max(150, baseSpeed + content.length * 3))
+}
 
-  const candidates = props.items
-    .filter((item) => {
-      const elapsed = props.currentTime - item.time
-      return elapsed > -1 && elapsed < 12
-    })
-    .sort((a, b) => a.time - b.time)
+function getDuration(item: Danmaku, width: number, speed: number): number {
+  if (!canvasRef.value) return 6
+  const canvasWidth = canvasRef.value.clientWidth
+  return (canvasWidth + width) / speed
+}
 
-  for (const item of candidates) {
-    const fontSize = item.fontSize || 'medium'
+function updateDimensions() {
+  if (!canvasRef.value) return
+  const rect = canvasRef.value.getBoundingClientRect()
+  canvasRef.value.width = rect.width
+  canvasRef.value.height = rect.height
+  ctx = canvasRef.value.getContext('2d')
+}
+
+function draw() {
+  if (!ctx || !canvasRef.value) return
+  ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
+
+  for (const d of activeDanmakus) {
+    ctx.font = `${d.fontSizePx}px "PingFang SC", "Microsoft YaHei", sans-serif`
+    ctx.fillStyle = d.color
+    ctx.shadowBlur = 0
+
+    ctx.lineWidth = 2
+    ctx.strokeStyle = 'black'
+    ctx.shadowColor = 'black'
+    ctx.shadowBlur = 0
+    ctx.textBaseline = 'middle'
+
+    ctx.strokeText(d.content, d.x, d.y)
+    ctx.fillText(d.content, d.x, d.y)
+  }
+}
+
+function updateActiveDanmakus(nowSeconds: number) {
+  if (!canvasRef.value) return
+  const canvasWidth = canvasRef.value.width
+  if (canvasWidth === 0) return
+
+  activeDanmakus = activeDanmakus.filter(d => {
+    if (d.type === 'scroll') {
+      return d.x + d.width > 0
+    } else {
+      const elapsed = nowSeconds - (d.startTime || 0)
+      return elapsed < d.duration
+    }
+  })
+
+  const newItems = props.items.filter(item => {
+    const elapsed = nowSeconds - item.time
+    return elapsed >= -0.2 && elapsed < (item as any)._duration
+  }).slice(0, MAX_ACTIVE - activeDanmakus.length)
+
+  const rowsOccupiedUntil = new Array(MAX_ROWS).fill(0)
+
+  for (const d of activeDanmakus) {
+    const rowIndex = Math.floor((d.y - TOP_PADDING) / ROW_HEIGHT)
+    if (rowIndex >= 0 && rowIndex < MAX_ROWS) {
+      rowsOccupiedUntil[rowIndex] = Math.max(rowsOccupiedUntil[rowIndex], nowSeconds + d.duration)
+    }
+  }
+
+  for (const item of newItems) {
+    const fontSizePx = getFontSize(item.fontSize)
+    const color = getColor(item)
+    const content = item.content
     const type = item.type || 'scroll'
-    const duration = type === 'scroll'
-      ? Math.max(5, Math.min(12, 6 + item.content.length * 0.03))
-      : 5
-    // Deterministic color from preset palette, unless user explicitly picked a non-default color
-    const color = (!item.color || item.color === '#FFFFFF')
-      ? PRESET_COLORS[item.id % PRESET_COLORS.length]
-      : item.color
-
-    const elapsed = props.currentTime - item.time
-    if (type !== 'scroll' && elapsed > duration) continue
 
     if (type === 'scroll') {
-      const occupyDuration = duration * 0.3
+      if (!ctx) continue
+      ctx.font = `${fontSizePx}px "PingFang SC", "Microsoft YaHei", sans-serif`
+      const width = ctx.measureText(content).width
+
+      const speed = getSpeed(content, fontSizePx)
+      const duration = getDuration(item, width, speed)
+
       let bestRow = -1
-      let bestTime = Infinity
+      let minEndTime = Infinity
+      for (let i = 0; i < MAX_ROWS; i++) {
+        if (rowsOccupiedUntil[i] <= nowSeconds) {
+          bestRow = i
+          break
+        }
+        if (rowsOccupiedUntil[i] < minEndTime) {
+          minEndTime = rowsOccupiedUntil[i]
+          bestRow = i
+        }
+      }
+      if (bestRow === -1) bestRow = 0
 
-      for (let row = 0; row < totalRows; row++) {
-        if (rowOccupiedUntil[row] <= props.currentTime) {
-          bestRow = row
-          break
-        }
-        if (rowOccupiedUntil[row] < bestTime) {
-          bestTime = rowOccupiedUntil[row]
-          bestRow = row
-        }
-      }
+      const y = TOP_PADDING + bestRow * ROW_HEIGHT + ROW_HEIGHT / 2
+      const startX = canvasWidth
+      const endX = -width
+      const travelDistance = canvasWidth + width
+      const speedPxPerSec = travelDistance / duration
+      const elapsed = nowSeconds - item.time
+      let currentX = startX - speedPxPerSec * elapsed
+      if (currentX > canvasWidth) currentX = canvasWidth
+      if (currentX < endX) currentX = endX
 
-      if (bestRow >= 0) {
-        const startTime = Math.max(props.currentTime, rowOccupiedUntil[bestRow])
-        rowOccupiedUntil[bestRow] = startTime + occupyDuration
-        result.push({ ...item, _row: bestRow, _fontSize: fontSize, _type: type, _color: color, _duration: duration })
+      activeDanmakus.push({
+        ...item,
+        x: currentX,
+        y,
+        speed: speedPxPerSec,
+        duration,
+        width,
+        fontSizePx,
+        color,
+        startTime: nowSeconds,
+      })
+
+      rowsOccupiedUntil[bestRow] = nowSeconds + duration
+    }
+    
+    else if (type === 'top' || type === 'bottom') {
+      let row: number
+      if (type === 'top') {
+        row = Math.min(2, MAX_ROWS - 1)
+      } else {
+        row = Math.max(MAX_ROWS - 3, 0)
       }
-    } else if (type === 'top') {
-      const maxTopRow = Math.min(2, totalRows - 1)
-      for (let row = 0; row <= maxTopRow; row++) {
-        if (rowOccupiedUntil[row] <= props.currentTime) {
-          rowOccupiedUntil[row] = props.currentTime + duration
-          result.push({ ...item, _row: row, _fontSize: fontSize, _type: type, _color: color, _duration: duration })
-          break
-        }
-      }
-    } else if (type === 'bottom') {
-      const minBottomRow = Math.max(0, totalRows - 3)
-      for (let row = minBottomRow; row < totalRows; row++) {
-        if (rowOccupiedUntil[row] <= props.currentTime) {
-          rowOccupiedUntil[row] = props.currentTime + duration
-          result.push({ ...item, _row: row, _fontSize: fontSize, _type: type, _color: color, _duration: duration })
-          break
-        }
-      }
+      const y = TOP_PADDING + row * ROW_HEIGHT + ROW_HEIGHT / 2
+      const duration = 4
+
+      if (!ctx) continue
+      ctx.font = `${fontSizePx}px "PingFang SC", "Microsoft YaHei", sans-serif`
+      const width = ctx.measureText(content).width
+      const x = (canvasRef.value.width - width) / 2
+
+      activeDanmakus.push({
+        ...item,
+        x,
+        y,
+        speed: 0,
+        duration,
+        width,
+        fontSizePx,
+        color,
+        startTime: nowSeconds,
+      })
     }
 
-    if (result.length >= 30) break
+    if (!ctx) continue
+    ctx.font = `${fontSizePx}px "PingFang SC", "Microsoft YaHei", sans-serif`
+    const width = ctx.measureText(content).width
+
+    const speed = getSpeed(content, fontSizePx)
+    const duration = getDuration(item, width, speed)
+
+    let bestRow = -1
+    let minEndTime = Infinity
+    for (let i = 0; i < MAX_ROWS; i++) {
+      if (rowsOccupiedUntil[i] <= nowSeconds) {
+        bestRow = i
+        break
+      }
+      if (rowsOccupiedUntil[i] < minEndTime) {
+        minEndTime = rowsOccupiedUntil[i]
+        bestRow = i
+      }
+    }
+    if (bestRow === -1) bestRow = 0
+
+    const y = TOP_PADDING + bestRow * ROW_HEIGHT + ROW_HEIGHT / 2
+    const startX = canvasWidth
+    const endX = -width
+    const travelDistance = canvasWidth + width
+    const speedPxPerSec = travelDistance / duration
+    const elapsed = nowSeconds - item.time
+    let currentX = startX - speedPxPerSec * elapsed
+    if (currentX > canvasWidth) currentX = canvasWidth
+    if (currentX < endX) currentX = endX
+
+    activeDanmakus.push({
+      ...item,
+      x: currentX,
+      y,
+      speed: speedPxPerSec,
+      duration,
+      width,
+      fontSizePx,
+      color,
+    })
+
+    rowsOccupiedUntil[bestRow] = nowSeconds + duration
+
+    if (activeDanmakus.length > MAX_ACTIVE) activeDanmakus.shift()
   }
 
-  return result
+  const deltaSeconds = nowSeconds - lastTime
+  if (deltaSeconds > 0.03) {
+    for (const d of activeDanmakus) {
+      d.x -= d.speed * deltaSeconds
+    }
+    lastTime = nowSeconds
+  }
+
+  draw()
+}
+
+let animationFrame: number | null = null
+function animate() {
+  const nowSeconds = performance.now() / 1000
+  updateActiveDanmakus(nowSeconds)
+  animationFrame = requestAnimationFrame(animate)
+}
+
+function resizeObserver() {
+  if (!canvasRef.value) return
+  updateDimensions()
+  activeDanmakus = []
+  lastTime = performance.now() / 1000
+}
+
+let resizeObserverInstance: ResizeObserver | null = null
+
+onMounted(() => {
+  updateDimensions()
+  resizeObserverInstance = new ResizeObserver(resizeObserver)
+  if (canvasRef.value) resizeObserverInstance.observe(canvasRef.value)
+  lastTime = performance.now() / 1000
+  animationFrame = requestAnimationFrame(animate)
 })
 
-function getStyle(item: VisibleDanmaku) {
-  const top = TOP_PADDING + item._row * ROW_HEIGHT
+onBeforeUnmount(() => {
+  if (animationFrame) cancelAnimationFrame(animationFrame)
+  if (resizeObserverInstance) resizeObserverInstance.disconnect()
+})
 
-  if (item._type !== 'scroll') {
-    return {
-      top: `${top}px`,
-      color: item._color,
-      animation: `danmaku-fixed ${item._duration}s linear forwards`,
-    }
+watch(() => props.items, (items) => {
+  if (!ctx || !canvasRef.value) return
+  const canvasWidth = canvasRef.value.width
+  for (const item of items) {
+    const fontSizePx = getFontSize(item.fontSize)
+    ctx.font = `${fontSizePx}px "PingFang SC", "Microsoft YaHei", sans-serif`
+    const width = ctx.measureText(item.content).width
+    const speed = getSpeed(item.content, fontSizePx)
+    const duration = getDuration(item, width, speed)
+    ;(item as any)._duration = duration
   }
-
-  // scroll type
-  return {
-    top: `${top}px`,
-    color: item._color,
-    '--duration': `${item._duration}s`,
-  }
-}
+}, { immediate: true, deep: false })
 </script>
 
 <style scoped>
 .danmaku-layer {
   position: absolute;
   inset: 0;
-  overflow: hidden;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-}
-
-.danmaku {
-  position: absolute;
-  min-width: max-content;
-  font-weight: 700;
-  line-height: 1.2;
-  white-space: nowrap;
-  user-select: none;
-  /* Bilibili-style text stroke for readability on any background */
-  text-shadow:
-    1px 0 0 #000,
-    -1px 0 0 #000,
-    0 1px 0 #000,
-    0 -1px 0 #000,
-    1px 1px 0 #000,
-    -1px -1px 0 #000,
-    1px -1px 0 #000,
-    -1px 1px 0 #000;
-}
-
-/* Font sizes */
-.danmaku-small  { font-size: 12px; }
-.danmaku-medium { font-size: 16px; }
-.danmaku-large  { font-size: 20px; }
-
-/* Scroll type */
-.danmaku-scroll {
-  left: 100%;
-  animation: danmaku-fly var(--duration, 6s) linear forwards;
-}
-
-@keyframes danmaku-fly {
-  to {
-    transform: translateX(calc(-100vw - 100%));
-  }
-}
-
-/* Fixed top/bottom types */
-.danmaku-top,
-.danmaku-bottom {
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-@keyframes danmaku-fixed {
-  0%   { opacity: 0; }
-  10%  { opacity: 1; }
-  90%  { opacity: 1; }
-  100% { opacity: 0; }
+  display: block;
 }
 </style>

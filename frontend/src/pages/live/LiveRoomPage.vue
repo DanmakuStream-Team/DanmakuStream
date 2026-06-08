@@ -66,6 +66,17 @@
             @click="color = c"
           />
         </div>
+        <div class="danmaku-type">
+          <span
+            v-for="t in DANMAKU_TYPES"
+            :key="t.value"
+            class="type-btn"
+            :class="{ active: danmakuType === t.value }"
+            @click="danmakuType = t.value"
+          >
+            {{ t.label }}
+          </span>
+        </div>
       </aside>
     </section>
   </main>
@@ -92,9 +103,20 @@ const ending = ref(false)
 const room = ref<LiveRoom>()
 const text = ref('')
 const color = ref('#FFFFFF')
+const danmakuType = ref('scroll')
 const viewerCount = ref(0)
 const streamReady = ref(false)
-const DANMAKU_COLORS = ['#FFFFFF', '#FF5555', '#55FF55', '#5555FF', '#FFFF55', '#FF55FF', '#55FFFF', '#FF8C00', '#FF69B4', '#00CED1', '#FFD700', '#FF6347']
+const DANMAKU_COLORS = [
+  '#FFFFFF', '#000000',
+  '#FF5555', '#55FF55', '#5555FF', '#FFFF55', 
+  '#FF55FF', '#55FFFF', '#FF8C00', '#FF69B4', 
+  '#00CED1', '#FFD700', '#FF6347'
+]
+const DANMAKU_TYPES = [
+  { label: '滚动', value: 'scroll' },
+  { label: '顶部', value: 'top' },
+  { label: '底部', value: 'bottom' }
+]
 const messages = ref<Danmaku[]>([])
 let ws: DanmakuWebSocket | null = null
 let streamTimer: ReturnType<typeof setInterval> | null = null
@@ -195,17 +217,7 @@ function send() {
     return
   }
   if (!text.value.trim()) return
-  ws?.send(text.value.trim(), color.value)
-  messages.value.push({
-    id: Date.now(),
-    videoId: roomId,
-    userId: authStore.userInfo?.id || 0,
-    content: text.value.trim(),
-    time: 0,
-    color: color.value,
-    fontSize: 'medium',
-    type: 'scroll',
-  })
+  ws?.send(text.value.trim(), color.value, danmakuType.value)
   text.value = ''
 }
 
@@ -332,6 +344,28 @@ function handlePlayerError() {
 .color-dot.active {
   border-color: #165dff;
   transform: scale(1.1);
+}
+
+.danmaku-type {
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+  justify-content: center;
+}
+
+.type-btn {
+  padding: 4px 12px;
+  border-radius: 16px;
+  background: #f0f2f5;
+  color: #333;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.type-btn.active {
+  background: #165dff;
+  color: white;
 }
 
 @media (max-width: 920px) {
