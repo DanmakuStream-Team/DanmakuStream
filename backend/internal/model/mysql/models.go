@@ -13,7 +13,7 @@ type User struct {
 	Nickname    string `gorm:"uniqueIndex;size:50;not null"`
 	Avatar      string `gorm:"size:500"`
 	Bio         string `gorm:"size:500"`
-	Role        string `gorm:"size:20;default:user"` // user | creator | admin
+	Role        string `gorm:"size:20;default:user"` // user | creator | moderator | admin
 	FollowCount int64  `gorm:"default:0"`
 	FanCount    int64  `gorm:"default:0"`
 }
@@ -110,6 +110,30 @@ type Notification struct {
 	Read    bool   `gorm:"default:false;index"`
 	User    User   `gorm:"foreignKey:UserID"`
 	Actor   User   `gorm:"foreignKey:ActorID"`
+}
+
+type SiteBanner struct {
+	gorm.Model
+	Title    string `gorm:"size:120;not null"`
+	ImageURL string `gorm:"size:500"`
+	Link     string `gorm:"size:500"`
+	Enabled  bool   `gorm:"default:true;index"`
+	Sort     int    `gorm:"default:0"`
+}
+
+type SiteAnnouncement struct {
+	gorm.Model
+	Content   string `gorm:"size:500;not null"`
+	Enabled   bool   `gorm:"default:true;index"`
+	StartedAt *time.Time
+	EndedAt   *time.Time
+}
+
+type TrafficStat struct {
+	gorm.Model
+	Date     string `gorm:"size:10;not null;uniqueIndex:idx_traffic_date_category"` // YYYY-MM-DD
+	Category string `gorm:"size:32;not null;uniqueIndex:idx_traffic_date_category"`
+	Bytes    uint64 `gorm:"default:0"`
 }
 
 // UserInfo is a safe DTO returned to the client (no password field).

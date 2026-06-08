@@ -1,4 +1,4 @@
-export type UserRole = 'user' | 'creator' | 'admin'
+export type UserRole = 'user' | 'creator' | 'moderator' | 'admin'
 export type VideoStatus = 'pending' | 'approved' | 'rejected'
 
 export interface UserInfo {

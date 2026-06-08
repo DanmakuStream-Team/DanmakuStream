@@ -3,11 +3,23 @@
     <div class="section-head">
       <div>
         <h1>管理后台</h1>
-        <p class="muted">处理视频审核和弹幕治理。</p>
+        <p class="muted">管理基础设施、用户权限、运营内容、视频审核和弹幕治理。</p>
       </div>
     </div>
 
     <section class="quick-grid">
+      <button class="soft-panel quick-card" type="button" @click="router.push('/admin/infrastructure')">
+        <strong>服务器监控</strong>
+        <span>存储容量、流量消耗、在线和并发预警</span>
+      </button>
+      <button class="soft-panel quick-card" type="button" @click="router.push('/admin/users')">
+        <strong>用户与权限</strong>
+        <span>用户画像、上传数、弹幕数和角色分配</span>
+      </button>
+      <button class="soft-panel quick-card" type="button" @click="router.push('/admin/operations')">
+        <strong>运营工具</strong>
+        <span>首页轮播图和全站系统公告管理</span>
+      </button>
       <button class="soft-panel quick-card" type="button" @click="router.push('/admin/videos')">
         <strong>视频审核</strong>
         <span>查看 pending / approved / rejected 视频</span>
@@ -38,7 +50,7 @@ const router = useRouter()
 
 .quick-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
 }
 

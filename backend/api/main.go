@@ -9,6 +9,7 @@ import (
 
 	"danmakustream/backend/internal/config"
 	"danmakustream/backend/internal/handler/response"
+	adminhandler "danmakustream/backend/internal/handler/v1/admin"
 	authhandler "danmakustream/backend/internal/handler/v1/auth"
 	commenthandler "danmakustream/backend/internal/handler/v1/comment"
 	danmakuhandler "danmakustream/backend/internal/handler/v1/danmaku"
@@ -48,6 +49,7 @@ func main() {
 
 	r := gin.Default()
 	r.MaxMultipartMemory = 8 << 20
+	r.Use(middleware.TrafficMiddleware(svcCtx))
 
 	r.Use(func(ctx *gin.Context) {
 		ctx.Header("Access-Control-Allow-Origin", "*")
@@ -140,6 +142,17 @@ func main() {
 		admin.PUT("/admin/videos/:id/status", videohandler.AdminUpdateStatusHandler(svcCtx))
 		admin.GET("/admin/danmaku", danmakuhandler.AdminListHandler(svcCtx))
 		admin.PUT("/admin/danmaku/:id/block", danmakuhandler.BlockHandler(svcCtx))
+		admin.GET("/admin/infrastructure", adminhandler.InfrastructureHandler(svcCtx))
+		admin.GET("/admin/users", adminhandler.UserListHandler(svcCtx))
+		admin.PUT("/admin/users/:id/role", adminhandler.UpdateUserRoleHandler(svcCtx))
+		admin.GET("/admin/banners", adminhandler.BannerListHandler(svcCtx))
+		admin.POST("/admin/banners", adminhandler.CreateBannerHandler(svcCtx))
+		admin.PUT("/admin/banners/:id", adminhandler.UpdateBannerHandler(svcCtx))
+		admin.DELETE("/admin/banners/:id", adminhandler.DeleteBannerHandler(svcCtx))
+		admin.GET("/admin/announcements", adminhandler.AnnouncementListHandler(svcCtx))
+		admin.POST("/admin/announcements", adminhandler.CreateAnnouncementHandler(svcCtx))
+		admin.PUT("/admin/announcements/:id", adminhandler.UpdateAnnouncementHandler(svcCtx))
+		admin.DELETE("/admin/announcements/:id", adminhandler.DeleteAnnouncementHandler(svcCtx))
 	}
 
 	r.GET("/ws/live/:id", wshandler.LiveWebSocketHandler(svcCtx))
