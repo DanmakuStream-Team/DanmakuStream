@@ -8,10 +8,10 @@ export const useCommentStore = defineStore('comment', () => {
   const loading = ref(false)
   const submitting = ref(false)
 
-  async function fetchComments(videoId: number, params?: { sort?: 'date' | 'like' }) {
+  async function fetchComments(videoId: number) {
     loading.value = true
     try {
-      const res = await commentApi.list(videoId, params)
+      const res = await commentApi.list(videoId)
       comments.value = res.data
     } finally {
       loading.value = false

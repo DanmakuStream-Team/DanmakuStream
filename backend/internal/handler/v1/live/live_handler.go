@@ -168,13 +168,6 @@ func CreateHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			}
 		}
 
-		_ = svcCtx.DB.Transaction(func(tx *gorm.DB) error {
-			if err := notifyScheduleReservations(tx, userID, title); err != nil {
-				return err
-			}
-			return notifyLiveFollowers(tx, userID, "live_start", "你关注的主播开播了", title, "/live")
-		})
-
 		if err := svcCtx.DB.Preload("Owner").First(&room, room.ID).Error; err != nil {
 			response.Fail(c, http.StatusInternalServerError, "直播间加载失败")
 			return

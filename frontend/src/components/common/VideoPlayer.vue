@@ -7,12 +7,9 @@
       playsinline
       :poster="mediaUrl(poster)"
       @timeupdate="emitTime"
-      @play="isPaused = false"
-      @pause="isPaused = true"
-      @ended="isPaused = true"
       @error="handleVideoError"
     />
-    <DanmakuLayer :items="danmakus" :current-time="currentTime" :paused="isPaused" />
+    <DanmakuLayer :items="danmakus" :current-time="currentTime" />
   </div>
 </template>
 
@@ -28,7 +25,6 @@ const emit = defineEmits<{ timeupdate: [time: number]; error: [message: string] 
 
 const videoRef = ref<HTMLVideoElement>()
 const currentTime = ref(0)
-const isPaused = ref(true)
 const sourceUrl = computed(() => mediaUrl(props.url))
 let hls: Hls | null = null
 
@@ -45,7 +41,6 @@ async function setupSource(url: string) {
   video.removeAttribute('src')
   video.load()
   currentTime.value = 0
-  isPaused.value = true
 
   if (!url) return
 

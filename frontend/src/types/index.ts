@@ -75,39 +75,6 @@ export interface LiveRoom {
   createdAt: string
 }
 
-export interface DynamicPost {
-  id: number
-  userId: number
-  content: string
-  images: string
-  author?: UserInfo
-  createdAt: string
-}
-
-export interface LiveSchedule {
-  id: number
-  title: string
-  coverUrl: string
-  scheduledAt: string
-  status: 'pending' | 'canceled' | 'live'
-  reminderCount: number
-  reserved: boolean
-  ownerId: number
-  owner?: UserInfo
-  createdAt: string
-}
-
-export interface NotificationInfo {
-  id: number
-  type: string
-  title: string
-  content: string
-  link: string
-  read: boolean
-  actor?: UserInfo
-  createdAt: string
-}
-
 export interface PageResult<T> {
   list: T[]
   total: number

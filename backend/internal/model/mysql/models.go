@@ -72,46 +72,6 @@ type LiveRoom struct {
 	EndedAt     *time.Time
 }
 
-type DynamicPost struct {
-	gorm.Model
-	UserID  uint   `gorm:"not null;index"`
-	User    User   `gorm:"foreignKey:UserID"`
-	Content string `gorm:"type:text;not null"`
-	Images  string `gorm:"size:1000"`
-}
-
-type LiveSchedule struct {
-	gorm.Model
-	Title         string `gorm:"size:200;not null"`
-	CoverURL      string `gorm:"size:500"`
-	ScheduledAt   time.Time
-	Status        string `gorm:"size:20;default:pending"` // pending | canceled | live
-	ReminderCount int64  `gorm:"default:0"`
-	OwnerID       uint   `gorm:"not null;index"`
-	Owner         User   `gorm:"foreignKey:OwnerID"`
-}
-
-type LiveReservation struct {
-	gorm.Model
-	ScheduleID uint         `gorm:"not null;uniqueIndex:idx_live_reservation"`
-	UserID     uint         `gorm:"not null;uniqueIndex:idx_live_reservation"`
-	Schedule   LiveSchedule `gorm:"foreignKey:ScheduleID"`
-	User       User         `gorm:"foreignKey:UserID"`
-}
-
-type Notification struct {
-	gorm.Model
-	UserID  uint   `gorm:"not null;index"`
-	ActorID *uint  `gorm:"index"`
-	Type    string `gorm:"size:50;not null"`
-	Title   string `gorm:"size:200;not null"`
-	Content string `gorm:"type:text"`
-	Link    string `gorm:"size:500"`
-	Read    bool   `gorm:"default:false;index"`
-	User    User   `gorm:"foreignKey:UserID"`
-	Actor   User   `gorm:"foreignKey:ActorID"`
-}
-
 // UserInfo is a safe DTO returned to the client (no password field).
 type UserInfo struct {
 	ID       uint   `json:"id"`

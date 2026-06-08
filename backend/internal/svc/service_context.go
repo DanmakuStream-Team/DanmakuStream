@@ -27,10 +27,6 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		&model.Danmaku{},
 		&model.Comment{},
 		&model.LiveRoom{},
-		&model.DynamicPost{},
-		&model.LiveSchedule{},
-		&model.LiveReservation{},
-		&model.Notification{},
 		&model.Follow{},
 		&model.Like{},
 		&model.Collect{},
@@ -45,7 +41,6 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	os.MkdirAll(filepath.Join(absDir, "videos"), 0755)
 	os.MkdirAll(filepath.Join(absDir, "covers"), 0755)
 	os.MkdirAll(filepath.Join(absDir, "avatars"), 0755)
-	os.MkdirAll(filepath.Join(absDir, "images"), 0755)
 
 	return &ServiceContext{
 		Config:   c,

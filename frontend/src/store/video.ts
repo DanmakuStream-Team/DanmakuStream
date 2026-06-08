@@ -16,7 +16,6 @@ export const useVideoStore = defineStore('video', () => {
       keyword?: string; 
       tag?: string 
       category?: string
-      sort?: 'hot' | 'date' | 'like' | 'collect'
     }
   ) {
     loading.value = true

@@ -21,10 +21,6 @@ type createCommentReq struct {
 	ParentID *uint  `json:"parentId"`
 }
 
-type listCommentReq struct {
-	Sort string `form:"sort"`
-}
-
 type commentItem struct {
 	ID        uint            `json:"id"`
 	VideoID   uint            `json:"videoId"`
@@ -45,22 +41,11 @@ func ListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			return
 		}
 
-		var req listCommentReq
-		if err := c.ShouldBindQuery(&req); err != nil {
-			response.Fail(c, http.StatusBadRequest, "参数错误")
-			return
-		}
-		orderExpr, err := commentSortExpr(req.Sort)
-		if err != nil {
-			response.Fail(c, http.StatusBadRequest, err.Error())
-			return
-		}
-
 		var comments []model.Comment
 		err = svcCtx.DB.
 			Preload("User").
 			Where("video_id = ?", videoID).
-			Order(orderExpr).
+			Order("created_at ASC").
 			Find(&comments).Error
 		if err != nil {
 			response.Fail(c, http.StatusInternalServerError, "评论加载失败")
@@ -90,19 +75,6 @@ func ListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		}
 
 		response.Ok(c, buildCommentTree(comments, likedMap))
-	}
-}
-
-func commentSortExpr(sort string) (string, error) {
-	switch sort {
-	case "":
-		return "created_at ASC", nil
-	case "date":
-		return "created_at DESC", nil
-	case "like":
-		return "like_count DESC, created_at DESC", nil
-	default:
-		return "", errors.New("无效的评论排序方式")
 	}
 }
 

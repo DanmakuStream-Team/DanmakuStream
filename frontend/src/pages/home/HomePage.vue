@@ -40,9 +40,7 @@
           <div class="search-body">
             <h3>{{ video.title }}</h3>
             <p class="search-author">
-              <button class="user-link" type="button" :disabled="!video.author?.id" @click.stop="openUser(video.author?.id)">
-                {{ video.author?.nickname || '匿名用户' }}
-              </button>
+              <span>{{ video.author?.nickname || '匿名用户' }}</span>
               <em>{{ formatCount(video.viewCount) }} 播放</em>
             </p>
             <p class="search-desc">{{ video.description || '暂无简介' }}</p>
@@ -61,9 +59,7 @@
             <div v-else class="feature-fallback">DanmakuStream</div>
             <div class="feature-title">
               <h3>{{ featuredVideo.title }}</h3>
-              <button class="feature-author" type="button" :disabled="!featuredVideo.author?.id" @click.stop="openUser(featuredVideo.author?.id)">
-                {{ featuredVideo.author?.nickname || '匿名用户' }}
-              </button>
+              <p>{{ featuredVideo.author?.nickname || '匿名用户' }}</p>
             </div>
           </div>
         </article>
@@ -176,11 +172,6 @@ function selectCategory(catValue: string) {
   activeCategory.value = catValue
   page.value = 1
   loadVideos()
-}
-
-function openUser(userId?: number) {
-  if (!userId) return
-  router.push(`/user/${userId}`)
 }
 
 onMounted(async () => {
@@ -335,25 +326,12 @@ watch(() => route.query.feature, () => {
   white-space: nowrap;
 }
 
-.feature-author {
-  display: block;
+.feature-title p {
   overflow: hidden;
   margin: 8px 0 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
   color: rgba(255, 255, 255, 0.76);
-  cursor: pointer;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.feature-author:not(:disabled):hover {
-  color: #fff;
-}
-
-.feature-author:disabled {
-  cursor: default;
 }
 
 .search-layout {
@@ -461,27 +439,6 @@ watch(() => route.query.feature, () => {
 
 .search-author em {
   font-style: normal;
-}
-
-.user-link {
-  max-width: 180px;
-  overflow: hidden;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.user-link:not(:disabled):hover {
-  color: #00aeec;
-}
-
-.user-link:disabled {
-  cursor: default;
 }
 
 .search-desc {
