@@ -2,7 +2,7 @@ import request from '@/utils/request'
 import type { PageResult, VideoInfo, VideoStatus } from '@/types'
 
 export const videoApi = {
-  list(params: { page: number; pageSize: number; keyword?: string; tag?: string }) {
+  list(params: { page: number; pageSize: number; keyword?: string; tag?: string; category?: string; sort?: 'hot' | 'date' | 'like' | 'collect' }) {
     return request.get<PageResult<VideoInfo>>('/videos', { params })
   },
   detail(id: number) {
@@ -28,6 +28,12 @@ export const videoApi = {
   },
   remove(id: number) {
     return request.delete<{ id: number }>(`/videos/${id}`)
+  },
+  download(id: number) {
+    return request.get<Blob>(`/videos/${id}/download`, {
+      responseType: 'blob',
+      timeout: 0,
+    })
   },
   like(id: number) {
     return request.post<{ liked: boolean }>(`/videos/${id}/like`)

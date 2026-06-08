@@ -16,7 +16,6 @@
         />
 
         <div class="video-info">
-          <el-tag type="primary" effect="light">{{ video.status }}</el-tag>
           <h1>{{ video.title }}</h1>
           <div class="stats">
             <span>{{ formatCount(video.viewCount) }} 播放</span>
@@ -26,7 +25,7 @@
           <div class="actions">
             <el-button @click="toggleLike">点赞 {{ formatCount(video.likeCount) }}</el-button>
             <el-button @click="toggleCollect">收藏 {{ formatCount(video.collectCount) }}</el-button>
-            <el-button @click="downloadVideo">下载</el-button>
+            <el-button :loading="downloading" @click="downloadVideo">下载</el-button>
           </div>
           <div class="tags">
             <el-tag v-for="tag in normalizeTags(video.tags)" :key="tag">{{ tag }}</el-tag>
@@ -70,7 +69,6 @@
           </el-avatar>
           <div>
             <strong>{{ video.author?.nickname || '匿名用户' }}</strong>
-            <span>{{ video.author?.role }}</span>
           </div>
           <el-button type="primary" @click="router.push(`/user/${video.author.id}`)">查看主页</el-button>
         </div>
@@ -133,6 +131,7 @@ const DANMAKU_COLORS = ['#FFFFFF', '#FF5555', '#55FF55', '#5555FF', '#FFFF55', '
 const danmakuColor = ref(DANMAKU_COLORS[0])
 const commentText = ref('')
 const replyTarget = ref<Comment | null>(null)
+const downloading = ref(false)
 const video = computed(() => videoStore.currentVideo)
 
 function handleTouchStart(e: TouchEvent) {
@@ -181,40 +180,57 @@ async function load() {
 async function toggleLike() {
   if (!ensureLogin()) return
   if (!video.value) return
+  const current = video.value
   const res = await videoApi.like(video.value.id)
   if (res.data.liked) {
-    upsertUserLibraryRecord('liked', video.value)
+    current.likeCount += 1
+    upsertUserLibraryRecord('liked', current)
   } else {
-    removeUserLibraryRecord('liked', video.value.id)
+    current.likeCount = Math.max(0, current.likeCount - 1)
+    removeUserLibraryRecord('liked', current.id)
   }
-  await videoStore.fetchVideoDetail(video.value.id)
 }
 
 async function toggleCollect() {
   if (!ensureLogin()) return
   if (!video.value) return
+  const current = video.value
   const res = await videoApi.collect(video.value.id)
   if (res.data.collected) {
-    upsertUserLibraryRecord('collections', video.value)
+    current.collectCount += 1
+    upsertUserLibraryRecord('collections', current)
   } else {
-    removeUserLibraryRecord('collections', video.value.id)
+    current.collectCount = Math.max(0, current.collectCount - 1)
+    removeUserLibraryRecord('collections', current.id)
   }
-  await videoStore.fetchVideoDetail(video.value.id)
 }
 
-function downloadVideo() {
+async function downloadVideo() {
   if (!ensureLogin()) return
-  if (!video.value?.videoUrl) {
-    ElMessage.warning('当前视频没有可下载地址')
-    return
+  if (!video.value) return
+  downloading.value = true
+  try {
+    const current = video.value
+    const res = await videoApi.download(current.id)
+    saveBlob(res.data, `${current.title || 'danmaku-video'}.mp4`)
+    upsertUserLibraryRecord('downloads', current)
+    ElMessage.success('下载已开始')
+  } catch (error: any) {
+    ElMessage.error(error.message || '下载失败')
+  } finally {
+    downloading.value = false
   }
-  upsertUserLibraryRecord('downloads', video.value)
+}
+
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
-  link.href = mediaUrl(video.value.videoUrl)
-  link.download = `${video.value.title || 'danmaku-video'}.mp4`
-  link.target = '_blank'
-  link.rel = 'noreferrer'
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
   link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }
 
 async function sendDanmaku() {
@@ -328,14 +344,8 @@ function saveHistory() {
   gap: 12px;
 }
 
-.author-panel strong,
-.author-panel span {
+.author-panel strong {
   display: block;
-}
-
-.author-panel span {
-  color: #667085;
-  margin-top: 4px;
 }
 
 .danmaku-box {
@@ -375,7 +385,14 @@ function saveHistory() {
 
 .comments {
   display: grid;
-  gap: 16px;
+  gap: 14px;
+  padding: 22px 26px;
+}
+
+.comment-head h2 {
+  color: #18191c;
+  font-size: 22px;
+  font-weight: 700;
 }
 
 .comment-input {
@@ -387,7 +404,7 @@ function saveHistory() {
 
 .comment-list {
   display: grid;
-  gap: 18px;
+  gap: 0;
 }
 
 @media (max-width: 920px) {
