@@ -29,6 +29,12 @@ export const videoApi = {
   remove(id: number) {
     return request.delete<{ id: number }>(`/videos/${id}`)
   },
+  download(id: number) {
+    return request.get<Blob>(`/videos/${id}/download`, {
+      responseType: 'blob',
+      timeout: 0,
+    })
+  },
   like(id: number) {
     return request.post<{ liked: boolean }>(`/videos/${id}/like`)
   },

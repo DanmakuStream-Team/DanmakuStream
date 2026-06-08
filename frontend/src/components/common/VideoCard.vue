@@ -13,22 +13,29 @@
     </div>
     <div class="body">
       <h3>{{ video.title }}</h3>
-      <div class="author">
+      <button class="author" type="button" :disabled="!video.author?.id" @click.stop="openAuthor">
         <el-icon><User /></el-icon>
         <span>{{ video.author?.nickname || '匿名用户' }}</span>
         <em>{{ formatTime(video.createdAt) }}</em>
-      </div>
+      </button>
     </div>
   </article>
 </template>
 
 <script setup lang="ts">
 import { ChatDotRound, User, VideoPlay } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
 import type { VideoInfo } from '@/types'
 import { formatCount, formatDuration, formatTime, mediaUrl } from '@/utils/format'
 
-defineProps<{ video: VideoInfo }>()
+const props = defineProps<{ video: VideoInfo }>()
 defineEmits<{ open: [] }>()
+const router = useRouter()
+
+function openAuthor() {
+  if (!props.video.author?.id) return
+  router.push(`/user/${props.video.author.id}`)
+}
 </script>
 
 <style scoped>
@@ -120,8 +127,24 @@ h3 {
   align-items: center;
   gap: 5px;
   margin-top: 7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: #9499a0;
+  cursor: pointer;
   font-size: 12px;
+}
+
+.author:hover {
+  color: #00aeec;
+}
+
+.author:disabled {
+  cursor: default;
+}
+
+.author:disabled:hover {
+  color: #9499a0;
 }
 
 .author span {

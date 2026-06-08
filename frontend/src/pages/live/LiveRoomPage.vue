@@ -4,7 +4,14 @@
       <div>
         <h1>{{ room?.title || `直播间 ${roomId}` }}</h1>
         <p class="muted">
-          <span v-if="room?.owner">主播：{{ room.owner.nickname || room.owner.username }}</span>
+          <button
+            v-if="room?.owner"
+            class="owner-link"
+            type="button"
+            @click="router.push(`/user/${room.owner?.id}`)"
+          >
+            主播：{{ room.owner.nickname || room.owner.username }}
+          </button>
           <span v-if="room?.startedAt"> · 开播时间：{{ room.startedAt }}</span>
         </p>
       </div>
@@ -228,6 +235,19 @@ function handlePlayerError() {
 
 .section-head p {
   margin: 8px 0 0;
+}
+
+.owner-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.owner-link:hover {
+  color: #00aeec;
 }
 
 .room-status {
