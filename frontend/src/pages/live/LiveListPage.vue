@@ -23,12 +23,12 @@
         </div>
         <div class="live-body">
           <h2>{{ room.title }}</h2>
-          <div class="live-owner">
+          <button class="live-owner" type="button" :disabled="!room.owner?.id" @click.stop="openUser(room.owner?.id)">
             <el-avatar :size="28" :src="mediaUrl(room.owner?.avatar || '')">
               {{ room.owner?.nickname?.slice(0, 1) || 'U' }}
             </el-avatar>
             <span>{{ room.owner?.nickname || room.owner?.username || '匿名主播' }}</span>
-          </div>
+          </button>
         </div>
       </article>
 
@@ -117,6 +117,11 @@ function openCreateDialog() {
   createForm.title = `${authStore.userInfo?.nickname || '我的'}的直播间`
   createForm.coverUrl = ''
   createVisible.value = true
+}
+
+function openUser(userId?: number) {
+  if (!userId) return
+  router.push(`/user/${userId}`)
 }
 
 async function createLiveRoom() {
@@ -246,8 +251,20 @@ async function createLiveRoom() {
   align-items: center;
   gap: 7px;
   min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: #9499a0;
+  cursor: pointer;
   font-size: 13px;
+}
+
+.live-owner:not(:disabled):hover {
+  color: #fb7299;
+}
+
+.live-owner:disabled {
+  cursor: default;
 }
 
 .live-owner span {
