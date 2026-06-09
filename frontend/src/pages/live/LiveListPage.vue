@@ -16,7 +16,7 @@
         @click="router.push(`/live/${room.id}`)"
       >
         <div class="live-cover">
-          <img v-if="room.coverUrl" :src="mediaUrl(room.coverUrl)" :alt="room.title" />
+          <img v-if="room.coverUrl" :src="mediaUrl(room.coverUrl)" :alt="room.title">
           <div v-else class="live-cover-fallback">Danmaku Live</div>
           <span class="live-badge">直播中</span>
           <span class="live-viewers">{{ formatCount(room.viewerCount) }} 人观看</span>
@@ -57,7 +57,7 @@
       <template #footer>
         <el-button @click="createVisible = false">取消</el-button>
         <el-button type="primary" :loading="creating" @click="createLiveRoom">
-          {{ createdRoom ? '重新生成' : '开始直播' }}
+          {{ createdRoom ? '显示参数' : '开始直播' }}
         </el-button>
         <el-button v-if="createdRoom" type="success" @click="router.push(`/live/${createdRoom.id}`)">
           进入直播间
@@ -139,7 +139,7 @@ async function createLiveRoom() {
     })
     createdRoom.value = res.data
     await loadLiveRooms()
-    ElMessage.success('直播间已创建')
+    ElMessage.success('已获取直播推流参数')
   } catch {
     ElMessage.error('直播间创建失败')
   } finally {

@@ -67,10 +67,6 @@ function getColor(item: Danmaku): string {
   return PRESET_COLORS[item.id % PRESET_COLORS.length]
 }
 
-function getOutlineColor(color: string): string {
-  return color.toLowerCase() === '#000000' ? '#ffffff' : '#000000'
-}
-
 function getSpeed(content: string, fontSizePx: number): number {
   const baseSpeed = 120 + fontSizePx * 2
   return Math.min(280, Math.max(120, baseSpeed + content.length * 2))
@@ -146,7 +142,7 @@ function parseAdvancedDanmaku(item: Danmaku): AdvancedSpec | null {
     return fallback
   }
 
-  const text = params.get('text') || textPart.trim() || '●'
+  const text = params.get('text') || textPart.trim() || '*'
   const x = clamp(readNumber(['x', 'fromX'], 50), 0, 100)
   const y = clamp(readNumber(['y', 'fromY'], 50), 0, 100)
   const targetX = clamp(readNumber(['tx', 'toX', 'targetX'], x), 0, 100)
@@ -261,10 +257,7 @@ function draw() {
     ctx.globalAlpha = item.alpha
     ctx.font = `${item.fontSizePx}px "PingFang SC", "Microsoft YaHei", sans-serif`
     ctx.textBaseline = 'middle'
-    ctx.lineWidth = item.displayType === 'advanced' ? 2 : 3
-    ctx.strokeStyle = getOutlineColor(item.displayColor)
     ctx.fillStyle = item.displayColor
-    ctx.strokeText(item.displayText, item.x, item.y)
     ctx.fillText(item.displayText, item.x, item.y)
     ctx.restore()
   }
