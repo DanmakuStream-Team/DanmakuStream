@@ -19,7 +19,6 @@
         @change="uploadAvatar"
       />
       <div>
-        <el-tag>{{ user.role }}</el-tag>
         <div v-if="isEditingNickname" class="nickname-editor">
           <el-input
             v-model="nicknameDraft"
