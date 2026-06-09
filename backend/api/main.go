@@ -116,6 +116,8 @@ func main() {
 		auth.POST("/videos/:id/collect", videohandler.CollectHandler(svcCtx))
 
 		auth.POST("/danmaku", danmakuhandler.SendHandler(svcCtx))
+		// 上传 .danmaku 文件，批量创建高级弹幕。
+		auth.POST("/danmaku/advanced/upload", danmakuhandler.UploadAdvancedHandler(svcCtx))
 		auth.POST("/comments", commenthandler.CreateHandler(svcCtx))
 		auth.DELETE("/comments/:id", commenthandler.DeleteHandler(svcCtx))
 		auth.POST("/comments/:id/like", commenthandler.LikeHandler(svcCtx))

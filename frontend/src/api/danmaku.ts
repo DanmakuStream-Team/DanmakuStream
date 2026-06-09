@@ -8,6 +8,12 @@ export const danmakuApi = {
   send(data: Pick<Danmaku, 'videoId' | 'content' | 'time' | 'color' | 'fontSize' | 'type'>) {
     return request.post<Danmaku>('/danmaku', data)
   },
+  uploadAdvanced(videoId: number, file: File) {
+    const form = new FormData()
+    form.append('videoId', String(videoId))
+    form.append('file', file)
+    return request.post<{ list: Danmaku[]; count: number }>('/danmaku/advanced/upload', form)
+  },
   adminList(params: { page: number; pageSize: number; videoId?: number; keyword?: string; blocked?: boolean }) {
     return request.get<PageResult<Danmaku>>('/admin/danmaku', { params })
   },

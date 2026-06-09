@@ -1,5 +1,5 @@
 <template>
-  <main 
+  <main
     class="page-shell detail-page"
     @touchstart="handleTouchStart"
     @touchend="handleTouchEnd"
@@ -74,8 +74,61 @@
         </div>
 
         <div class="soft-panel danmaku-box">
-          <h3>发送弹幕</h3>
-          <el-input v-model="danmakuText" placeholder="此刻想说什么" @keyup.enter="sendDanmaku" />
+          <div class="danmaku-head">
+            <h3>发送弹幕</h3>
+            <el-radio-group v-model="danmakuMode" size="small">
+              <el-radio-button label="normal">普通</el-radio-button>
+              <el-radio-button label="advanced">高级</el-radio-button>
+            </el-radio-group>
+          </div>
+
+          <template v-if="danmakuMode === 'normal'">
+            <el-input
+              v-model="danmakuText"
+              class="normal-danmaku-input"
+              placeholder="此刻想说什么"
+              @keyup.enter="sendDanmaku"
+            />
+            <div class="danmaku-options">
+              <el-select v-model="danmakuType" size="small">
+                <el-option label="滚动" value="scroll" />
+                <el-option label="顶部" value="top" />
+                <el-option label="底部" value="bottom" />
+              </el-select>
+              <el-select v-model="danmakuFontSize" size="small">
+                <el-option label="小" value="small" />
+                <el-option label="中" value="medium" />
+                <el-option label="大" value="large" />
+              </el-select>
+            </div>
+          </template>
+
+          <template v-else>
+            <el-input
+              v-model="danmakuText"
+              type="textarea"
+              :rows="4"
+              placeholder="@adv x=10 y=20 tx=80 ty=20 dur=4 size=24 color=#FFFFFF | hello"
+            />
+            <div class="advanced-help">
+              <span>x/y/tx/ty 使用 0-100 的播放器百分比，dur 控制持续秒数。</span>
+              <el-button text size="small" @click="fillAdvancedTemplate">填入示例</el-button>
+            </div>
+            <div class="advanced-upload">
+              <input
+                ref="danmakuFileInput"
+                class="file-input"
+                type="file"
+                accept=".danmaku"
+                @change="uploadAdvancedFile"
+              >
+              <el-button :loading="uploadingAdvanced" @click="chooseDanmakuFile">
+                上传 .danmaku 文件
+              </el-button>
+              <span>文件内部使用{}包裹单条语句,使用,隔开</span>
+            </div>
+          </template>
+
           <div class="danmaku-colors">
             <span
               v-for="c in DANMAKU_COLORS"
@@ -123,15 +176,23 @@ const authStore = useAuthStore()
 const videoStore = useVideoStore()
 const commentStore = useCommentStore()
 const playerRef = ref<InstanceType<typeof VideoPlayer>>()
+const danmakuFileInput = ref<HTMLInputElement>()
 const loading = ref(false)
 const currentTime = ref(0)
 const danmakus = ref<Danmaku[]>([])
 const danmakuText = ref('')
-const DANMAKU_COLORS = ['#FFFFFF', '#FF5555', '#55FF55', '#5555FF', '#FFFF55', '#FF55FF', '#55FFFF', '#FF8C00', '#FF69B4', '#00CED1', '#FFD700', '#FF6347']
+const danmakuMode = ref<'normal' | 'advanced'>('normal')
+const danmakuType = ref<'scroll' | 'top' | 'bottom'>('scroll')
+const danmakuFontSize = ref<'small' | 'medium' | 'large'>('medium')
+const DANMAKU_COLORS = [
+  '#FFFFFF', '#000000', '#FF5555', '#55FF55', '#5555FF', '#FFFF55',
+  '#FF55FF', '#55FFFF', '#FF8C00', '#FF69B4', '#00CED1', '#FFD700', '#FF6347',
+]
 const danmakuColor = ref(DANMAKU_COLORS[0])
 const commentText = ref('')
 const replyTarget = ref<Comment | null>(null)
 const downloading = ref(false)
+const uploadingAdvanced = ref(false)
 const video = computed(() => videoStore.currentVideo)
 
 function handleTouchStart(e: TouchEvent) {
@@ -233,16 +294,54 @@ function saveBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+function fillAdvancedTemplate() {
+  danmakuText.value = '@adv x=10 y=20 tx=80 ty=20 dur=4 size=24 color=#FFFFFF | hello'
+}
+
+function chooseDanmakuFile() {
+  if (!ensureLogin()) return
+  danmakuFileInput.value?.click()
+}
+
+async function uploadAdvancedFile(event: Event) {
+  if (!ensureLogin()) return
+  if (!video.value) return
+
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  if (!file.name.toLowerCase().endsWith('.danmaku')) {
+    ElMessage.error('请选择 .danmaku 文件')
+    return
+  }
+
+  uploadingAdvanced.value = true
+  try {
+    const res = await danmakuApi.uploadAdvanced(video.value.id, file)
+    danmakus.value.push(...res.data.list)
+    video.value.danmakuCount += res.data.count
+    ElMessage.success(`已上传 ${res.data.count} 条高级弹幕`)
+  } catch (error: any) {
+    ElMessage.error(error.message || '高级弹幕上传失败')
+  } finally {
+    uploadingAdvanced.value = false
+  }
+}
+
 async function sendDanmaku() {
   if (!ensureLogin()) return
   if (!video.value || !danmakuText.value.trim()) return
+
+  const content = danmakuText.value.trim()
   const res = await danmakuApi.send({
     videoId: video.value.id,
-    content: danmakuText.value.trim(),
+    content,
     time: Math.floor(playerRef.value?.getCurrentTime() || currentTime.value),
     color: danmakuColor.value,
-    fontSize: 'medium',
-    type: 'scroll',
+    fontSize: danmakuFontSize.value,
+    type: danmakuMode.value === 'advanced' ? 'advanced' : danmakuType.value,
   })
   danmakus.value.push(res.data)
   danmakuText.value = ''
@@ -286,8 +385,9 @@ function saveHistory() {
 
 .watch-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: 18px;
+  align-items: start;
 }
 
 .main-col {
@@ -329,8 +429,10 @@ function saveHistory() {
 
 .side-col {
   display: grid;
-  align-content: start;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 16px;
+  min-width: 0;
+  min-height: clamp(360px, calc((min(100vw, 1180px) - 420px) * 0.5625), 620px);
 }
 
 .author-panel,
@@ -350,7 +452,82 @@ function saveHistory() {
 
 .danmaku-box {
   display: grid;
-  gap: 12px;
+  align-content: start;
+  gap: 16px;
+  min-width: 0;
+  min-height: 0;
+  padding-top: 24px;
+}
+
+.danmaku-head,
+.danmaku-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.danmaku-head {
+  flex-wrap: wrap;
+}
+
+.danmaku-head :deep(.el-radio-group) {
+  max-width: 100%;
+}
+
+.danmaku-box :deep(.el-input),
+.danmaku-box :deep(.el-textarea),
+.danmaku-box :deep(.el-select) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.normal-danmaku-input {
+  margin-top: 8px;
+}
+
+.normal-danmaku-input :deep(.el-input__wrapper) {
+  min-height: 44px;
+}
+
+.danmaku-options .el-select {
+  flex: 1;
+}
+
+.advanced-help,
+.advanced-upload {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.advanced-help {
+  padding-top: 2px;
+}
+
+.advanced-upload {
+  padding: 10px;
+  border: 1px dashed #d0d5dd;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.advanced-help span,
+.advanced-upload span {
+  min-width: 0;
+}
+
+.advanced-help :deep(.el-button) {
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.file-input {
+  display: none;
 }
 
 .danmaku-colors {
@@ -358,6 +535,7 @@ function saveHistory() {
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+  padding-top: 4px;
 }
 
 .color-dot {
