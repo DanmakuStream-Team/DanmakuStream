@@ -37,6 +37,7 @@ type adminDanmakuListReq struct {
 	Page     int    `form:"page"`
 	PageSize int    `form:"pageSize"`
 	VideoID  uint   `form:"videoId"`
+	Scene    string `form:"scene"`
 	Keyword  string `form:"keyword"`
 	Blocked  *bool  `form:"blocked"`
 }
@@ -44,6 +45,7 @@ type adminDanmakuListReq struct {
 type adminDanmakuItem struct {
 	ID        uint   `json:"id"`
 	VideoID   uint   `json:"videoId"`
+	Scene     string `json:"scene"`
 	UserID    uint   `json:"userId"`
 	Content   string `json:"content"`
 	Time      int    `json:"time"`
@@ -71,7 +73,7 @@ func ListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 
 		var danmakus []model.Danmaku
 		if err := svcCtx.DB.
-			Where("video_id = ? AND blocked = ?", videoID, false).
+			Where("video_id = ? AND scene = ? AND blocked = ?", videoID, "video", false).
 			Order("time ASC").
 			Find(&danmakus).Error; err != nil {
 			response.Fail(c, http.StatusInternalServerError, "弹幕加载失败")
@@ -123,6 +125,7 @@ func SendHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 
 		danmaku := model.Danmaku{
 			VideoID:  req.VideoID,
+			Scene:    "video",
 			UserID:   userID,
 			Content:  req.Content,
 			Time:     req.Time,
@@ -177,6 +180,14 @@ func AdminListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			db = db.Where("video_id = ?", req.VideoID)
 		}
 
+		if req.Scene != "" {
+			if req.Scene != "video" && req.Scene != "live" {
+				response.Fail(c, http.StatusBadRequest, "无效的弹幕场景")
+				return
+			}
+			db = db.Where("scene = ?", req.Scene)
+		}
+
 		if req.Keyword != "" {
 			db = db.Where("content LIKE ?", "%"+req.Keyword+"%")
 		}
@@ -206,6 +217,7 @@ func AdminListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			list = append(list, adminDanmakuItem{
 				ID:        d.ID,
 				VideoID:   d.VideoID,
+				Scene:     d.Scene,
 				UserID:    d.UserID,
 				Content:   d.Content,
 				Time:      d.Time,
