@@ -16,10 +16,18 @@ export interface InfrastructureMetrics {
     monthDownBytes: number
     source: string
   }
+  cpu: {
+    usagePercent: number
+    warning: boolean
+    critical: boolean
+    source: string
+  }
   online: {
     current: number
     highestConcurrent: number
     liveRoomCount: number
+    liveViewerCount: number
+    videoConnections: number
   }
 }
 

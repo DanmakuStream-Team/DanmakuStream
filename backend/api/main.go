@@ -49,6 +49,7 @@ func main() {
 
 	r := gin.Default()
 	r.MaxMultipartMemory = 8 << 20
+	r.Use(middleware.VideoConnectionMiddleware())
 	r.Use(middleware.TrafficMiddleware(svcCtx))
 
 	r.Use(func(ctx *gin.Context) {
