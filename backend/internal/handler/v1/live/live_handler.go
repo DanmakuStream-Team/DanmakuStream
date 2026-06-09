@@ -152,6 +152,13 @@ func CreateHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		} else if err != nil {
 			response.Fail(c, http.StatusInternalServerError, "直播间加载失败")
 			return
+		} else if room.Status == "live" && room.StreamKey != "" {
+			if err := svcCtx.DB.Preload("Owner").First(&room, room.ID).Error; err != nil {
+				response.Fail(c, http.StatusInternalServerError, "live room load failed")
+				return
+			}
+			response.Ok(c, toLiveRoomInfo(room, true, svcCtx.Config.Live.RTMPHost, svcCtx.Config.Live.HTTPHost))
+			return
 		} else {
 			updates := map[string]any{
 				"title":        title,
