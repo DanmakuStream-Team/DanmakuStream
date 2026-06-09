@@ -10,9 +10,8 @@
 
           <nav class="nav">
             <button
-              v-for="item in navItems"
+              v-for="item in visibleNavItems"
               :key="item.key"
-              v-show="item.key !== 'admin' || authStore.isAdmin"
               type="button"
               :class="{ active: isActive(item.key) }"
               @click="goNav(item)"
@@ -64,6 +63,36 @@
         </div>
 
         <div class="actions">
+          <el-dropdown v-if="authStore.isLoggedIn" trigger="click" @visible-change="handleNotificationVisible">
+            <el-badge :value="unreadCount" :hidden="unreadCount === 0" :max="99">
+              <el-button class="round-action" circle title="通知">
+                <el-icon><Bell /></el-icon>
+              </el-button>
+            </el-badge>
+            <template #dropdown>
+              <div class="notification-panel">
+                <div class="notification-head">
+                  <strong>通知</strong>
+                  <el-button size="small" text :disabled="unreadCount === 0" @click="markAllNotificationsRead">
+                    全部已读
+                  </el-button>
+                </div>
+                <button
+                  v-for="item in notifications"
+                  :key="item.id"
+                  class="notification-item"
+                  :class="{ unread: !item.read }"
+                  type="button"
+                  @click="openNotification(item)"
+                >
+                  <span>{{ item.title }}</span>
+                  <em>{{ item.content }}</em>
+                  <small>{{ item.createdAt }}</small>
+                </button>
+                <div v-if="!notifications.length" class="notification-empty">暂无通知</div>
+              </div>
+            </template>
+          </el-dropdown>
           <el-dropdown trigger="click">
             <el-button class="round-action" circle title="创作">
               <el-icon><Upload /></el-icon>
@@ -84,8 +113,8 @@
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item @click="router.push(`/user/${authStore.userInfo?.id}`)">个人主页</el-dropdown-item>
-                <el-dropdown-item @click="router.push('/creator')">创作者中心</el-dropdown-item>
-                <el-dropdown-item v-if="authStore.isAdmin" @click="router.push('/admin')">管理后台</el-dropdown-item>
+                <el-dropdown-item v-if="!authStore.isStaff" @click="router.push('/creator')">创作者中心</el-dropdown-item>
+                <el-dropdown-item v-if="authStore.isStaff" @click="router.push('/admin')">审核后台</el-dropdown-item>
                 <el-dropdown-item divided @click="logout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -108,7 +137,7 @@
           <span />
         </button>
 
-        <section class="side-section primary-section">
+        <section v-if="!authStore.isStaff" class="side-section primary-section">
           <button class="side-item" :class="{ active: isActive('home') }" type="button" @click="router.push('/')">
             <el-icon><HomeFilled /></el-icon>
             <span>首页</span>
@@ -135,7 +164,7 @@
           </el-button>
         </section>
 
-        <section v-if="authStore.isLoggedIn" class="side-section">
+        <section v-if="authStore.isLoggedIn && !authStore.isStaff" class="side-section">
           <button class="side-title action-title" type="button" @click="router.push(`/user/${authStore.userInfo?.id}`)">
             <span>我</span>
             <el-icon><ArrowRight /></el-icon>
@@ -170,7 +199,7 @@
           </button>
         </section>
 
-        <section v-if="authStore.isLoggedIn" class="side-section">
+        <section v-if="authStore.isLoggedIn && !authStore.isStaff" class="side-section">
           <button class="side-title action-title" :class="{ active: isActive('subscriptions') }" type="button" @click="router.push('/subscriptions')">
             <span>订阅</span>
             <el-icon><ArrowRight /></el-icon>
@@ -211,6 +240,7 @@ import { ElMessage } from 'element-plus'
 import {
   ArrowDown,
   ArrowRight,
+  Bell,
   Clock,
   Download,
   HomeFilled,
@@ -227,6 +257,8 @@ import { useAuthStore } from '@/store/auth'
 import { userApi } from '@/api/user'
 import type { FolloweeInfo } from '@/api/user'
 import ThumbUpIcon from '@/components/icons/ThumbUpIcon.vue'
+import { notificationApi } from '@/api/notification'
+import type { NotificationInfo } from '@/types'
 
 const router = useRouter()
 const route = useRoute()
@@ -236,6 +268,8 @@ const isSearchFocused = ref(false)
 const isSidebarCollapsed = ref(false)
 const searchHistory = ref<string[]>([])
 const subscriptions = ref<FolloweeInfo[]>([])
+const notifications = ref<NotificationInfo[]>([])
+const unreadCount = ref(0)
 const displayCount = ref(5)
 const searchHistoryKey = 'danmaku:search-history'
 const visibleSubscriptions = computed(() => subscriptions.value.slice(0, displayCount.value))
@@ -249,6 +283,18 @@ async function loadFollowing() {
     subscriptions.value = res.data.list
   } catch {
     subscriptions.value = []
+  }
+}
+
+async function loadNotifications() {
+  if (!authStore.isLoggedIn) return
+  try {
+    const res = await notificationApi.list({ page: 1, pageSize: 8 })
+    notifications.value = res.data.list
+    unreadCount.value = res.data.unreadCount
+  } catch {
+    notifications.value = []
+    unreadCount.value = 0
   }
 }
 
@@ -285,13 +331,20 @@ function useSearchHistory(value: string) {
 
 onMounted(() => {
   loadFollowing()
+  loadNotifications()
   loadSearchHistory()
   keyword.value = String(route.query.keyword || '')
 })
 
 watch(() => authStore.isLoggedIn, (loggedIn) => {
-  if (loggedIn) loadFollowing()
-  else subscriptions.value = []
+  if (loggedIn) {
+    loadFollowing()
+    loadNotifications()
+  } else {
+    subscriptions.value = []
+    notifications.value = []
+    unreadCount.value = 0
+  }
 })
 
 watch(() => route.query.keyword, (value) => {
@@ -305,6 +358,11 @@ const navItems = [
   { key: 'creator', label: '投稿', path: '/creator/upload' },
   { key: 'admin', label: '审核', path: '/admin' },
 ]
+
+const visibleNavItems = computed(() => {
+  if (authStore.isStaff) return navItems.filter((item) => item.key === 'admin')
+  return navItems.filter((item) => item.key !== 'admin')
+})
 
 function goNav(item: (typeof navItems)[number]) {
   router.push({ path: item.path, query: item.query || {} })
@@ -367,6 +425,32 @@ function goLiveStart() {
   }
   ElMessage.warning('请先登录后再开播')
   router.push({ path: '/login', query: { redirect: '/live?create=1' } })
+}
+
+function handleNotificationVisible(visible: boolean) {
+  if (visible) loadNotifications()
+}
+
+async function openNotification(item: NotificationInfo) {
+  if (!item.read) {
+    await notificationApi.read(item.id)
+    item.read = true
+    unreadCount.value = Math.max(0, unreadCount.value - 1)
+  }
+  if (item.link) {
+    router.push(normalizeNotificationLink(item.link))
+  }
+}
+
+async function markAllNotificationsRead() {
+  await notificationApi.readAll()
+  notifications.value = notifications.value.map((item) => ({ ...item, read: true }))
+  unreadCount.value = 0
+}
+
+function normalizeNotificationLink(link: string) {
+  if (link === '/live-schedules') return '/live'
+  return link || '/'
 }
 
 function logout() {
@@ -578,6 +662,81 @@ function logout() {
 
 .round-action {
   color: #61666d;
+}
+
+.notification-panel {
+  width: 320px;
+  max-height: 430px;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.notification-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 4px 8px;
+}
+
+.notification-head strong {
+  color: #18191c;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.notification-item {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #18191c;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notification-item:hover {
+  background: #f6f7f8;
+}
+
+.notification-item.unread {
+  background: rgba(0, 174, 236, 0.08);
+}
+
+.notification-item span,
+.notification-item em,
+.notification-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notification-item span {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.notification-item em {
+  color: #61666d;
+  font-size: 13px;
+  font-style: normal;
+}
+
+.notification-item small {
+  color: #9499a0;
+  font-size: 12px;
+}
+
+.notification-empty {
+  display: grid;
+  min-height: 96px;
+  place-items: center;
+  color: #9499a0;
+  font-size: 14px;
+  font-weight: 800;
 }
 
 .login-btn {

@@ -8,15 +8,15 @@
     </div>
 
     <section class="quick-grid">
-      <button class="soft-panel quick-card" type="button" @click="router.push('/admin/infrastructure')">
+      <button v-if="authStore.isAdmin" class="soft-panel quick-card" type="button" @click="router.push('/admin/infrastructure')">
         <strong>服务器监控</strong>
         <span>存储容量、流量消耗、在线和并发预警</span>
       </button>
-      <button class="soft-panel quick-card" type="button" @click="router.push('/admin/users')">
+      <button v-if="authStore.isAdmin" class="soft-panel quick-card" type="button" @click="router.push('/admin/users')">
         <strong>用户与权限</strong>
         <span>用户画像、上传数、弹幕数和角色分配</span>
       </button>
-      <button class="soft-panel quick-card" type="button" @click="router.push('/admin/operations')">
+      <button v-if="authStore.isAdmin" class="soft-panel quick-card" type="button" @click="router.push('/admin/operations')">
         <strong>运营工具</strong>
         <span>首页轮播图和全站系统公告管理</span>
       </button>
@@ -34,8 +34,10 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/store/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 </script>
 
 <style scoped>

@@ -1,12 +1,15 @@
 package admin
 
 import (
+	"bufio"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"danmakustream/backend/internal/handler/response"
+	"danmakustream/backend/internal/metrics"
 	model "danmakustream/backend/internal/model/mysql"
 	"danmakustream/backend/internal/svc"
 
@@ -56,12 +59,13 @@ type saveAnnouncementReq struct {
 func InfrastructureHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		usage := diskUsage(svcCtx.VideoDir)
+		cpu := cpuUsage()
 
-		var currentOnline int64
+		var liveViewerCount int64
 		_ = svcCtx.DB.Model(&model.LiveRoom{}).
 			Where("status = ?", "live").
 			Select("COALESCE(SUM(viewer_count), 0)").
-			Scan(&currentOnline).Error
+			Scan(&liveViewerCount).Error
 
 		var highestConcurrent int64
 		_ = svcCtx.DB.Model(&model.LiveRoom{}).
@@ -100,10 +104,18 @@ func InfrastructureHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 				"monthDownBytes": monthDownBytes,
 				"source":         "go-application-middleware",
 			},
+			"cpu": gin.H{
+				"usagePercent": cpu,
+				"warning":      cpu >= 75,
+				"critical":     cpu >= 90,
+				"source":       "/proc/stat",
+			},
 			"online": gin.H{
-				"current":           currentOnline,
+				"current":           liveViewerCount + metrics.ActiveVideoConnections(),
 				"highestConcurrent": highestConcurrent,
 				"liveRoomCount":     liveRoomCount,
+				"liveViewerCount":   liveViewerCount,
+				"videoConnections":  metrics.ActiveVideoConnections(),
 			},
 		})
 	}
@@ -367,6 +379,74 @@ type diskStat struct {
 	total   uint64
 	free    uint64
 	percent float64
+}
+
+func cpuUsage() float64 {
+	first, err := readCPUStat()
+	if err != nil {
+		return 0
+	}
+	time.Sleep(120 * time.Millisecond)
+	second, err := readCPUStat()
+	if err != nil {
+		return 0
+	}
+
+	totalDelta := second.total - first.total
+	idleDelta := second.idle - first.idle
+	if totalDelta == 0 {
+		return 0
+	}
+	usage := (float64(totalDelta-idleDelta) / float64(totalDelta)) * 100
+	if usage < 0 {
+		return 0
+	}
+	if usage > 100 {
+		return 100
+	}
+	return usage
+}
+
+type cpuStat struct {
+	total uint64
+	idle  uint64
+}
+
+func readCPUStat() (cpuStat, error) {
+	file, err := os.Open("/proc/stat")
+	if err != nil {
+		return cpuStat{}, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	if !scanner.Scan() {
+		return cpuStat{}, scanner.Err()
+	}
+
+	parts := strings.Fields(scanner.Text())
+	if len(parts) < 5 || parts[0] != "cpu" {
+		return cpuStat{}, errText("invalid cpu stat")
+	}
+
+	var values []uint64
+	for _, part := range parts[1:] {
+		value, err := strconv.ParseUint(part, 10, 64)
+		if err != nil {
+			return cpuStat{}, err
+		}
+		values = append(values, value)
+	}
+
+	var total uint64
+	for _, value := range values {
+		total += value
+	}
+	idle := values[3]
+	if len(values) > 4 {
+		idle += values[4]
+	}
+	return cpuStat{total: total, idle: idle}, nil
 }
 
 func getPage(c *gin.Context) (int, int) {

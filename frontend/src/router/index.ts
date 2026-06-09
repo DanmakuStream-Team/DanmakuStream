@@ -16,12 +16,12 @@ const routes: RouteRecordRaw[] = [
       { path: 'me/:kind(history|liked|collections|downloads)', name: 'UserLibrary', component: () => import('@/pages/user/UserLibraryPage.vue'), meta: { requiresAuth: true } },
       { path: 'creator', name: 'CreatorDashboard', component: () => import('@/pages/user/CreatorDashboardPage.vue'), meta: { requiresAuth: true } },
       { path: 'creator/upload', name: 'VideoUpload', component: () => import('@/pages/video/VideoUploadPage.vue'), meta: { requiresAuth: true } },
-      { path: 'admin', name: 'AdminDashboard', component: () => import('@/pages/admin/AdminDashboardPage.vue') },
-      { path: 'admin/infrastructure', name: 'AdminInfrastructure', component: () => import('@/pages/admin/AdminInfrastructurePage.vue') },
-      { path: 'admin/users', name: 'AdminUsers', component: () => import('@/pages/admin/AdminUsersPage.vue') },
-      { path: 'admin/operations', name: 'AdminOperations', component: () => import('@/pages/admin/AdminOperationsPage.vue') },
-      { path: 'admin/videos', name: 'AdminVideos', component: () => import('@/pages/admin/AdminVideosPage.vue') },
-      { path: 'admin/danmaku', name: 'AdminDanmaku', component: () => import('@/pages/admin/AdminDanmakuPage.vue') },
+      { path: 'admin', name: 'AdminDashboard', component: () => import('@/pages/admin/AdminDashboardPage.vue'), meta: { requiresStaff: true } },
+      { path: 'admin/infrastructure', name: 'AdminInfrastructure', component: () => import('@/pages/admin/AdminInfrastructurePage.vue'), meta: { requiresAdmin: true } },
+      { path: 'admin/users', name: 'AdminUsers', component: () => import('@/pages/admin/AdminUsersPage.vue'), meta: { requiresAdmin: true } },
+      { path: 'admin/operations', name: 'AdminOperations', component: () => import('@/pages/admin/AdminOperationsPage.vue'), meta: { requiresAdmin: true } },
+      { path: 'admin/videos', name: 'AdminVideos', component: () => import('@/pages/admin/AdminVideosPage.vue'), meta: { requiresStaff: true } },
+      { path: 'admin/danmaku', name: 'AdminDanmaku', component: () => import('@/pages/admin/AdminDanmakuPage.vue'), meta: { requiresStaff: true } },
     ],
   },
   { path: '/login', name: 'Login', component: () => import('@/pages/home/LoginPage.vue') },
@@ -36,8 +36,16 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  if (!to.matched.some((record) => record.meta.requiresAuth)) return true
   const authStore = useAuthStore()
+  if (to.matched.some((record) => record.meta.requiresAdmin)) {
+    if (authStore.isAdmin) return true
+    return authStore.isLoggedIn ? '/' : { path: '/login', query: { redirect: to.fullPath } }
+  }
+  if (to.matched.some((record) => record.meta.requiresStaff)) {
+    if (authStore.isStaff) return true
+    return authStore.isLoggedIn ? '/' : { path: '/login', query: { redirect: to.fullPath } }
+  }
+  if (!to.matched.some((record) => record.meta.requiresAuth)) return true
   if (authStore.isLoggedIn) return true
   return {
     path: '/login',
