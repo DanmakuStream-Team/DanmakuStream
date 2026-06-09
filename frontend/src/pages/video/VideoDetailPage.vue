@@ -36,28 +36,32 @@
         <section class="soft-panel comments">
           <div class="comment-head">
             <h2>评论 {{ commentStore.countComments() }}</h2>
-          </div>
-          <div class="comment-input">
-            <el-input
-              v-model="commentText"
-              type="textarea"
-              :rows="3"
-              :placeholder="replyTarget ? `回复 ${replyTarget.author?.nickname || '用户'}` : '写下你的看法'"
-            />
-            <el-button type="primary" :loading="commentStore.submitting" @click="submitComment">
-              {{ replyTarget ? '发送回复' : '发表评论' }}
+            <el-button text @click="commentsCollapsed = !commentsCollapsed">
+              {{ commentsCollapsed ? '展开评论' : '收起评论' }}
             </el-button>
-            <el-button v-if="replyTarget" text @click="replyTarget = null">取消回复</el-button>
           </div>
-          <div v-loading="commentStore.loading" class="comment-list">
-            <CommentItem
-              v-for="comment in commentStore.comments"
-              :key="comment.id"
-              :comment="comment"
-              @reply="replyTarget = $event"
-              @like="likeComment"
-            />
-            <el-empty v-if="!commentStore.comments.length" description="暂无评论" />
+          <div v-show="!commentsCollapsed" class="comment-body">
+            <div class="comment-input">
+              <el-input
+                v-model="commentText"
+                type="textarea"
+                :rows="3"
+                placeholder="写下你的看法"
+              />
+              <el-button type="primary" :loading="commentStore.submitting" @click="submitComment">
+                发表评论
+              </el-button>
+            </div>
+            <div v-loading="commentStore.loading" class="comment-list">
+              <CommentItem
+                v-for="comment in commentStore.comments"
+                :key="comment.id"
+                :comment="comment"
+                @reply="submitReply"
+                @like="likeComment"
+              />
+              <el-empty v-if="!commentStore.comments.length" description="暂无评论" />
+            </div>
           </div>
         </section>
       </div>
@@ -130,7 +134,7 @@ const danmakuText = ref('')
 const DANMAKU_COLORS = ['#FFFFFF', '#FF5555', '#55FF55', '#5555FF', '#FFFF55', '#FF55FF', '#55FFFF', '#FF8C00', '#FF69B4', '#00CED1', '#FFD700', '#FF6347']
 const danmakuColor = ref(DANMAKU_COLORS[0])
 const commentText = ref('')
-const replyTarget = ref<Comment | null>(null)
+const commentsCollapsed = ref(false)
 const downloading = ref(false)
 const video = computed(() => videoStore.currentVideo)
 
@@ -220,17 +224,28 @@ async function downloadVideo() {
   } finally {
     downloading.value = false
   }
+  downloading.value = true
+  try {
+    const current = video.value
+    downloadByUrl(mediaUrl(current.videoUrl), `${current.title || 'danmaku-video'}.m3u8`)
+    upsertUserLibraryRecord('downloads', current)
+    ElMessage.success('下载已开始')
+  } catch (error: any) {
+    ElMessage.error(error.message || '下载失败')
+  } finally {
+    downloading.value = false
+  }
 }
 
-function saveBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
+function downloadByUrl(url: string, filename: string) {
   const link = document.createElement('a')
   link.href = url
   link.download = filename
+  link.target = '_blank'
+  link.rel = 'noreferrer'
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
-  URL.revokeObjectURL(url)
 }
 
 async function sendDanmaku() {
@@ -251,9 +266,14 @@ async function sendDanmaku() {
 async function submitComment() {
   if (!ensureLogin()) return
   if (!video.value || !commentText.value.trim()) return
-  await commentStore.createComment(video.value.id, commentText.value.trim(), replyTarget.value?.id)
+  await commentStore.createComment(video.value.id, commentText.value.trim())
   commentText.value = ''
-  replyTarget.value = null
+}
+
+async function submitReply(target: Comment, content: string) {
+  if (!ensureLogin()) return
+  if (!video.value || !content.trim()) return
+  await commentStore.createComment(video.value.id, content.trim(), target.id)
 }
 
 async function likeComment(comment: Comment) {
@@ -383,6 +403,13 @@ function saveHistory() {
   margin: 0;
 }
 
+.comment-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .comments {
   display: grid;
   gap: 14px;
@@ -393,6 +420,11 @@ function saveHistory() {
   color: #18191c;
   font-size: 22px;
   font-weight: 700;
+}
+
+.comment-body {
+  display: grid;
+  gap: 16px;
 }
 
 .comment-input {

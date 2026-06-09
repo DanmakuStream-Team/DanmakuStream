@@ -24,25 +24,44 @@
         <button type="button" @click="$emit('like', comment)">
           {{ comment.liked ? '已赞' : '点赞' }}{{ comment.likeCount ? ` ${comment.likeCount}` : '' }}
         </button>
-        <button type="button" @click="$emit('reply', comment)">回复</button>
+        <button type="button" @click="toggleReplyBox">回复</button>
+      </div>
+      <div v-if="replying" class="inline-reply">
+        <el-input
+          v-model="replyText"
+          type="textarea"
+          :rows="2"
+          :placeholder="`回复 ${comment.author?.nickname || '用户'}`"
+        />
+        <div class="inline-reply-actions">
+          <el-button size="small" @click="cancelReply">取消</el-button>
+          <el-button type="primary" size="small" :loading="submitting" @click="submitReply">发送回复</el-button>
+        </div>
       </div>
       <div v-if="depth === 0 && flattenedReplies.length" class="replies">
         <CommentItem
-          v-for="reply in flattenedReplies"
+          v-for="reply in visibleReplies"
           :key="reply.comment.id"
           :comment="reply.comment"
           :depth="1"
           :reply-to="reply.replyTo"
-          @reply="$emit('reply', $event)"
+          @reply="(target, content) => $emit('reply', target, content)"
           @like="$emit('like', $event)"
         />
+        <button v-if="hasHiddenReplies" class="reply-toggle" type="button" @click="repliesExpanded = true">
+          展开 {{ flattenedReplies.length - defaultReplyCount }} 条回复
+        </button>
+        <button v-else-if="flattenedReplies.length > defaultReplyCount" class="reply-toggle" type="button" @click="repliesExpanded = false">
+          收起回复
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import type { Comment, UserInfo } from '@/types'
 import { formatTime, mediaUrl } from '@/utils/format'
@@ -55,15 +74,52 @@ interface FlatReply {
 const props = withDefaults(defineProps<{ comment: Comment; depth?: number; replyTo?: UserInfo }>(), {
   depth: 0,
 })
-defineEmits<{ reply: [comment: Comment]; like: [comment: Comment] }>()
+const emit = defineEmits<{ reply: [comment: Comment, content: string]; like: [comment: Comment] }>()
 const router = useRouter()
+
+const defaultReplyCount = 2
+const repliesExpanded = ref(false)
+const replying = ref(false)
+const submitting = ref(false)
+const replyText = ref('')
 const flattenedReplies = computed(() => flattenReplies(props.comment.replies || []))
+const visibleReplies = computed(() => {
+  const replies = flattenedReplies.value
+  return repliesExpanded.value ? replies : replies.slice(0, defaultReplyCount)
+})
+const hasHiddenReplies = computed(() => {
+  return !repliesExpanded.value && flattenedReplies.value.length > defaultReplyCount
+})
 
 function flattenReplies(items: Comment[], parentAuthor = props.comment.author): FlatReply[] {
   return items.flatMap((item) => [
     { comment: item, replyTo: parentAuthor },
     ...flattenReplies(item.replies || [], item.author),
   ])
+}
+
+function toggleReplyBox() {
+  replying.value = !replying.value
+}
+
+function cancelReply() {
+  replying.value = false
+  replyText.value = ''
+}
+
+async function submitReply() {
+  const content = replyText.value.trim()
+  if (!content) {
+    ElMessage.warning('请输入回复内容')
+    return
+  }
+  submitting.value = true
+  try {
+    emit('reply', props.comment, content)
+    cancelReply()
+  } finally {
+    submitting.value = false
+  }
 }
 
 function openAuthor() {
@@ -186,8 +242,21 @@ p {
   font-size: 13px;
 }
 
-.ops button:hover {
+.ops button:hover,
+.reply-toggle:hover {
   color: #00aeec;
+}
+
+.inline-reply {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 10px;
+}
+
+.inline-reply-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .replies {
@@ -195,5 +264,15 @@ p {
   gap: 2px;
   margin-top: 8px;
   padding-left: 0;
+}
+
+.reply-toggle {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #9499a0;
+  cursor: pointer;
+  font-size: 13px;
 }
 </style>
