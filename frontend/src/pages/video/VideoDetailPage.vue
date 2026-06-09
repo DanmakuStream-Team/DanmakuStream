@@ -16,7 +16,6 @@
         />
 
         <div class="video-info">
-          <el-tag type="primary" effect="light">{{ video.status }}</el-tag>
           <h1>{{ video.title }}</h1>
           <div class="stats">
             <span>{{ formatCount(video.viewCount) }} 播放</span>
@@ -26,7 +25,7 @@
           <div class="actions">
             <el-button @click="toggleLike">点赞 {{ formatCount(video.likeCount) }}</el-button>
             <el-button @click="toggleCollect">收藏 {{ formatCount(video.collectCount) }}</el-button>
-            <el-button @click="downloadVideo">下载</el-button>
+            <el-button :loading="downloading" @click="downloadVideo">下载</el-button>
           </div>
           <div class="tags">
             <el-tag v-for="tag in normalizeTags(video.tags)" :key="tag">{{ tag }}</el-tag>
@@ -74,7 +73,6 @@
           </el-avatar>
           <div>
             <strong>{{ video.author?.nickname || '匿名用户' }}</strong>
-            <span>{{ video.author?.role }}</span>
           </div>
           <el-button type="primary" @click="router.push(`/user/${video.author.id}`)">查看主页</el-button>
         </div>
@@ -137,6 +135,7 @@ const DANMAKU_COLORS = ['#FFFFFF', '#FF5555', '#55FF55', '#5555FF', '#FFFF55', '
 const danmakuColor = ref(DANMAKU_COLORS[0])
 const commentText = ref('')
 const commentsCollapsed = ref(false)
+const downloading = ref(false)
 const video = computed(() => videoStore.currentVideo)
 
 function handleTouchStart(e: TouchEvent) {
@@ -210,19 +209,34 @@ async function toggleCollect() {
   }
 }
 
-function downloadVideo() {
+async function downloadVideo() {
   if (!ensureLogin()) return
   if (!video.value?.videoUrl) {
     ElMessage.warning('当前视频没有可下载地址')
     return
   }
-  upsertUserLibraryRecord('downloads', video.value)
+  downloading.value = true
+  try {
+    const current = video.value
+    downloadByUrl(mediaUrl(current.videoUrl), `${current.title || 'danmaku-video'}.m3u8`)
+    upsertUserLibraryRecord('downloads', current)
+    ElMessage.success('下载已开始')
+  } catch (error: any) {
+    ElMessage.error(error.message || '下载失败')
+  } finally {
+    downloading.value = false
+  }
+}
+
+function downloadByUrl(url: string, filename: string) {
   const link = document.createElement('a')
-  link.href = mediaUrl(video.value.videoUrl)
-  link.download = `${video.value.title || 'danmaku-video'}.mp4`
+  link.href = url
+  link.download = filename
   link.target = '_blank'
   link.rel = 'noreferrer'
+  document.body.appendChild(link)
   link.click()
+  document.body.removeChild(link)
 }
 
 async function sendDanmaku() {

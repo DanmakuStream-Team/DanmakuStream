@@ -27,7 +27,17 @@
             <span>{{ formatCount(video.viewCount) }} 播放 · {{ formatCount(video.danmakuCount) }} 弹幕</span>
           </div>
           <el-tag :type="statusType(video.status)">{{ statusText(video.status) }}</el-tag>
-          <el-button @click="router.push(`/video/${video.id}`)">查看</el-button>
+          <div class="row-actions">
+            <el-button @click="router.push(`/video/${video.id}`)">查看</el-button>
+            <el-button
+              type="danger"
+              plain
+              :loading="deletingId === video.id"
+              @click="deleteVideo(video)"
+            >
+              删除
+            </el-button>
+          </div>
         </div>
       </div>
       <el-empty v-else description="暂无视频" />
@@ -38,6 +48,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { videoApi } from '@/api/video'
 import { useAuthStore } from '@/store/auth'
 import type { VideoInfo, VideoStatus } from '@/types'
@@ -46,6 +57,7 @@ import { formatCount, mediaUrl } from '@/utils/format'
 const router = useRouter()
 const authStore = useAuthStore()
 const loading = ref(false)
+const deletingId = ref<number>()
 const videos = ref<VideoInfo[]>([])
 const status = ref('')
 const statusOptions = [
@@ -74,6 +86,30 @@ function statusText(value: VideoStatus) {
 
 function statusType(value: VideoStatus) {
   return ({ pending: 'warning', approved: 'success', rejected: 'danger' } as const)[value]
+}
+
+async function deleteVideo(video: VideoInfo) {
+  try {
+    await ElMessageBox.confirm(`确定删除《${video.title}》吗？删除后不可恢复。`, '删除视频', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      confirmButtonClass: 'el-button--danger',
+    })
+  } catch {
+    return
+  }
+
+  deletingId.value = video.id
+  try {
+    await videoApi.remove(video.id)
+    ElMessage.success('视频已删除')
+    await load()
+  } catch (error: any) {
+    ElMessage.error(error.message || '删除失败')
+  } finally {
+    deletingId.value = undefined
+  }
 }
 </script>
 
@@ -137,9 +173,20 @@ function statusType(value: VideoStatus) {
   font-size: 13px;
 }
 
+.row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 @media (max-width: 720px) {
   .video-row {
     grid-template-columns: 90px 1fr;
+  }
+
+  .row-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
   }
 }
 </style>

@@ -19,7 +19,6 @@
         @change="uploadAvatar"
       />
       <div>
-        <el-tag>{{ user.role }}</el-tag>
         <h1>{{ user.nickname }}</h1>
         <div v-if="isEditingBio" class="bio-editor">
           <el-input
