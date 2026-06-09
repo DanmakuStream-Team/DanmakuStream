@@ -39,6 +39,7 @@ type Video struct {
 type Danmaku struct {
 	gorm.Model
 	VideoID  uint   `gorm:"not null;index"`
+	Scene    string `gorm:"size:20;default:video;index"` // video | live
 	UserID   uint   `gorm:"not null;index"`
 	Content  string `gorm:"size:200;not null"`
 	Time     int    `gorm:"not null"` // seconds offset in video

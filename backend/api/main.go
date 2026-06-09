@@ -46,6 +46,7 @@ func main() {
 	}
 
 	svcCtx := svc.NewServiceContext(c)
+	livehandler.StartScheduleWorker(svcCtx)
 
 	r := gin.Default()
 	r.MaxMultipartMemory = 8 << 20

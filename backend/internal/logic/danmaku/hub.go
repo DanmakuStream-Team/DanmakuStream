@@ -161,6 +161,7 @@ func (c *Client) ReadPump() {
 		}
 		danmaku := model.Danmaku{
 			VideoID:  c.RoomID,
+			Scene:    "live",
 			UserID:   c.UserID,
 			Content:  incoming.Content,
 			Color:    incoming.Color,
