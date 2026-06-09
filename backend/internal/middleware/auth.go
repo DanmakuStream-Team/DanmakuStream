@@ -63,3 +63,15 @@ func AdminMiddleware(c *gin.Context) {
 	}
 	c.Next()
 }
+
+func StaffMiddleware(c *gin.Context) {
+	role, _ := c.Get(CtxKeyRole)
+	if role != "admin" && role != "moderator" {
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+			"code":    403,
+			"message": "权限不足",
+		})
+		return
+	}
+	c.Next()
+}

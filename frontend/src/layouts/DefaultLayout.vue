@@ -10,9 +10,8 @@
 
           <nav class="nav">
             <button
-              v-for="item in navItems"
+              v-for="item in visibleNavItems"
               :key="item.key"
-              v-show="item.key !== 'admin' || authStore.isAdmin"
               type="button"
               :class="{ active: isActive(item.key) }"
               @click="goNav(item)"
@@ -84,8 +83,8 @@
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item @click="router.push(`/user/${authStore.userInfo?.id}`)">个人主页</el-dropdown-item>
-                <el-dropdown-item @click="router.push('/creator')">创作者中心</el-dropdown-item>
-                <el-dropdown-item v-if="authStore.isAdmin" @click="router.push('/admin')">管理后台</el-dropdown-item>
+                <el-dropdown-item v-if="!authStore.isStaff" @click="router.push('/creator')">创作者中心</el-dropdown-item>
+                <el-dropdown-item v-if="authStore.isStaff" @click="router.push('/admin')">审核后台</el-dropdown-item>
                 <el-dropdown-item divided @click="logout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -108,7 +107,7 @@
           <span />
         </button>
 
-        <section class="side-section primary-section">
+        <section v-if="!authStore.isStaff" class="side-section primary-section">
           <button class="side-item" :class="{ active: isActive('home') }" type="button" @click="router.push('/')">
             <el-icon><HomeFilled /></el-icon>
             <span>首页</span>
@@ -135,7 +134,7 @@
           </el-button>
         </section>
 
-        <section v-if="authStore.isLoggedIn" class="side-section">
+        <section v-if="authStore.isLoggedIn && !authStore.isStaff" class="side-section">
           <button class="side-title action-title" type="button" @click="router.push(`/user/${authStore.userInfo?.id}`)">
             <span>我</span>
             <el-icon><ArrowRight /></el-icon>
@@ -170,7 +169,7 @@
           </button>
         </section>
 
-        <section v-if="authStore.isLoggedIn" class="side-section">
+        <section v-if="authStore.isLoggedIn && !authStore.isStaff" class="side-section">
           <button class="side-title action-title" :class="{ active: isActive('subscriptions') }" type="button" @click="router.push('/subscriptions')">
             <span>订阅</span>
             <el-icon><ArrowRight /></el-icon>
@@ -305,6 +304,11 @@ const navItems = [
   { key: 'creator', label: '投稿', path: '/creator/upload' },
   { key: 'admin', label: '审核', path: '/admin' },
 ]
+
+const visibleNavItems = computed(() => {
+  if (authStore.isStaff) return navItems.filter((item) => item.key === 'admin')
+  return navItems.filter((item) => item.key !== 'admin')
+})
 
 function goNav(item: (typeof navItems)[number]) {
   router.push({ path: item.path, query: item.query || {} })
