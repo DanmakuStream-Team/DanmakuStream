@@ -224,28 +224,17 @@ async function downloadVideo() {
   } finally {
     downloading.value = false
   }
-  downloading.value = true
-  try {
-    const current = video.value
-    downloadByUrl(mediaUrl(current.videoUrl), `${current.title || 'danmaku-video'}.m3u8`)
-    upsertUserLibraryRecord('downloads', current)
-    ElMessage.success('下载已开始')
-  } catch (error: any) {
-    ElMessage.error(error.message || '下载失败')
-  } finally {
-    downloading.value = false
-  }
 }
 
-function downloadByUrl(url: string, filename: string) {
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
   link.download = filename
-  link.target = '_blank'
-  link.rel = 'noreferrer'
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }
 
 async function sendDanmaku() {
