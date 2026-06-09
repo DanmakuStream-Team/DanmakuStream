@@ -2,6 +2,7 @@ package live
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -34,6 +35,19 @@ type liveScheduleInfo struct {
 	OwnerID       uint            `json:"ownerId"`
 	Owner         *model.UserInfo `json:"owner,omitempty"`
 	CreatedAt     string          `json:"createdAt"`
+}
+
+func StartScheduleWorker(svcCtx *svc.ServiceContext) {
+	go func() {
+		processDueLiveSchedules(svcCtx)
+
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			processDueLiveSchedules(svcCtx)
+		}
+	}()
 }
 
 func ScheduleListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
@@ -257,6 +271,108 @@ func ReserveScheduleHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			"reminderCount": reminderCount,
 		})
 	}
+}
+
+func processDueLiveSchedules(svcCtx *svc.ServiceContext) {
+	var schedules []model.LiveSchedule
+	if err := svcCtx.DB.
+		Where("status = ? AND scheduled_at <= ?", "pending", time.Now()).
+		Order("scheduled_at ASC").
+		Limit(20).
+		Find(&schedules).Error; err != nil {
+		fmt.Println("live schedule worker load failed:", err)
+		return
+	}
+
+	for _, schedule := range schedules {
+		if err := startScheduledLive(svcCtx, schedule); err != nil {
+			fmt.Println("live schedule worker start failed:", err)
+		}
+	}
+}
+
+func startScheduledLive(svcCtx *svc.ServiceContext, schedule model.LiveSchedule) error {
+	return svcCtx.DB.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&model.LiveSchedule{}).
+			Where("id = ? AND status = ?", schedule.ID, "pending").
+			Update("status", "live")
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return nil
+		}
+
+		now := time.Now()
+		streamKey, err := generateStreamKey()
+		if err != nil {
+			return err
+		}
+
+		var room model.LiveRoom
+		err = tx.Where("owner_id = ?", schedule.OwnerID).First(&room).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			room = model.LiveRoom{
+				Title:       schedule.Title,
+				CoverURL:    schedule.CoverURL,
+				StreamKey:   streamKey,
+				Status:      "live",
+				ViewerCount: 0,
+				OwnerID:     schedule.OwnerID,
+				StartedAt:   &now,
+				EndedAt:     nil,
+			}
+			if err := tx.Create(&room).Error; err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		} else {
+			if err := tx.Model(&room).Updates(map[string]any{
+				"title":        schedule.Title,
+				"cover_url":    schedule.CoverURL,
+				"stream_key":   streamKey,
+				"status":       "live",
+				"viewer_count": 0,
+				"started_at":   &now,
+				"ended_at":     nil,
+			}).Error; err != nil {
+				return err
+			}
+		}
+
+		return notifyScheduleReservationUsers(tx, schedule.ID, schedule.OwnerID, schedule.Title, "/live")
+	})
+}
+
+func notifyScheduleReservationUsers(tx *gorm.DB, scheduleID, ownerID uint, title, link string) error {
+	var reservations []model.LiveReservation
+	if err := tx.Where("schedule_id = ?", scheduleID).Find(&reservations).Error; err != nil {
+		return err
+	}
+	if len(reservations) == 0 {
+		return nil
+	}
+
+	actor := ownerID
+	notifications := make([]model.Notification, 0, len(reservations))
+	for _, reservation := range reservations {
+		if reservation.UserID == ownerID {
+			continue
+		}
+		notifications = append(notifications, model.Notification{
+			UserID:  reservation.UserID,
+			ActorID: &actor,
+			Type:    "live_start",
+			Title:   "你预约的直播已开播",
+			Content: title,
+			Link:    link,
+		})
+	}
+	if len(notifications) == 0 {
+		return nil
+	}
+	return tx.Create(&notifications).Error
 }
 
 func notifyScheduleReservations(tx *gorm.DB, ownerID uint, title string) error {

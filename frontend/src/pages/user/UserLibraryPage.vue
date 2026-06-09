@@ -21,7 +21,9 @@
             <p>{{ record.video.description || '这个视频暂无简介。' }}</p>
           </div>
           <div class="meta-row">
-            <span><el-icon><User /></el-icon>{{ record.video.author?.nickname || '匿名用户' }}</span>
+            <button class="meta-user" type="button" :disabled="!record.video.author?.id" @click="router.push(`/user/${record.video.author?.id}`)">
+              <el-icon><User /></el-icon>{{ record.video.author?.nickname || '匿名用户' }}
+            </button>
             <span><el-icon><VideoPlay /></el-icon>{{ formatCount(record.video.viewCount) }}</span>
             <span><el-icon><Star /></el-icon>{{ formatCount(record.video.likeCount) }}</span>
             <span>{{ formatTime(record.savedAt) }}</span>
@@ -32,7 +34,14 @@
         </div>
         <div class="item-actions">
           <el-button type="primary" @click="router.push(`/video/${record.video.id}`)">播放</el-button>
-          <el-button v-if="kind !== 'downloads'" :icon="Download" @click="downloadVideo(record.video)">下载</el-button>
+          <el-button
+            v-if="kind !== 'downloads'"
+            :icon="Download"
+            :loading="downloadingId === record.video.id"
+            @click="downloadVideo(record.video)"
+          >
+            下载
+          </el-button>
           <el-button :icon="Close" text @click="removeRecord(record.video.id)" />
         </div>
       </article>
@@ -49,6 +58,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Close, Delete, Download, Star, User, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { videoApi } from '@/api/video'
 import type { VideoInfo } from '@/types'
 import { formatCount, formatTime, mediaUrl } from '@/utils/format'
 import {
@@ -63,6 +73,7 @@ import {
 const route = useRoute()
 const router = useRouter()
 const records = ref<UserLibraryRecord[]>([])
+const downloadingId = ref<number>()
 
 const kind = computed<UserLibraryKind>(() => {
   const value = route.params.kind
@@ -120,19 +131,30 @@ async function clearRecords() {
   loadRecords()
 }
 
-function downloadVideo(video: VideoInfo) {
-  if (!video.videoUrl) {
-    ElMessage.warning('当前视频没有可下载地址')
-    return
+async function downloadVideo(video: VideoInfo) {
+  downloadingId.value = video.id
+  try {
+    const res = await videoApi.download(video.id)
+    saveBlob(res.data, `${video.title || 'danmaku-video'}.mp4`)
+    upsertUserLibraryRecord('downloads', video)
+    loadRecords()
+    ElMessage.success('下载已开始')
+  } catch (error: any) {
+    ElMessage.error(error.message || '下载失败')
+  } finally {
+    downloadingId.value = undefined
   }
-  upsertUserLibraryRecord('downloads', video)
-  loadRecords()
+}
+
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
-  link.href = mediaUrl(video.videoUrl)
-  link.download = `${video.title || 'danmaku-video'}.mp4`
-  link.target = '_blank'
-  link.rel = 'noreferrer'
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
   link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }
 </script>
 
@@ -245,6 +267,27 @@ function downloadVideo(video: VideoInfo) {
   align-items: center;
   flex-shrink: 0;
   gap: 4px;
+}
+
+.meta-user {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.meta-user:not(:disabled):hover {
+  color: #00aeec;
+}
+
+.meta-user:disabled {
+  cursor: default;
 }
 
 .progress-line {

@@ -211,9 +211,18 @@ async function toggleCollect() {
 
 async function downloadVideo() {
   if (!ensureLogin()) return
-  if (!video.value?.videoUrl) {
-    ElMessage.warning('当前视频没有可下载地址')
-    return
+  if (!video.value) return
+  downloading.value = true
+  try {
+    const current = video.value
+    const res = await videoApi.download(current.id)
+    saveBlob(res.data, `${current.title || 'danmaku-video'}.mp4`)
+    upsertUserLibraryRecord('downloads', current)
+    ElMessage.success('下载已开始')
+  } catch (error: any) {
+    ElMessage.error(error.message || '下载失败')
+  } finally {
+    downloading.value = false
   }
   downloading.value = true
   try {
@@ -355,14 +364,8 @@ function saveHistory() {
   gap: 12px;
 }
 
-.author-panel strong,
-.author-panel span {
+.author-panel strong {
   display: block;
-}
-
-.author-panel span {
-  color: #667085;
-  margin-top: 4px;
 }
 
 .danmaku-box {
@@ -409,7 +412,14 @@ function saveHistory() {
 
 .comments {
   display: grid;
-  gap: 16px;
+  gap: 14px;
+  padding: 22px 26px;
+}
+
+.comment-head h2 {
+  color: #18191c;
+  font-size: 22px;
+  font-weight: 700;
 }
 
 .comment-body {
@@ -426,7 +436,7 @@ function saveHistory() {
 
 .comment-list {
   display: grid;
-  gap: 18px;
+  gap: 0;
 }
 
 @media (max-width: 920px) {

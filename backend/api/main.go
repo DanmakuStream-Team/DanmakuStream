@@ -46,6 +46,7 @@ func main() {
 	}
 
 	svcCtx := svc.NewServiceContext(c)
+	livehandler.StartScheduleWorker(svcCtx)
 
 	r := gin.Default()
 	r.MaxMultipartMemory = 8 << 20
@@ -109,6 +110,7 @@ func main() {
 		auth.POST("/videos/upload", videohandler.UploadHandler(svcCtx))
 		auth.PUT("/videos/:id", videohandler.UpdateHandler(svcCtx))
 		auth.POST("/videos/:id/cover", videohandler.UpdateCoverHandler(svcCtx))
+		auth.GET("/videos/:id/download", videohandler.DownloadHandler(svcCtx))
 		auth.DELETE("/videos/:id", videohandler.DeleteHandler(svcCtx))
 		auth.POST("/videos/:id/like", videohandler.LikeHandler(svcCtx))
 		auth.POST("/videos/:id/collect", videohandler.CollectHandler(svcCtx))
