@@ -44,6 +44,22 @@
         <p>由 Go 后端 middleware 统计 Docker Compose 部署下的视频、媒体和 API 响应流量。</p>
       </div>
 
+      <div class="soft-panel metric-card" :class="{ warning: metrics?.cpu.warning, critical: metrics?.cpu.critical }">
+        <div class="metric-title">
+          <strong>CPU 使用率</strong>
+          <el-tag :type="cpuTagType">{{ cpuStatus }}</el-tag>
+        </div>
+        <el-progress
+          type="dashboard"
+          :percentage="Math.round(metrics?.cpu.usagePercent || 0)"
+          :color="cpuColor"
+        />
+        <div class="metric-meta">
+          <span>当前 {{ formatPercent(metrics?.cpu.usagePercent) }}</span>
+          <span>来源 {{ metrics?.cpu.source || '-' }}</span>
+        </div>
+      </div>
+
       <div class="soft-panel metric-card">
         <div class="metric-title">
           <strong>在线与并发</strong>
@@ -51,8 +67,8 @@
         </div>
         <div class="online-count">{{ metrics?.online.current || 0 }}</div>
         <div class="metric-meta">
-          <span>当前在线</span>
-          <span>最高并发 {{ metrics?.online.highestConcurrent || 0 }}</span>
+          <span>当前在线 = 直播 {{ metrics?.online.liveViewerCount || 0 }} + 看视频连接 {{ metrics?.online.videoConnections || 0 }}</span>
+          <span>直播最高并发 {{ metrics?.online.highestConcurrent || 0 }}</span>
         </div>
       </div>
     </section>
@@ -76,9 +92,24 @@ const storageTagType = computed(() => {
   if (metrics.value?.storage.warning) return 'warning'
   return 'success'
 })
+const cpuColor = computed(() => {
+  if (metrics.value?.cpu.critical) return '#f56c6c'
+  if (metrics.value?.cpu.warning) return '#e6a23c'
+  return '#fb7299'
+})
+const cpuTagType = computed(() => {
+  if (metrics.value?.cpu.critical) return 'danger'
+  if (metrics.value?.cpu.warning) return 'warning'
+  return 'success'
+})
 const storageStatus = computed(() => {
   if (metrics.value?.storage.critical) return '容量危险'
   if (metrics.value?.storage.warning) return '容量预警'
+  return '正常'
+})
+const cpuStatus = computed(() => {
+  if (metrics.value?.cpu.critical) return '负载危险'
+  if (metrics.value?.cpu.warning) return '负载预警'
   return '正常'
 })
 
@@ -107,6 +138,10 @@ function formatBytes(value = 0) {
   }
   return `${size.toFixed(size >= 10 ? 1 : 2)} ${units[index]}`
 }
+
+function formatPercent(value = 0) {
+  return `${value.toFixed(value >= 10 ? 1 : 2)}%`
+}
 </script>
 
 <style scoped>
@@ -121,7 +156,7 @@ function formatBytes(value = 0) {
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 18px;
 }
 
@@ -197,6 +232,12 @@ function formatBytes(value = 0) {
 @media (max-width: 980px) {
   .metrics-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 981px) and (max-width: 1280px) {
+  .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

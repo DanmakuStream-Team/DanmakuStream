@@ -50,6 +50,7 @@ func main() {
 
 	r := gin.Default()
 	r.MaxMultipartMemory = 8 << 20
+	r.Use(middleware.VideoConnectionMiddleware())
 	r.Use(middleware.TrafficMiddleware(svcCtx))
 
 	r.Use(func(ctx *gin.Context) {
@@ -137,13 +138,18 @@ func main() {
 		auth.PUT("/notifications/:id/read", notificationhandler.ReadHandler(svcCtx))
 	}
 
+	staff := v1.Group("")
+	staff.Use(authMW, middleware.StaffMiddleware)
+	{
+		staff.GET("/admin/videos", videohandler.AdminListHandler(svcCtx))
+		staff.PUT("/admin/videos/:id/status", videohandler.AdminUpdateStatusHandler(svcCtx))
+		staff.GET("/admin/danmaku", danmakuhandler.AdminListHandler(svcCtx))
+		staff.PUT("/admin/danmaku/:id/block", danmakuhandler.BlockHandler(svcCtx))
+	}
+
 	admin := v1.Group("")
 	admin.Use(authMW, middleware.AdminMiddleware)
 	{
-		admin.GET("/admin/videos", videohandler.AdminListHandler(svcCtx))
-		admin.PUT("/admin/videos/:id/status", videohandler.AdminUpdateStatusHandler(svcCtx))
-		admin.GET("/admin/danmaku", danmakuhandler.AdminListHandler(svcCtx))
-		admin.PUT("/admin/danmaku/:id/block", danmakuhandler.BlockHandler(svcCtx))
 		admin.GET("/admin/infrastructure", adminhandler.InfrastructureHandler(svcCtx))
 		admin.GET("/admin/users", adminhandler.UserListHandler(svcCtx))
 		admin.PUT("/admin/users/:id/role", adminhandler.UpdateUserRoleHandler(svcCtx))

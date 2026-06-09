@@ -19,7 +19,30 @@
         @change="uploadAvatar"
       />
       <div>
-        <h1>{{ user.nickname }}</h1>
+        <el-tag>{{ user.role }}</el-tag>
+        <div v-if="isEditingNickname" class="nickname-editor">
+          <el-input
+            v-model="nicknameDraft"
+            maxlength="30"
+            show-word-limit
+            placeholder="输入新的昵称"
+            @keyup.enter="saveNickname"
+            @keyup.esc="cancelNicknameEdit"
+          />
+          <div class="nickname-actions">
+            <el-button size="small" @click="cancelNicknameEdit">取消</el-button>
+            <el-button size="small" type="primary" :loading="savingNickname" @click="saveNickname">保存</el-button>
+          </div>
+        </div>
+        <h1
+          v-else
+          class="nickname-display"
+          :class="{ editable: isSelf }"
+          :title="isSelf ? '右键修改昵称' : undefined"
+          @contextmenu.prevent="startNicknameEdit"
+        >
+          {{ user.nickname }}
+        </h1>
         <div v-if="isEditingBio" class="bio-editor">
           <el-input
             v-model="bioDraft"
@@ -106,9 +129,12 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const loading = ref(false)
+const savingNickname = ref(false)
 const savingBio = ref(false)
 const uploadingAvatar = ref(false)
+const isEditingNickname = ref(false)
 const isEditingBio = ref(false)
+const nicknameDraft = ref('')
 const bioDraft = ref('')
 const avatarInputRef = ref<HTMLInputElement>()
 const avatarVersion = ref(Date.now())
@@ -296,6 +322,43 @@ function resetCrop() {
   cropOffsetY.value = 0
 }
 
+function startNicknameEdit() {
+  if (!isSelf.value || !user.value) return
+  nicknameDraft.value = user.value.nickname || ''
+  isEditingNickname.value = true
+}
+
+function cancelNicknameEdit() {
+  isEditingNickname.value = false
+  nicknameDraft.value = ''
+}
+
+async function saveNickname() {
+  if (!user.value) return
+  const nextNickname = nicknameDraft.value.trim()
+  if (!nextNickname) {
+    ElMessage.warning('昵称不能为空')
+    return
+  }
+  if (nextNickname === user.value.nickname) {
+    cancelNicknameEdit()
+    return
+  }
+
+  savingNickname.value = true
+  try {
+    await authApi.updateMe({ nickname: nextNickname })
+    user.value.nickname = nextNickname
+    syncAuthUser({ nickname: nextNickname })
+    isEditingNickname.value = false
+    ElMessage.success('昵称已更新')
+  } catch {
+    ElMessage.error('昵称保存失败')
+  } finally {
+    savingNickname.value = false
+  }
+}
+
 function startBioEdit() {
   if (!isSelf.value || !user.value) return
   bioDraft.value = user.value.bio || ''
@@ -451,6 +514,35 @@ function syncAuthUser(patch: Partial<UserInfo>) {
 h1 {
   margin: 10px 0 8px;
   color: #142033;
+}
+
+.nickname-display {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nickname-display.editable {
+  cursor: context-menu;
+}
+
+.nickname-display.editable:hover {
+  color: #fb7299;
+}
+
+.nickname-editor {
+  display: grid;
+  max-width: 360px;
+  gap: 8px;
+  margin: 10px 0 8px;
+}
+
+.nickname-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .bio-display {

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -98,26 +99,13 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			return
 		}
 
-		video := model.Video{
-			Title:       title,
-			Description: description,
-			Tags:        tags,
-			AuthorID:    userID,
-			Status:      "pending",
-		}
-		if err := svcCtx.DB.Create(&video).Error; err != nil {
-			response.Fail(c, http.StatusInternalServerError, "创建视频记录失败")
+		tmpDir := filepath.Join(svcCtx.VideoDir, "tmp", strconv.FormatUint(uint64(userID), 10))
+		if err := os.MkdirAll(tmpDir, 0755); err != nil {
+			response.Fail(c, http.StatusInternalServerError, "创建临时目录失败")
 			return
 		}
 
-		// Save uploaded video to temp path
-		videoDir := filepath.Join(svcCtx.VideoDir, "videos", strconv.FormatUint(uint64(video.ID), 10))
-		if err := os.MkdirAll(videoDir, 0755); err != nil {
-			response.Fail(c, http.StatusInternalServerError, "创建视频目录失败")
-			return
-		}
-
-		tmpPath := filepath.Join(videoDir, "upload"+filepath.Ext(videoFile.Filename))
+		tmpPath := filepath.Join(tmpDir, fmt.Sprintf("upload_%d%s", time.Now().UnixNano(), filepath.Ext(videoFile.Filename)))
 		src, err := videoFile.Open()
 		if err != nil {
 			response.Fail(c, http.StatusInternalServerError, "读取上传文件失败")
@@ -133,20 +121,54 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		defer dst.Close()
 
 		if _, err := io.Copy(dst, src); err != nil {
+			os.Remove(tmpPath)
 			response.Fail(c, http.StatusInternalServerError, "保存上传文件失败")
 			return
 		}
 		src.Close()
 		dst.Close()
 
+		video := model.Video{
+			Title:       title,
+			Description: description,
+			Tags:        tags,
+			AuthorID:    userID,
+			Status:      "pending",
+		}
+		if err := svcCtx.DB.Create(&video).Error; err != nil {
+			os.Remove(tmpPath)
+			response.Fail(c, http.StatusInternalServerError, "创建视频记录失败")
+			return
+		}
+
+		videoDir := filepath.Join(svcCtx.VideoDir, "videos", strconv.FormatUint(uint64(video.ID), 10))
+		if err := os.MkdirAll(videoDir, 0755); err != nil {
+			cleanupUploadRecord(svcCtx, video.ID, tmpPath, "")
+			response.Fail(c, http.StatusInternalServerError, "创建视频目录失败")
+			return
+		}
+
+		finalUploadPath := filepath.Join(videoDir, "upload"+filepath.Ext(videoFile.Filename))
+		if err := os.Rename(tmpPath, finalUploadPath); err != nil {
+			cleanupUploadRecord(svcCtx, video.ID, tmpPath, videoDir)
+			response.Fail(c, http.StatusInternalServerError, "保存上传文件失败")
+			return
+		}
+
 		// Save cover image if provided
 		coverURL := ""
 		if coverFile, err := c.FormFile("cover"); err == nil {
 			coverDir := filepath.Join(svcCtx.VideoDir, "covers", strconv.FormatUint(uint64(video.ID), 10))
 			if err := os.MkdirAll(coverDir, 0755); err != nil {
+				cleanupUploadRecord(svcCtx, video.ID, "", videoDir)
 				response.Fail(c, http.StatusInternalServerError, "创建封面目录失败")
 				return
 			}
+			defer func() {
+				if coverURL == "" {
+					_ = os.RemoveAll(coverDir)
+				}
+			}()
 			coverPath := filepath.Join(coverDir, coverFile.Filename)
 			src, _ := coverFile.Open()
 			if src != nil {
@@ -165,7 +187,7 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			svcCtx.DB.Model(&video).Update("cover_url", coverURL)
 		}
 
-		go transcodeVideoAsync(svcCtx, video.ID, videoDir, tmpPath, coverURL)
+		go transcodeVideoAsync(svcCtx, video.ID, videoDir, finalUploadPath, coverURL)
 
 		response.Ok(c, video)
 	}
@@ -270,6 +292,16 @@ func safeDownloadName(title string) string {
 		"|", "_",
 	)
 	return replacer.Replace(name)
+}
+
+func cleanupUploadRecord(svcCtx *svc.ServiceContext, videoID uint, tmpPath, videoDir string) {
+	_ = svcCtx.DB.Delete(&model.Video{}, videoID).Error
+	if tmpPath != "" {
+		_ = os.Remove(tmpPath)
+	}
+	if videoDir != "" {
+		_ = os.RemoveAll(videoDir)
+	}
 }
 
 func transcodeVideoAsync(svcCtx *svc.ServiceContext, videoID uint, videoDir, tmpPath, coverURL string) {
@@ -558,6 +590,10 @@ func AdminUpdateStatusHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 				return
 			}
 			if video.VideoURL == "" {
+				if !hasUploadedVideoSource(svcCtx, uint(videoID)) {
+					response.Fail(c, http.StatusForbidden, "视频文件未上传成功，不能审核通过")
+					return
+				}
 				response.Fail(c, http.StatusForbidden, "视频仍在转码，暂时不能审核通过")
 				return
 			}
@@ -581,6 +617,12 @@ func AdminUpdateStatusHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			"status": req.Status,
 		})
 	}
+}
+
+func hasUploadedVideoSource(svcCtx *svc.ServiceContext, videoID uint) bool {
+	videoDir := filepath.Join(svcCtx.VideoDir, "videos", strconv.FormatUint(uint64(videoID), 10))
+	matches, err := filepath.Glob(filepath.Join(videoDir, "upload.*"))
+	return err == nil && len(matches) > 0
 }
 
 func UpdateHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
