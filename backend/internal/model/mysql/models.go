@@ -41,7 +41,7 @@ type Danmaku struct {
 	VideoID  uint   `gorm:"not null;index"`
 	Scene    string `gorm:"size:20;default:video;index"` // video | live
 	UserID   uint   `gorm:"not null;index"`
-	Content  string `gorm:"size:200;not null"`
+	Content  string `gorm:"size:500;not null"`
 	Time     int    `gorm:"not null"` // seconds offset in video
 	Color    string `gorm:"size:10;default:#FFFFFF"`
 	FontSize string `gorm:"size:10;default:medium"` // small | medium | large

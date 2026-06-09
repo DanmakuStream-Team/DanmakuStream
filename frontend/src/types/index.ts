@@ -41,7 +41,7 @@ export interface Danmaku {
   time: number
   color: string
   fontSize: 'small' | 'medium' | 'large'
-  type: 'scroll' | 'top' | 'bottom'
+  type: 'scroll' | 'top' | 'bottom' | 'advanced'
   blocked?: boolean
   createdAt?: string
 }
