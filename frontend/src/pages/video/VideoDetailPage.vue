@@ -62,14 +62,21 @@
 
       <aside v-if="video" class="side-col">
         <div class="soft-panel author-panel">
-          <el-avatar :size="52" :src="mediaUrl(video.author?.avatar)">
-            {{ video.author?.nickname?.slice(0, 1) || 'U' }}
-          </el-avatar>
-          <div>
-            <strong>{{ video.author?.nickname || '匿名用户' }}</strong>
-            <span>{{ video.author?.username }}</span>
-          </div>
-          <el-button type="primary" @click="router.push(`/user/${video.author.id}`)">查看主页</el-button>
+          <button
+            class="author-main"
+            type="button"
+            :disabled="!video.author?.id"
+            @click="openAuthorProfile"
+          >
+            <el-avatar :size="52" :src="mediaUrl(video.author?.avatar)">
+              {{ video.author?.nickname?.slice(0, 1) || 'U' }}
+            </el-avatar>
+            <span class="author-text">
+              <strong>{{ video.author?.nickname || '匿名用户' }}</strong>
+              <span>{{ video.author?.username }}</span>
+            </span>
+          </button>
+          <el-button type="primary" :disabled="!video.author?.id" @click="openAuthorProfile">查看主页</el-button>
         </div>
 
         <div v-if="canManageVideo" class="soft-panel collaborator-panel">
@@ -324,6 +331,12 @@ function handleTouchEnd(e: TouchEvent) {
 function goToNextVideo() {
   if (!video.value) return
   router.push(`/video/${video.value.id + 1}`)
+}
+
+function openAuthorProfile() {
+  const authorId = video.value?.author?.id
+  if (!authorId) return
+  router.push(`/user/${authorId}`)
 }
 
 async function load() {
@@ -668,12 +681,37 @@ function categoryLabel(value: string) {
   gap: 12px;
 }
 
-.author-panel strong,
-.author-panel span {
+.author-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.author-main:disabled {
+  cursor: default;
+}
+
+.author-main:not(:disabled):hover strong {
+  color: #00aeec;
+}
+
+.author-text,
+.author-text strong,
+.author-text span {
   display: block;
 }
 
-.author-panel span {
+.author-text {
+  min-width: 0;
+}
+
+.author-text span {
   color: #667085;
   font-size: 13px;
 }
