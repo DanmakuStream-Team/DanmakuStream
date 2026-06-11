@@ -55,7 +55,8 @@
 
       <!-- 正常模式：精选+网格 -->
       <div v-else ref="feedLayoutRef" v-loading="isInitialLoading" class="feed-layout">
-        <article v-if="featuredVideo" class="feature-card" @click="openVideo(featuredVideo)">
+        <div v-if="featuredVideo" class="featured-section">
+          <article class="feature-card" @click="openVideo(featuredVideo)">
           <div class="feature-cover">
             <img v-if="featuredVideo.coverUrl" :src="mediaUrl(featuredVideo.coverUrl)" :alt="featuredVideo.title" />
             <div v-else class="feature-fallback">DanmakuStream</div>
@@ -66,10 +67,29 @@
               </button>
             </div>
           </div>
-        </article>
+          </article>
+
+          <div class="featured-side-grid">
+            <article
+              v-for="video in featuredSideVideos"
+              :key="video.id"
+              class="side-video-card"
+              @click="openVideo(video)"
+            >
+              <div class="side-cover">
+                <img v-if="video.coverUrl" :src="mediaUrl(video.coverUrl)" :alt="video.title" />
+                <div v-else class="side-fallback">Danmaku</div>
+              </div>
+              <div class="side-video-body">
+                <h3>{{ video.title }}</h3>
+                <span>{{ formatCount(video.viewCount) }} 鎾斁</span>
+              </div>
+            </article>
+          </div>
+        </div>
 
         <VideoCard
-          v-for="video in gridVideos"
+          v-for="video in restGridVideos"
           :key="video.id"
           :video="video"
           @open="openVideo(video)"
@@ -139,7 +159,8 @@ const isSearching = computed(() => Boolean(keyword.value.trim()))
 const isInitialLoading = computed(() => videoStore.loading && page.value === 1)
 const hasMoreVideos = computed(() => videoStore.videoList.length < videoStore.total)
 const featuredVideo = computed(() => videoStore.videoList[0])
-const gridVideos = computed(() => videoStore.videoList.slice(featuredVideo.value ? 1 : 0))
+const featuredSideVideos = computed(() => videoStore.videoList.slice(featuredVideo.value ? 1 : 0, featuredVideo.value ? 5 : 0))
+const restGridVideos = computed(() => videoStore.videoList.slice(featuredVideo.value ? 5 : 0))
 const currentPageSize = computed(() => {
   return isSearching.value ? 20 : 24
 })
@@ -401,16 +422,24 @@ watch(() => route.query.feature, () => {
   min-height: 360px;
 }
 
+.featured-section {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.9fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
 .feature-card {
-  grid-column: span 2;
   align-self: start;
-  aspect-ratio: 16 / 9;
+  min-height: 100%;
   cursor: pointer;
 }
 
 .feature-cover {
   position: relative;
   overflow: hidden;
+  aspect-ratio: 16 / 9;
   height: 100%;
   border-radius: 10px;
   background: #f1f2f3;
@@ -470,6 +499,82 @@ watch(() => route.query.feature, () => {
 
 .feature-author:disabled {
   cursor: default;
+}
+
+.featured-side-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.side-video-card {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 45% minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 10px;
+  background: #f7f9fc;
+  cursor: pointer;
+  transition: background 0.16s ease, transform 0.16s ease;
+}
+
+.side-video-card:hover {
+  background: #eef8fd;
+  transform: translateY(-1px);
+}
+
+.side-cover {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  background: #f1f2f3;
+}
+
+.side-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.side-fallback {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: #00aeec;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.side-video-body {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.side-video-body h3 {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: #18191c;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.side-video-body span {
+  overflow: hidden;
+  color: #9499a0;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .search-layout {
@@ -633,8 +738,12 @@ watch(() => route.query.feature, () => {
     grid-template-columns: 1fr;
   }
 
-  .feature-card {
-    grid-column: span 1;
+  .featured-section {
+    grid-template-columns: 1fr;
+  }
+
+  .featured-side-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .features {
@@ -653,6 +762,14 @@ watch(() => route.query.feature, () => {
 
   .search-item {
     grid-template-columns: 1fr;
+  }
+
+  .featured-side-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .side-video-card {
+    grid-template-columns: 128px minmax(0, 1fr);
   }
 }
 </style>
