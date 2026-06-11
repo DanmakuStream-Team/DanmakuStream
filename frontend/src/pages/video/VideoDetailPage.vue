@@ -147,6 +147,27 @@
             <el-button type="primary" @click="sendDanmaku">发送</el-button>
           </div>
         </div>
+        <div class="soft-panel recommend-panel">
+          <h3>相关推荐</h3>
+          <div class="recommend-list">
+            <article
+              v-for="item in recommendedVideos"
+              :key="item.id"
+              class="recommend-item"
+              @click="openRecommendedVideo(item)"
+            >
+              <div class="recommend-cover">
+                <img v-if="item.coverUrl" :src="mediaUrl(item.coverUrl)" :alt="item.title" />
+                <span v-else>Danmaku</span>
+              </div>
+              <div class="recommend-body">
+                <strong>{{ item.title }}</strong>
+                <span>{{ formatCount(item.viewCount) }} 播放 · {{ formatCount(item.danmakuCount) }} 弹幕</span>
+              </div>
+            </article>
+            <el-empty v-if="!recommendedVideos.length" description="暂无推荐" />
+          </div>
+        </div>
       </aside>
 
       <div v-if="!loading && !video" class="soft-panel empty-panel">
@@ -157,7 +178,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import VideoPlayer from '@/components/common/VideoPlayer.vue'
@@ -168,7 +189,7 @@ import { commentApi } from '@/api/comment'
 import { useAuthStore } from '@/store/auth'
 import { useCommentStore } from '@/store/comment'
 import { useVideoStore } from '@/store/video'
-import type { Comment, Danmaku } from '@/types'
+import type { Comment, Danmaku, VideoInfo } from '@/types'
 import { formatCount, formatTime, mediaUrl, normalizeTags } from '@/utils/format'
 import { removeUserLibraryRecord, upsertUserLibraryRecord } from '@/utils/userLibrary'
 
@@ -197,6 +218,7 @@ const commentText = ref('')
 const commentsCollapsed = ref(false)
 const downloading = ref(false)
 const uploadingAdvanced = ref(false)
+const recommendedVideos = ref<VideoInfo[]>([])
 const video = computed(() => videoStore.currentVideo)
 
 function handleTouchStart(e: TouchEvent) {
@@ -236,10 +258,42 @@ async function load() {
       commentStore.fetchComments(id),
     ])
     danmakus.value = danmakuRes.data
+    await loadRecommendations()
     saveHistory()
   } finally {
     loading.value = false
   }
+}
+
+watch(() => route.params.id, () => {
+  videoStore.clearCurrent()
+  commentStore.clearComments()
+  danmakus.value = []
+  recommendedVideos.value = []
+  load()
+})
+
+async function loadRecommendations() {
+  if (!video.value) return
+
+  try {
+    const tags = normalizeTags(video.value.tags)
+    const res = await videoApi.list({
+      page: 1,
+      pageSize: 8,
+      tag: tags[0] || undefined,
+      sort: 'hot',
+    })
+    recommendedVideos.value = res.data.list
+      .filter(item => item.id !== video.value?.id)
+      .slice(0, 6)
+  } catch {
+    recommendedVideos.value = []
+  }
+}
+
+function openRecommendedVideo(item: VideoInfo) {
+  router.push(`/video/${item.id}`)
 }
 
 async function toggleLike() {
@@ -438,7 +492,6 @@ function saveHistory() {
 
 .side-col {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
   gap: 16px;
   min-width: 0;
   min-height: clamp(360px, calc((min(100vw, 1180px) - 420px) * 0.5625), 620px);
@@ -446,6 +499,7 @@ function saveHistory() {
 
 .author-panel,
 .danmaku-box,
+.recommend-panel,
 .comments {
   padding: 18px;
 }
@@ -566,8 +620,71 @@ function saveHistory() {
 }
 
 .danmaku-box h3,
+.recommend-panel h3,
 .comment-head h2 {
   margin: 0;
+}
+
+.recommend-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.recommend-list {
+  display: grid;
+  gap: 12px;
+}
+
+.recommend-item {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 10px;
+  cursor: pointer;
+}
+
+.recommend-cover {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  place-items: center;
+  border-radius: 8px;
+  background: #f1f2f3;
+  color: #00aeec;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.recommend-cover img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.recommend-body {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.recommend-body strong {
+  overflow: hidden;
+  color: #18191c;
+  font-size: 14px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recommend-item:hover .recommend-body strong {
+  color: #00aeec;
+}
+
+.recommend-body span {
+  color: #9499a0;
+  font-size: 12px;
 }
 
 .comment-head {
