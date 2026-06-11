@@ -775,27 +775,13 @@ function logout() {
   overflow-y: auto;
   border-right: 1px solid #f1f2f3;
   background: #fff;
-  scrollbar-color: rgba(251, 114, 153, 0.34) transparent;
-  scrollbar-width: thin;
+  scrollbar-width: none;
   transition: padding 0.18s ease;
 }
 
 .sidebar::-webkit-scrollbar {
-  width: 8px;
-}
-
-.sidebar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.sidebar::-webkit-scrollbar-thumb {
-  border: 2px solid #fff;
-  border-radius: 999px;
-  background: rgba(251, 114, 153, 0.28);
-}
-
-.sidebar::-webkit-scrollbar-thumb:hover {
-  background: rgba(251, 114, 153, 0.56);
+  width: 0;
+  height: 0;
 }
 
 .sidebar.collapsed {
