@@ -87,6 +87,7 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		title := c.PostForm("title")
 		description := c.PostForm("description")
 		tags := c.PostForm("tags")
+		category := c.PostForm("category")
 
 		if title == "" {
 			response.Fail(c, http.StatusBadRequest, "标题不能为空")
@@ -132,6 +133,7 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			Title:       title,
 			Description: description,
 			Tags:        tags,
+			Category:    category,
 			AuthorID:    userID,
 			Status:      "pending",
 		}
@@ -540,6 +542,7 @@ func AdminListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 				DanmakuCount: video.DanmakuCount,
 				Status:       video.Status,
 				Tags:         video.Tags,
+				Category:     video.Category,
 				CreatedAt:    video.CreatedAt.Format("2006-01-02 15:04:05"),
 				Author: &model.UserInfo{
 					ID:       video.Author.ID,

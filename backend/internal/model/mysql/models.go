@@ -36,6 +36,32 @@ type Video struct {
 	Category     string `gorm:"column:category;type:varchar(32)" json:"category"`
 }
 
+type VideoCollection struct {
+	gorm.Model
+	Title       string `gorm:"size:120;not null"`
+	Description string `gorm:"size:500"`
+	CoverURL    string `gorm:"size:500"`
+	OwnerID     uint   `gorm:"not null;index"`
+	Owner       User   `gorm:"foreignKey:OwnerID"`
+}
+
+type VideoCollectionItem struct {
+	gorm.Model
+	CollectionID uint            `gorm:"not null;uniqueIndex:idx_collection_video"`
+	VideoID      uint            `gorm:"not null;uniqueIndex:idx_collection_video"`
+	Sort         int             `gorm:"default:0"`
+	Collection   VideoCollection `gorm:"foreignKey:CollectionID"`
+	Video        Video           `gorm:"foreignKey:VideoID"`
+}
+
+type VideoCollaborator struct {
+	gorm.Model
+	VideoID uint  `gorm:"not null;uniqueIndex:idx_video_collaborator"`
+	UserID  uint  `gorm:"not null;uniqueIndex:idx_video_collaborator"`
+	Video   Video `gorm:"foreignKey:VideoID"`
+	User    User  `gorm:"foreignKey:UserID"`
+}
+
 type Danmaku struct {
 	gorm.Model
 	VideoID  uint   `gorm:"not null;index"`

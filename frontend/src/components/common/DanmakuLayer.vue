@@ -6,7 +6,16 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Danmaku } from '@/types'
 
-const props = defineProps<{ items: Danmaku[]; currentTime: number; paused?: boolean }>()
+const props = withDefaults(defineProps<{
+  items: Danmaku[]
+  currentTime: number
+  paused?: boolean
+  visible?: boolean
+  opacity?: number
+}>(), {
+  visible: true,
+  opacity: 1,
+})
 
 const canvasRef = ref<HTMLCanvasElement>()
 let ctx: CanvasRenderingContext2D | null = null
@@ -251,10 +260,11 @@ function updateActive(deltaSeconds: number, mediaTime: number) {
 function draw() {
   if (!ctx || !canvasRef.value) return
   ctx.clearRect(0, 0, getCanvasWidth(), getCanvasHeight())
+  if (!props.visible) return
 
   for (const item of activeDanmakus) {
     ctx.save()
-    ctx.globalAlpha = item.alpha
+    ctx.globalAlpha = item.alpha * props.opacity
     ctx.font = `${item.fontSizePx}px "PingFang SC", "Microsoft YaHei", sans-serif`
     ctx.textBaseline = 'middle'
     ctx.fillStyle = item.displayColor
@@ -308,6 +318,8 @@ watch(() => props.currentTime, (time) => {
 watch(() => props.items, () => {
   if (!props.paused) enqueueDueDanmakus(props.currentTime)
 }, { deep: false })
+
+watch(() => [props.visible, props.opacity], draw)
 </script>
 
 <style scoped>

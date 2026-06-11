@@ -11,6 +11,7 @@ import (
 	"danmakustream/backend/internal/handler/response"
 	adminhandler "danmakustream/backend/internal/handler/v1/admin"
 	authhandler "danmakustream/backend/internal/handler/v1/auth"
+	collectionhandler "danmakustream/backend/internal/handler/v1/collection"
 	commenthandler "danmakustream/backend/internal/handler/v1/comment"
 	danmakuhandler "danmakustream/backend/internal/handler/v1/danmaku"
 	dynamichandler "danmakustream/backend/internal/handler/v1/dynamic"
@@ -78,7 +79,9 @@ func main() {
 
 		// 视频列表，支持 sort=hot|date|like|collect 排序。
 		v1.GET("/videos", videohandler.ListHandler(svcCtx))
+		v1.GET("/videos/:id/collections", collectionhandler.VideoCollectionsHandler(svcCtx))
 		v1.GET("/videos/:id", videohandler.DetailHandler(svcCtx))
+		v1.GET("/collections/:id", collectionhandler.DetailHandler(svcCtx))
 		v1.GET("/danmaku/:videoId", danmakuhandler.ListHandler(svcCtx))
 
 		// 动态列表。
@@ -104,6 +107,7 @@ func main() {
 		auth.PUT("/users/me", userhandler.UpdateMeHandler(svcCtx))
 		auth.POST("/users/me/avatar", userhandler.UploadAvatarHandler(svcCtx))
 		auth.GET("/users/me/videos", userhandler.MeVideosHandler(svcCtx))
+		auth.GET("/users/me/collections", collectionhandler.MineHandler(svcCtx))
 		auth.GET("/users/following", userhandler.FollowingListHandler(svcCtx))
 		auth.POST("/users/:id/follow", userhandler.FollowHandler(svcCtx))
 		auth.POST("/images/upload", mediahandler.UploadImageHandler(svcCtx))
@@ -115,6 +119,14 @@ func main() {
 		auth.DELETE("/videos/:id", videohandler.DeleteHandler(svcCtx))
 		auth.POST("/videos/:id/like", videohandler.LikeHandler(svcCtx))
 		auth.POST("/videos/:id/collect", videohandler.CollectHandler(svcCtx))
+		// 视频共创成员管理。
+		auth.POST("/videos/:id/collaborators", collectionhandler.AddCollaboratorHandler(svcCtx))
+		auth.DELETE("/videos/:id/collaborators/:userId", collectionhandler.RemoveCollaboratorHandler(svcCtx))
+
+		// 视频合集创建和视频增删。
+		auth.POST("/collections", collectionhandler.CreateHandler(svcCtx))
+		auth.POST("/collections/:id/videos", collectionhandler.AddVideoHandler(svcCtx))
+		auth.DELETE("/collections/:id/videos/:videoId", collectionhandler.RemoveVideoHandler(svcCtx))
 
 		auth.POST("/danmaku", danmakuhandler.SendHandler(svcCtx))
 		// 上传 .danmaku 文件，批量创建高级弹幕。

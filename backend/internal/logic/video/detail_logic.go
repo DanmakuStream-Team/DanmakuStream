@@ -67,6 +67,7 @@ func (l *DetailVideoLogic) Detail(req *VideoDetailReq) (*VideoDetailInfo, error)
 			DanmakuCount: video.DanmakuCount,
 			Status:       video.Status,
 			Tags:         video.Tags,
+			Category:     video.Category,
 			CreatedAt:    video.CreatedAt.Format("2006-01-02 15:04:05"),
 			Author: &model.UserInfo{
 				ID:       video.Author.ID,

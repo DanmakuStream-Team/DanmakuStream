@@ -1,16 +1,14 @@
 <template>
-  <main
-    class="page-shell detail-page"
-    @touchstart="handleTouchStart"
-    @touchend="handleTouchEnd"
-  >
+  <main class="page-shell detail-page" @touchstart="handleTouchStart" @touchend="handleTouchEnd">
     <section v-loading="loading" class="watch-grid">
       <div v-if="video" class="main-col">
         <VideoPlayer
           ref="playerRef"
+          v-model:danmaku-visible="danmakuVisible"
           :url="video.videoUrl"
           :poster="video.coverUrl"
           :danmakus="danmakus"
+          :danmaku-opacity="danmakuOpacity"
           @timeupdate="currentTime = $event"
           @error="ElMessage.error($event)"
         />
@@ -28,6 +26,7 @@
             <el-button :loading="downloading" @click="downloadVideo">下载</el-button>
           </div>
           <div class="tags">
+            <el-tag v-if="video.category" type="success">{{ categoryLabel(video.category) }}</el-tag>
             <el-tag v-for="tag in normalizeTags(video.tags)" :key="tag">{{ tag }}</el-tag>
           </div>
           <p>{{ video.description || '这个视频暂无简介。' }}</p>
@@ -42,12 +41,7 @@
           </div>
           <div v-show="!commentsCollapsed" class="comment-body">
             <div class="comment-input">
-              <el-input
-                v-model="commentText"
-                type="textarea"
-                :rows="3"
-                placeholder="写下你的看法"
-              />
+              <el-input v-model="commentText" type="textarea" :rows="3" placeholder="写下你的看法" />
               <el-button type="primary" :loading="commentStore.submitting" @click="submitComment">
                 发表评论
               </el-button>
@@ -73,25 +67,44 @@
           </el-avatar>
           <div>
             <strong>{{ video.author?.nickname || '匿名用户' }}</strong>
+            <span>{{ video.author?.username }}</span>
           </div>
           <el-button type="primary" @click="router.push(`/user/${video.author.id}`)">查看主页</el-button>
         </div>
 
-        <div class="soft-panel danmaku-box">
-          <div class="danmaku-head">
-            <h3>发送弹幕</h3>
-            <el-radio-group v-model="danmakuMode" size="small">
-              <el-radio-button label="normal">普通</el-radio-button>
-              <el-radio-button label="advanced">高级</el-radio-button>
-            </el-radio-group>
+        <div v-if="canManageVideo" class="soft-panel collaborator-panel">
+          <h3>共创管理</h3>
+          <div class="collaborator-search">
+            <el-input v-model="collaboratorKeyword" placeholder="搜索用户昵称或用户名" @keyup.enter="searchCollaborators" />
+            <el-button @click="searchCollaborators">搜索</el-button>
           </div>
+          <div class="collaborator-options">
+            <button
+              v-for="user in collaboratorOptions"
+              :key="user.id"
+              type="button"
+              class="collaborator-item"
+              @click="inviteCollaborator(user.id)"
+            >
+              <span>{{ user.nickname }}</span>
+              <small>@{{ user.username }}</small>
+            </button>
+          </div>
+        </div>
 
-          <template v-if="danmakuMode === 'normal'">
+        <div class="soft-panel side-panel">
+          <el-radio-group v-model="sideMode" size="small" class="side-tabs">
+            <el-radio-button label="normal">普通弹幕</el-radio-button>
+            <el-radio-button label="advanced">高级弹幕</el-radio-button>
+            <el-radio-button label="collection">视频合集</el-radio-button>
+          </el-radio-group>
+
+          <template v-if="sideMode === 'normal'">
             <el-input
-              v-model="danmakuText"
+              v-model="normalDanmakuText"
               class="normal-danmaku-input"
               placeholder="此刻想说什么"
-              @keyup.enter="sendDanmaku"
+              @keyup.enter="sendNormalDanmaku"
             />
             <div class="danmaku-options">
               <el-select v-model="danmakuType" size="small">
@@ -105,13 +118,32 @@
                 <el-option label="大" value="large" />
               </el-select>
             </div>
+            <div class="danmaku-colors">
+              <span
+                v-for="c in DANMAKU_COLORS"
+                :key="c"
+                class="color-dot"
+                :class="{ active: danmakuColor === c }"
+                :style="{ background: c }"
+                @click="danmakuColor = c"
+              />
+            </div>
+            <div class="danmaku-control-row">
+              <span>显示弹幕</span>
+              <el-switch v-model="danmakuVisible" />
+            </div>
+            <div class="danmaku-control-row">
+              <span>透明度</span>
+              <el-slider v-model="danmakuOpacity" :min="10" :max="100" :step="5" />
+            </div>
+            <el-button class="send-button" type="primary" @click="sendNormalDanmaku">发送</el-button>
           </template>
 
-          <template v-else>
+          <template v-else-if="sideMode === 'advanced'">
             <el-input
-              v-model="danmakuText"
+              v-model="advancedDanmakuText"
               type="textarea"
-              :rows="4"
+              :rows="5"
               placeholder="@adv x=10 y=20 tx=80 ty=20 dur=4 size=24 color=#FFFFFF | hello"
             />
             <div class="advanced-help">
@@ -119,34 +151,59 @@
               <el-button text size="small" @click="fillAdvancedTemplate">填入示例</el-button>
             </div>
             <div class="advanced-upload">
-              <input
-                ref="danmakuFileInput"
-                class="file-input"
-                type="file"
-                accept=".danmaku"
-                @change="uploadAdvancedFile"
-              >
-              <el-button :loading="uploadingAdvanced" @click="chooseDanmakuFile">
-                上传 .danmaku 文件
-              </el-button>
-              <span>文件内部使用{}包裹单条语句,使用,隔开</span>
+              <input ref="danmakuFileInput" class="file-input" type="file" accept=".danmaku" @change="uploadAdvancedFile">
+              <el-button :loading="uploadingAdvanced" @click="chooseDanmakuFile">上传 .danmaku 文件</el-button>
+              <span>文件内可用花括号包住单条语句，用逗号分隔。</span>
             </div>
+            <el-button class="send-button" type="primary" @click="sendAdvancedDanmaku">发送高级弹幕</el-button>
           </template>
 
-          <div class="danmaku-colors">
-            <span
-              v-for="c in DANMAKU_COLORS"
-              :key="c"
-              class="color-dot"
-              :class="{ active: danmakuColor === c }"
-              :style="{ background: c }"
-              @click="danmakuColor = c"
-            />
-          </div>
-          <div class="danmaku-actions">
-            <el-button type="primary" @click="sendDanmaku">发送</el-button>
-          </div>
+          <template v-else>
+            <div v-if="canManageVideo" class="collection-editor">
+              <el-input v-model="newCollectionTitle" placeholder="新合集标题" />
+              <el-button type="primary" @click="createCollectionAndAddVideo">创建并加入当前视频</el-button>
+              <el-select v-model="selectedCollectionId" clearable placeholder="选择我的合集">
+                <el-option v-for="item in myCollections" :key="item.id" :label="item.title" :value="item.id" />
+              </el-select>
+              <el-button @click="addVideoToSelectedCollection">加入所选合集</el-button>
+            </div>
+
+            <div class="collection-list">
+              <article v-for="collection in videoCollections" :key="collection.id" class="collection-card">
+                <div>
+                  <strong>{{ collection.title }}</strong>
+                  <span>{{ collection.owner?.nickname }}</span>
+                </div>
+                <el-button size="small" @click="openCollection(collection.id)">查看</el-button>
+                <el-button
+                  v-if="canManageCollection(collection)"
+                  size="small"
+                  type="danger"
+                  plain
+                  @click="removeVideoFromCollection(collection.id)"
+                >
+                  移出
+                </el-button>
+              </article>
+              <el-empty v-if="!videoCollections.length" description="当前视频还没有加入合集" />
+            </div>
+
+            <div v-if="selectedCollectionDetail" class="collection-detail">
+              <strong>{{ selectedCollectionDetail.title }}</strong>
+              <button
+                v-for="item in selectedCollectionDetail.videos || []"
+                :key="item.id"
+                type="button"
+                class="collection-video"
+                @click="router.push(`/video/${item.id}`)"
+              >
+                <span>{{ item.title }}</span>
+                <small>{{ formatCount(item.viewCount) }} 播放</small>
+              </button>
+            </div>
+          </template>
         </div>
+
         <div class="soft-panel recommend-panel">
           <h3>相关推荐</h3>
           <div class="recommend-list">
@@ -157,7 +214,7 @@
               @click="openRecommendedVideo(item)"
             >
               <div class="recommend-cover">
-                <img v-if="item.coverUrl" :src="mediaUrl(item.coverUrl)" :alt="item.title" />
+                <img v-if="item.coverUrl" :src="mediaUrl(item.coverUrl)" :alt="item.title">
                 <span v-else>Danmaku</span>
               </div>
               <div class="recommend-body">
@@ -183,18 +240,18 @@ import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import VideoPlayer from '@/components/common/VideoPlayer.vue'
 import CommentItem from '@/components/common/CommentItem.vue'
-import { danmakuApi } from '@/api/danmaku'
-import { videoApi } from '@/api/video'
+import { collectionApi } from '@/api/collection'
 import { commentApi } from '@/api/comment'
+import { danmakuApi } from '@/api/danmaku'
+import { userApi } from '@/api/user'
+import { videoApi } from '@/api/video'
 import { useAuthStore } from '@/store/auth'
 import { useCommentStore } from '@/store/comment'
 import { useVideoStore } from '@/store/video'
-import type { Comment, Danmaku, VideoInfo } from '@/types'
+import type { Comment, Danmaku, UserInfo, VideoCollectionInfo, VideoInfo } from '@/types'
 import { formatCount, formatTime, mediaUrl, normalizeTags } from '@/utils/format'
 import { removeUserLibraryRecord, upsertUserLibraryRecord } from '@/utils/userLibrary'
 
-let touchStartY = 0
-const SWIPE_THRESHOLD = 50
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
@@ -205,12 +262,15 @@ const danmakuFileInput = ref<HTMLInputElement>()
 const loading = ref(false)
 const currentTime = ref(0)
 const danmakus = ref<Danmaku[]>([])
-const danmakuText = ref('')
-const danmakuMode = ref<'normal' | 'advanced'>('normal')
+const normalDanmakuText = ref('')
+const advancedDanmakuText = ref('')
+const sideMode = ref<'normal' | 'advanced' | 'collection'>('normal')
 const danmakuType = ref<'scroll' | 'top' | 'bottom'>('scroll')
 const danmakuFontSize = ref<'small' | 'medium' | 'large'>('medium')
+const danmakuVisible = ref(true)
+const danmakuOpacity = ref(85)
 const DANMAKU_COLORS = [
-  '#FFFFFF', '#000000', '#FF5555', '#55FF55', '#5555FF', '#FFFF55',
+  '#000000', '#FFFFFF', '#FF5555', '#55FF55', '#5555FF', '#FFFF55',
   '#FF55FF', '#55FFFF', '#FF8C00', '#FF69B4', '#00CED1', '#FFD700', '#FF6347',
 ]
 const danmakuColor = ref(DANMAKU_COLORS[0])
@@ -219,27 +279,21 @@ const commentsCollapsed = ref(false)
 const downloading = ref(false)
 const uploadingAdvanced = ref(false)
 const recommendedVideos = ref<VideoInfo[]>([])
+const videoCollections = ref<VideoCollectionInfo[]>([])
+const myCollections = ref<VideoCollectionInfo[]>([])
+const selectedCollectionDetail = ref<VideoCollectionInfo | null>(null)
+const selectedCollectionId = ref<number>()
+const newCollectionTitle = ref('')
+const collaboratorKeyword = ref('')
+const collaboratorOptions = ref<UserInfo[]>([])
 const video = computed(() => videoStore.currentVideo)
-
-function handleTouchStart(e: TouchEvent) {
-  touchStartY = e.touches[0].clientY
-}
-
-function handleTouchEnd(e: TouchEvent) {
-  const touchEndY = e.changedTouches[0].clientY
-  const diff = touchStartY - touchEndY
-
-  if (diff > SWIPE_THRESHOLD) {
-    goToNextVideo()
-  }
-}
-
-function goToNextVideo() {
-  if (!video.value) return
-  const nextId = video.value.id + 1
-  ElMessage.success('上滑切换到下一个视频')
-  router.push(`/video/${nextId}`)
-}
+const canManageVideo = computed(() => Boolean(
+  authStore.userInfo &&
+  video.value &&
+  authStore.userInfo.id === video.value.author?.id
+))
+let touchStartY = 0
+const SWIPE_THRESHOLD = 50
 
 onMounted(load)
 onUnmounted(() => {
@@ -247,6 +301,30 @@ onUnmounted(() => {
   videoStore.clearCurrent()
   commentStore.clearComments()
 })
+
+watch(() => route.params.id, () => {
+  videoStore.clearCurrent()
+  commentStore.clearComments()
+  danmakus.value = []
+  recommendedVideos.value = []
+  videoCollections.value = []
+  selectedCollectionDetail.value = null
+  load()
+})
+
+function handleTouchStart(e: TouchEvent) {
+  touchStartY = e.touches[0].clientY
+}
+
+function handleTouchEnd(e: TouchEvent) {
+  const diff = touchStartY - e.changedTouches[0].clientY
+  if (diff > SWIPE_THRESHOLD) goToNextVideo()
+}
+
+function goToNextVideo() {
+  if (!video.value) return
+  router.push(`/video/${video.value.id + 1}`)
+}
 
 async function load() {
   const id = Number(route.params.id)
@@ -258,37 +336,47 @@ async function load() {
       commentStore.fetchComments(id),
     ])
     danmakus.value = danmakuRes.data
-    await loadRecommendations()
+    await Promise.all([loadRecommendations(), loadVideoCollections(), loadMyCollections()])
     saveHistory()
   } finally {
     loading.value = false
   }
 }
 
-watch(() => route.params.id, () => {
-  videoStore.clearCurrent()
-  commentStore.clearComments()
-  danmakus.value = []
-  recommendedVideos.value = []
-  load()
-})
-
 async function loadRecommendations() {
   if (!video.value) return
-
   try {
     const tags = normalizeTags(video.value.tags)
     const res = await videoApi.list({
       page: 1,
       pageSize: 8,
       tag: tags[0] || undefined,
+      category: video.value.category || undefined,
       sort: 'hot',
     })
-    recommendedVideos.value = res.data.list
-      .filter(item => item.id !== video.value?.id)
-      .slice(0, 6)
+    recommendedVideos.value = res.data.list.filter((item) => item.id !== video.value?.id).slice(0, 6)
   } catch {
     recommendedVideos.value = []
+  }
+}
+
+async function loadVideoCollections() {
+  if (!video.value) return
+  try {
+    const res = await collectionApi.videoCollections(video.value.id)
+    videoCollections.value = res.data
+  } catch {
+    videoCollections.value = []
+  }
+}
+
+async function loadMyCollections() {
+  if (!authStore.isLoggedIn) return
+  try {
+    const res = await collectionApi.mine()
+    myCollections.value = res.data
+  } catch {
+    myCollections.value = []
   }
 }
 
@@ -296,11 +384,60 @@ function openRecommendedVideo(item: VideoInfo) {
   router.push(`/video/${item.id}`)
 }
 
+async function openCollection(id: number) {
+  const res = await collectionApi.detail(id)
+  selectedCollectionDetail.value = res.data
+}
+
+async function createCollectionAndAddVideo() {
+  if (!ensureLogin() || !video.value) return
+  const title = newCollectionTitle.value.trim()
+  if (!title) {
+    ElMessage.warning('请先输入合集标题')
+    return
+  }
+  const created = await collectionApi.create({ title })
+  await collectionApi.addVideo(created.data.id, video.value.id)
+  newCollectionTitle.value = ''
+  ElMessage.success('已创建合集并加入当前视频')
+  await Promise.all([loadVideoCollections(), loadMyCollections()])
+}
+
+async function addVideoToSelectedCollection() {
+  if (!ensureLogin() || !video.value || !selectedCollectionId.value) return
+  await collectionApi.addVideo(selectedCollectionId.value, video.value.id)
+  ElMessage.success('已加入合集')
+  await loadVideoCollections()
+}
+
+async function removeVideoFromCollection(collectionId: number) {
+  if (!ensureLogin() || !video.value) return
+  await collectionApi.removeVideo(collectionId, video.value.id)
+  ElMessage.success('已从合集移出')
+  await loadVideoCollections()
+}
+
+function canManageCollection(collection: VideoCollectionInfo) {
+  return Boolean(authStore.userInfo && collection.owner?.id === authStore.userInfo.id)
+}
+
+async function searchCollaborators() {
+  const q = collaboratorKeyword.value.trim()
+  if (!q) return
+  const res = await userApi.search({ q, page: 1, pageSize: 8 })
+  collaboratorOptions.value = res.data.list.filter((user) => user.id !== authStore.userInfo?.id)
+}
+
+async function inviteCollaborator(userId: number) {
+  if (!ensureLogin() || !video.value) return
+  await collectionApi.addCollaborator(video.value.id, userId)
+  ElMessage.success('已添加共创')
+}
+
 async function toggleLike() {
-  if (!ensureLogin()) return
-  if (!video.value) return
+  if (!ensureLogin() || !video.value) return
   const current = video.value
-  const res = await videoApi.like(video.value.id)
+  const res = await videoApi.like(current.id)
   if (res.data.liked) {
     current.likeCount += 1
     upsertUserLibraryRecord('liked', current)
@@ -311,10 +448,9 @@ async function toggleLike() {
 }
 
 async function toggleCollect() {
-  if (!ensureLogin()) return
-  if (!video.value) return
+  if (!ensureLogin() || !video.value) return
   const current = video.value
-  const res = await videoApi.collect(video.value.id)
+  const res = await videoApi.collect(current.id)
   if (res.data.collected) {
     current.collectCount += 1
     upsertUserLibraryRecord('collections', current)
@@ -325,8 +461,7 @@ async function toggleCollect() {
 }
 
 async function downloadVideo() {
-  if (!ensureLogin()) return
-  if (!video.value) return
+  if (!ensureLogin() || !video.value) return
   downloading.value = true
   try {
     const current = video.value
@@ -353,7 +488,7 @@ function saveBlob(blob: Blob, filename: string) {
 }
 
 function fillAdvancedTemplate() {
-  danmakuText.value = '@adv x=10 y=20 tx=80 ty=20 dur=4 size=24 color=#FFFFFF | hello'
+  advancedDanmakuText.value = '@adv x=10 y=20 tx=80 ty=20 dur=4 size=24 color=#FFFFFF | hello'
 }
 
 function chooseDanmakuFile() {
@@ -362,14 +497,11 @@ function chooseDanmakuFile() {
 }
 
 async function uploadAdvancedFile(event: Event) {
-  if (!ensureLogin()) return
-  if (!video.value) return
-
+  if (!ensureLogin() || !video.value) return
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
-
   if (!file.name.toLowerCase().endsWith('.danmaku')) {
     ElMessage.error('请选择 .danmaku 文件')
     return
@@ -388,33 +520,44 @@ async function uploadAdvancedFile(event: Event) {
   }
 }
 
-async function sendDanmaku() {
-  if (!ensureLogin()) return
-  if (!video.value || !danmakuText.value.trim()) return
+async function sendNormalDanmaku() {
+  await sendDanmaku(normalDanmakuText.value, danmakuType.value, () => {
+    normalDanmakuText.value = ''
+  })
+}
 
-  const content = danmakuText.value.trim()
+async function sendAdvancedDanmaku() {
+  await sendDanmaku(advancedDanmakuText.value, 'advanced', () => {
+    advancedDanmakuText.value = ''
+  })
+}
+
+async function sendDanmaku(contentValue: string, type: 'scroll' | 'top' | 'bottom' | 'advanced', afterSend: () => void) {
+  if (!ensureLogin() || !video.value) return
+  const content = contentValue.trim()
+  if (!content) return
+
   const res = await danmakuApi.send({
     videoId: video.value.id,
     content,
     time: Math.floor(playerRef.value?.getCurrentTime() || currentTime.value),
-    color: danmakuColor.value,
+    color: type === 'advanced' ? '#FFFFFF' : danmakuColor.value,
     fontSize: danmakuFontSize.value,
-    type: danmakuMode.value === 'advanced' ? 'advanced' : danmakuType.value,
+    type,
   })
   danmakus.value.push(res.data)
-  danmakuText.value = ''
+  video.value.danmakuCount += 1
+  afterSend()
 }
 
 async function submitComment() {
-  if (!ensureLogin()) return
-  if (!video.value || !commentText.value.trim()) return
+  if (!ensureLogin() || !video.value || !commentText.value.trim()) return
   await commentStore.createComment(video.value.id, commentText.value.trim())
   commentText.value = ''
 }
 
 async function submitReply(target: Comment, content: string) {
-  if (!ensureLogin()) return
-  if (!video.value || !content.trim()) return
+  if (!ensureLogin() || !video.value || !content.trim()) return
   await commentStore.createComment(video.value.id, content.trim(), target.id)
 }
 
@@ -438,6 +581,18 @@ function saveHistory() {
   const progress = duration > 0 ? Math.min(100, Math.round((currentTime.value / duration) * 100)) : 0
   upsertUserLibraryRecord('history', video.value, progress)
 }
+
+function categoryLabel(value: string) {
+  const map: Record<string, string> = {
+    game: '游戏',
+    tech: '科技',
+    life: '生活',
+    music: '音乐',
+    anime: '动漫',
+    knowledge: '知识',
+  }
+  return map[value] || value
+}
 </script>
 
 <style scoped>
@@ -448,14 +603,21 @@ function saveHistory() {
 
 .watch-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: minmax(0, 1fr) 380px;
   gap: 18px;
   align-items: start;
 }
 
-.main-col {
+.main-col,
+.side-col,
+.comment-body,
+.recommend-panel,
+.side-panel,
+.collection-list,
+.collection-detail,
+.collection-editor {
   display: grid;
-  gap: 18px;
+  gap: 16px;
 }
 
 .video-info {
@@ -473,7 +635,10 @@ function saveHistory() {
 .stats,
 .actions,
 .tags,
-.danmaku-actions {
+.danmaku-options,
+.danmaku-colors,
+.comment-head,
+.collaborator-search {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -490,15 +655,9 @@ function saveHistory() {
   line-height: 1.8;
 }
 
-.side-col {
-  display: grid;
-  gap: 16px;
-  min-width: 0;
-  min-height: clamp(360px, calc((min(100vw, 1180px) - 420px) * 0.5625), 620px);
-}
-
 .author-panel,
-.danmaku-box,
+.collaborator-panel,
+.side-panel,
 .recommend-panel,
 .comments {
   padding: 18px;
@@ -509,67 +668,70 @@ function saveHistory() {
   gap: 12px;
 }
 
-.author-panel strong {
+.author-panel strong,
+.author-panel span {
   display: block;
 }
 
-.danmaku-box {
-  display: grid;
-  align-content: start;
-  gap: 16px;
-  min-width: 0;
-  min-height: 0;
-  padding-top: 24px;
+.author-panel span {
+  color: #667085;
+  font-size: 13px;
 }
 
-.danmaku-head,
-.danmaku-options {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
+.side-tabs {
+  width: 100%;
 }
 
-.danmaku-head {
-  flex-wrap: wrap;
+.side-tabs :deep(.el-radio-button) {
+  flex: 1;
 }
 
-.danmaku-head :deep(.el-radio-group) {
-  max-width: 100%;
-}
-
-.danmaku-box :deep(.el-input),
-.danmaku-box :deep(.el-textarea),
-.danmaku-box :deep(.el-select) {
-  min-width: 0;
-  max-width: 100%;
-}
-
-.normal-danmaku-input {
-  margin-top: 8px;
+.side-tabs :deep(.el-radio-button__inner) {
+  width: 100%;
 }
 
 .normal-danmaku-input :deep(.el-input__wrapper) {
-  min-height: 44px;
+  min-height: 42px;
 }
 
 .danmaku-options .el-select {
   flex: 1;
+  min-width: 120px;
+}
+
+.danmaku-control-row {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  color: #667085;
+  font-size: 13px;
+}
+
+.send-button {
+  width: 96px;
+  justify-self: end;
+}
+
+.color-dot {
+  width: 22px;
+  height: 22px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.color-dot.active {
+  border-color: #165dff;
 }
 
 .advanced-help,
 .advanced-upload {
   display: grid;
-  gap: 10px;
-  justify-items: start;
+  gap: 8px;
   color: #667085;
   font-size: 12px;
   line-height: 1.5;
-}
-
-.advanced-help {
-  padding-top: 2px;
 }
 
 .advanced-upload {
@@ -579,55 +741,86 @@ function saveHistory() {
   background: #f8fafc;
 }
 
-.advanced-help span,
-.advanced-upload span {
-  min-width: 0;
-}
-
-.advanced-help :deep(.el-button) {
-  margin-left: 0;
-  padding-left: 0;
-}
-
 .file-input {
   display: none;
 }
 
-.danmaku-colors {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.collection-card,
+.collaborator-item,
+.recommend-item {
+  cursor: pointer;
+}
+
+.collection-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
   align-items: center;
+  padding: 10px;
+  border: 1px solid #edf0f3;
+  border-radius: 8px;
+}
+
+.collection-card strong,
+.collection-card span {
+  display: block;
+}
+
+.collection-card span {
+  color: #667085;
+  font-size: 12px;
+}
+
+.collection-detail {
+  gap: 8px;
   padding-top: 4px;
 }
 
-.color-dot {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
+.collection-video {
+  display: grid;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 1px solid #edf0f3;
+  border-radius: 8px;
+  background: #fff;
+  color: #18191c;
+  text-align: left;
   cursor: pointer;
-  border: 2px solid transparent;
-  transition: border-color 0.15s, transform 0.15s;
 }
 
-.color-dot:hover {
-  transform: scale(1.15);
+.collection-video small {
+  color: #667085;
 }
 
-.color-dot.active {
-  border-color: #165dff;
-  transform: scale(1.1);
+.collaborator-panel {
+  display: grid;
+  gap: 12px;
 }
 
-.danmaku-box h3,
+.collaborator-panel h3,
+.side-panel h3,
 .recommend-panel h3,
 .comment-head h2 {
   margin: 0;
 }
 
-.recommend-panel {
+.collaborator-options {
   display: grid;
-  gap: 14px;
+  gap: 8px;
+}
+
+.collaborator-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid #edf0f3;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.collaborator-item small {
+  color: #667085;
 }
 
 .recommend-list {
@@ -639,11 +832,9 @@ function saveHistory() {
   display: grid;
   grid-template-columns: 132px minmax(0, 1fr);
   gap: 10px;
-  cursor: pointer;
 }
 
 .recommend-cover {
-  position: relative;
   display: grid;
   overflow: hidden;
   aspect-ratio: 16 / 9;
@@ -658,7 +849,6 @@ function saveHistory() {
 .recommend-cover img {
   width: 100%;
   height: 100%;
-  display: block;
   object-fit: cover;
 }
 
@@ -678,49 +868,20 @@ function saveHistory() {
   white-space: nowrap;
 }
 
-.recommend-item:hover .recommend-body strong {
-  color: #00aeec;
-}
-
 .recommend-body span {
   color: #9499a0;
   font-size: 12px;
 }
 
 .comment-head {
-  display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-}
-
-.comments {
-  display: grid;
-  gap: 14px;
-  padding: 22px 26px;
-}
-
-.comment-head h2 {
-  color: #18191c;
-  font-size: 22px;
-  font-weight: 700;
-}
-
-.comment-body {
-  display: grid;
-  gap: 16px;
 }
 
 .comment-input {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-}
-
-.comment-list {
   display: grid;
-  gap: 0;
+  justify-items: start;
+  gap: 10px;
 }
 
 @media (max-width: 920px) {
