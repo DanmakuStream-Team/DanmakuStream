@@ -6,7 +6,16 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Danmaku } from '@/types'
 
-const props = defineProps<{ items: Danmaku[]; currentTime: number; paused?: boolean }>()
+const props = withDefaults(defineProps<{
+  items: Danmaku[]
+  currentTime: number
+  paused?: boolean
+  visible?: boolean
+  opacity?: number
+}>(), {
+  visible: true,
+  opacity: 1,
+})
 
 const canvasRef = ref<HTMLCanvasElement>()
 let ctx: CanvasRenderingContext2D | null = null
@@ -41,6 +50,7 @@ interface ActiveDanmaku extends Danmaku {
   width: number
   fontSizePx: number
   startedAt: number
+  elapsed: number
   displayType: string
   displayText: string
   displayColor: string
@@ -194,6 +204,7 @@ function addDanmaku(item: Danmaku, mediaTime: number, elapsed = 0) {
     width,
     fontSizePx,
     startedAt: mediaTime,
+    elapsed: Math.max(0, elapsed),
     displayType,
     displayText,
     displayColor,
@@ -229,7 +240,7 @@ function enqueueDueDanmakus(mediaTime: number) {
   }
 }
 
-function updateActive(deltaSeconds: number, mediaTime: number) {
+function updateActive(deltaSeconds: number) {
   activeDanmakus = activeDanmakus.filter((item) => {
     if (item.displayType === 'scroll') {
       item.x -= item.speed * deltaSeconds
@@ -237,24 +248,27 @@ function updateActive(deltaSeconds: number, mediaTime: number) {
     }
 
     if (item.displayType === 'advanced') {
-      const progress = clamp((mediaTime - item.startedAt) / item.duration, 0, 1)
+      item.elapsed += deltaSeconds
+      const progress = clamp(item.elapsed / item.duration, 0, 1)
       const ease = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2
       item.x = item.fromX + (item.targetX - item.fromX) * ease
       item.y = item.fromY + (item.targetY - item.fromY) * ease
       return progress < 1
     }
 
-    return mediaTime - item.startedAt < item.duration
+    item.elapsed += deltaSeconds
+    return item.elapsed < item.duration
   })
 }
 
 function draw() {
   if (!ctx || !canvasRef.value) return
   ctx.clearRect(0, 0, getCanvasWidth(), getCanvasHeight())
+  if (!props.visible) return
 
   for (const item of activeDanmakus) {
     ctx.save()
-    ctx.globalAlpha = item.alpha
+    ctx.globalAlpha = item.alpha * props.opacity
     ctx.font = `${item.fontSizePx}px "PingFang SC", "Microsoft YaHei", sans-serif`
     ctx.textBaseline = 'middle'
     ctx.fillStyle = item.displayColor
@@ -269,7 +283,7 @@ function animate(now: number) {
 
   if (!props.paused) {
     enqueueDueDanmakus(props.currentTime)
-    updateActive(deltaSeconds, props.currentTime)
+    updateActive(deltaSeconds)
   }
 
   draw()
@@ -308,6 +322,8 @@ watch(() => props.currentTime, (time) => {
 watch(() => props.items, () => {
   if (!props.paused) enqueueDueDanmakus(props.currentTime)
 }, { deep: false })
+
+watch(() => [props.visible, props.opacity], draw)
 </script>
 
 <style scoped>

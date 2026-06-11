@@ -24,6 +24,9 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	db.AutoMigrate(
 		&model.User{},
 		&model.Video{},
+		&model.VideoCollection{},
+		&model.VideoCollectionItem{},
+		&model.VideoCollaborator{},
 		&model.Danmaku{},
 		&model.Comment{},
 		&model.LiveRoom{},

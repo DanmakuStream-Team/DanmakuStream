@@ -185,6 +185,10 @@
             <el-icon><Clock /></el-icon>
             <span>历史记录</span>
           </button>
+          <button class="side-item" :class="{ active: isActive('tags') }" type="button" @click="router.push('/me/tags')">
+            <el-icon><CollectionTag /></el-icon>
+            <span>标签相关度</span>
+          </button>
           <button class="side-item" :class="{ active: isActive('liked') }" type="button" @click="router.push('/me/liked')">
             <el-icon><ThumbUpIcon /></el-icon>
             <span>赞过的视频</span>
@@ -242,6 +246,7 @@ import {
   ArrowRight,
   Bell,
   Clock,
+  CollectionTag,
   Download,
   HomeFilled,
   Notebook,
@@ -386,6 +391,9 @@ function isActive(key: string) {
   }
   if (key === 'history') {
     return route.path === '/me/history'
+  }
+  if (key === 'tags') {
+    return route.path === '/me/tags'
   }
   if (key === 'liked') {
     return route.path === '/me/liked'

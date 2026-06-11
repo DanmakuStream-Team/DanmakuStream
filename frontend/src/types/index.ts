@@ -27,10 +27,21 @@ export interface VideoInfo {
   collectCount: number
   danmakuCount: number
   status: VideoStatus
+  category: string
   author: UserInfo
   tags: string | string[]
   createdAt: string
   commentCount?: number
+}
+
+export interface VideoCollectionInfo {
+  id: number
+  title: string
+  description: string
+  coverUrl: string
+  owner: UserInfo
+  videos?: VideoInfo[]
+  createdAt: string
 }
 
 export interface Danmaku {
