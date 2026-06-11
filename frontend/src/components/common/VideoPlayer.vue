@@ -21,9 +21,8 @@
     />
 
     <div class="player-brand">DanmakuStream</div>
-    <div class="player-controls">
+    <div v-if="qualityOptions.length > 1" class="player-controls">
       <el-select
-        v-if="qualityOptions.length > 1"
         v-model="selectedQuality"
         class="quality-select"
         size="small"
@@ -37,13 +36,6 @@
           :value="option.value"
         />
       </el-select>
-      <el-switch
-        v-model="danmakuVisibleModel"
-        size="small"
-        inline-prompt
-        active-text="弹"
-        inactive-text="关"
-      />
     </div>
   </div>
 </template>
@@ -70,7 +62,6 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   timeupdate: [time: number]
   error: [message: string]
-  'update:danmakuVisible': [visible: boolean]
 }>()
 
 const videoRef = ref<HTMLVideoElement>()
@@ -79,10 +70,6 @@ const isPaused = ref(true)
 const selectedQuality = ref(-1)
 const qualityOptions = ref<{ label: string; value: number }[]>([])
 const sourceUrl = computed(() => mediaUrl(props.url))
-const danmakuVisibleModel = computed({
-  get: () => props.danmakuVisible,
-  set: (value: boolean) => emit('update:danmakuVisible', value),
-})
 let hls: Hls | null = null
 
 watch(sourceUrl, setupSource, { immediate: true })

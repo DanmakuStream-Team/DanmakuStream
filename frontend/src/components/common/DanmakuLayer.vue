@@ -50,6 +50,7 @@ interface ActiveDanmaku extends Danmaku {
   width: number
   fontSizePx: number
   startedAt: number
+  elapsed: number
   displayType: string
   displayText: string
   displayColor: string
@@ -203,6 +204,7 @@ function addDanmaku(item: Danmaku, mediaTime: number, elapsed = 0) {
     width,
     fontSizePx,
     startedAt: mediaTime,
+    elapsed: Math.max(0, elapsed),
     displayType,
     displayText,
     displayColor,
@@ -238,7 +240,7 @@ function enqueueDueDanmakus(mediaTime: number) {
   }
 }
 
-function updateActive(deltaSeconds: number, mediaTime: number) {
+function updateActive(deltaSeconds: number) {
   activeDanmakus = activeDanmakus.filter((item) => {
     if (item.displayType === 'scroll') {
       item.x -= item.speed * deltaSeconds
@@ -246,14 +248,16 @@ function updateActive(deltaSeconds: number, mediaTime: number) {
     }
 
     if (item.displayType === 'advanced') {
-      const progress = clamp((mediaTime - item.startedAt) / item.duration, 0, 1)
+      item.elapsed += deltaSeconds
+      const progress = clamp(item.elapsed / item.duration, 0, 1)
       const ease = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2
       item.x = item.fromX + (item.targetX - item.fromX) * ease
       item.y = item.fromY + (item.targetY - item.fromY) * ease
       return progress < 1
     }
 
-    return mediaTime - item.startedAt < item.duration
+    item.elapsed += deltaSeconds
+    return item.elapsed < item.duration
   })
 }
 
@@ -279,7 +283,7 @@ function animate(now: number) {
 
   if (!props.paused) {
     enqueueDueDanmakus(props.currentTime)
-    updateActive(deltaSeconds, props.currentTime)
+    updateActive(deltaSeconds)
   }
 
   draw()

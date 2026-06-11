@@ -14,6 +14,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'user/:id', name: 'UserProfile', component: () => import('@/pages/user/UserProfilePage.vue') },
       { path: 'subscriptions', name: 'Subscriptions', component: () => import('@/pages/user/SubscriptionPage.vue'), meta: { requiresAuth: true } },
       { path: 'me/:kind(history|liked|collections|downloads)', name: 'UserLibrary', component: () => import('@/pages/user/UserLibraryPage.vue'), meta: { requiresAuth: true } },
+      { path: 'me/tags', name: 'TagAffinity', component: () => import('@/pages/user/TagAffinityPage.vue'), meta: { requiresAuth: true } },
       { path: 'creator', name: 'CreatorDashboard', component: () => import('@/pages/user/CreatorDashboardPage.vue'), meta: { requiresAuth: true } },
       { path: 'creator/upload', name: 'VideoUpload', component: () => import('@/pages/video/VideoUploadPage.vue'), meta: { requiresAuth: true } },
       { path: 'admin', name: 'AdminDashboard', component: () => import('@/pages/admin/AdminDashboardPage.vue'), meta: { requiresStaff: true } },

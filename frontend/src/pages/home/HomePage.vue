@@ -167,6 +167,7 @@ async function loadVideos(options: { append?: boolean } = {}) {
       page: nextPage,
       pageSize: currentPageSize.value,
       keyword: keyword.value.trim() || undefined,
+      tag: String(route.query.tag || '').trim() || undefined,
       category: activeCategory.value || undefined,
       sort: 'hot',
     }, options.append)
@@ -317,6 +318,10 @@ onBeforeUnmount(() => {
 })
 watch(() => route.query.keyword, (value) => {
   keyword.value = String(value || '')
+  resetAndLoadVideos()
+})
+
+watch(() => route.query.tag, () => {
   resetAndLoadVideos()
 })
 
