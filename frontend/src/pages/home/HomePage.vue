@@ -55,7 +55,7 @@
 
       <!-- 正常模式：精选+网格 -->
       <div v-else ref="feedLayoutRef" v-loading="isInitialLoading" class="feed-layout">
-        <div v-if="featuredVideo" class="featured-section">
+        <div v-if="false && featuredVideo" class="featured-section">
           <article class="feature-card" @click="openVideo(featuredVideo)">
           <div class="feature-cover">
             <img v-if="featuredVideo.coverUrl" :src="mediaUrl(featuredVideo.coverUrl)" :alt="featuredVideo.title" />
@@ -82,14 +82,18 @@
               </div>
               <div class="side-video-body">
                 <h3>{{ video.title }}</h3>
-                <span>{{ formatCount(video.viewCount) }} 鎾斁</span>
+                <button class="side-author" type="button" :disabled="!video.author?.id" @click.stop="openUser(video.author?.id)">
+                  <el-icon><User /></el-icon>
+                  <span>{{ video.author?.nickname || '匿名用户' }}</span>
+                  <em>{{ formatTime(video.createdAt) }}</em>
+                </button>
               </div>
             </article>
           </div>
         </div>
 
         <VideoCard
-          v-for="video in restGridVideos"
+          v-for="video in videoStore.videoList"
           :key="video.id"
           :video="video"
           @open="openVideo(video)"
@@ -112,11 +116,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { User } from '@element-plus/icons-vue'
 import VideoCard from '@/components/common/VideoCard.vue'
 import { useAuthStore } from '@/store/auth'
 import { useVideoStore } from '@/store/video'
 import type { VideoInfo } from '@/types'
-import { formatCount, formatDuration, mediaUrl } from '@/utils/format'
+import { formatCount, formatDuration, formatTime, mediaUrl } from '@/utils/format'
 
 const router = useRouter()
 const route = useRoute()
@@ -159,8 +164,7 @@ const isSearching = computed(() => Boolean(keyword.value.trim()))
 const isInitialLoading = computed(() => videoStore.loading && page.value === 1)
 const hasMoreVideos = computed(() => videoStore.videoList.length < videoStore.total)
 const featuredVideo = computed(() => videoStore.videoList[0])
-const featuredSideVideos = computed(() => videoStore.videoList.slice(featuredVideo.value ? 1 : 0, featuredVideo.value ? 5 : 0))
-const restGridVideos = computed(() => videoStore.videoList.slice(featuredVideo.value ? 5 : 0))
+const featuredSideVideos = computed(() => videoStore.videoList.slice(featuredVideo.value ? 1 : 0, featuredVideo.value ? 7 : 0))
 const currentPageSize = computed(() => {
   return isSearching.value ? 20 : 24
 })
@@ -417,7 +421,7 @@ watch(() => route.query.feature, () => {
 
 .feed-layout {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 18px;
   min-height: 360px;
 }
@@ -425,13 +429,13 @@ watch(() => route.query.feature, () => {
 .featured-section {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.9fr);
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
   gap: 18px;
   align-items: stretch;
 }
 
 .feature-card {
-  align-self: start;
+  min-width: 0;
   min-height: 100%;
   cursor: pointer;
 }
@@ -503,27 +507,26 @@ watch(() => route.query.feature, () => {
 
 .featured-side-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 18px;
+  min-width: 0;
 }
 
 .side-video-card {
-  display: grid;
+  display: block;
   min-width: 0;
-  grid-template-columns: 45% minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-  padding: 8px;
-  border-radius: 10px;
-  background: #f7f9fc;
+  min-height: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
   cursor: pointer;
-  transition: background 0.16s ease, transform 0.16s ease;
+  transition: none;
 }
 
 .side-video-card:hover {
-  background: #eef8fd;
-  transform: translateY(-1px);
+  background: transparent;
+  transform: none;
 }
 
 .side-cover {
@@ -539,6 +542,11 @@ watch(() => route.query.feature, () => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.25s ease;
+}
+
+.side-video-card:hover .side-cover img {
+  transform: scale(1.04);
 }
 
 .side-fallback {
@@ -555,26 +563,66 @@ watch(() => route.query.feature, () => {
   display: grid;
   gap: 6px;
   min-width: 0;
+  padding: 8px 2px 0;
 }
 
 .side-video-body h3 {
-  display: -webkit-box;
+  display: block;
+  min-height: 20px;
   margin: 0;
   overflow: hidden;
   color: #18191c;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.35;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.side-video-body span {
-  overflow: hidden;
-  color: #9499a0;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.side-video-card:hover .side-video-body h3 {
+  color: #00aeec;
+}
+
+.side-author {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #9499a0;
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+}
+
+.side-author .el-icon {
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.side-author:hover {
+  color: #00aeec;
+}
+
+.side-author:disabled {
+  cursor: default;
+}
+
+.side-author:disabled:hover {
+  color: #9499a0;
+}
+
+.side-author span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-author em {
+  flex-shrink: 0;
+  font-style: normal;
 }
 
 .search-layout {
@@ -735,7 +783,7 @@ watch(() => route.query.feature, () => {
 
 @media (max-width: 1100px) {
   .feed-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .featured-section {
@@ -743,7 +791,7 @@ watch(() => route.query.feature, () => {
   }
 
   .featured-side-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .features {
@@ -752,6 +800,10 @@ watch(() => route.query.feature, () => {
 }
 
 @media (max-width: 760px) {
+  .feed-layout {
+    grid-template-columns: 1fr;
+  }
+
   .features {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -764,12 +816,12 @@ watch(() => route.query.feature, () => {
     grid-template-columns: 1fr;
   }
 
-  .featured-side-grid {
+  .featured-section {
     grid-template-columns: 1fr;
   }
 
-  .side-video-card {
-    grid-template-columns: 128px minmax(0, 1fr);
+  .featured-side-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
