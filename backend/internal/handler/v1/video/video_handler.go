@@ -336,11 +336,15 @@ func transcodeVideoAsync(svcCtx *svc.ServiceContext, videoID uint, videoDir, tmp
 		thumbnailPath,
 	)
 	thumbCmd.CombinedOutput()
+	duration := probeVideoDuration(tmpPath)
 	os.Remove(tmpPath)
 
 	relativePlaylist := fmt.Sprintf("/media/videos/%d/playlist.m3u8", videoID)
 	updates := map[string]any{
 		"video_url": relativePlaylist,
+	}
+	if duration > 0 {
+		updates["duration"] = duration
 	}
 	if coverURL == "" {
 		if _, err := os.Stat(thumbnailPath); err == nil {
@@ -348,6 +352,25 @@ func transcodeVideoAsync(svcCtx *svc.ServiceContext, videoID uint, videoDir, tmp
 		}
 	}
 	svcCtx.DB.Model(&model.Video{}).Where("id = ?", videoID).Updates(updates)
+}
+
+func probeVideoDuration(path string) int {
+	output, err := exec.Command("ffprobe",
+		"-v", "error",
+		"-show_entries", "format=duration",
+		"-of", "default=noprint_wrappers=1:nokey=1",
+		path,
+	).Output()
+	if err != nil {
+		fmt.Printf("probe video duration failed: %s\n", err)
+		return 0
+	}
+
+	seconds, err := strconv.ParseFloat(strings.TrimSpace(string(output)), 64)
+	if err != nil || seconds <= 0 {
+		return 0
+	}
+	return int(seconds + 0.5)
 }
 
 func LikeHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
