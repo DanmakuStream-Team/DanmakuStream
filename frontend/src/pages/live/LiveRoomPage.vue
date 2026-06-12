@@ -4,7 +4,14 @@
       <div>
         <h1>{{ room?.title || `直播间 ${roomId}` }}</h1>
         <p class="muted">
-          <span v-if="room?.owner">主播：{{ room.owner.nickname || room.owner.username }}</span>
+          <button
+            v-if="room?.owner"
+            class="owner-link"
+            type="button"
+            @click="router.push(`/user/${room.owner?.id}`)"
+          >
+            主播：{{ room.owner.nickname || room.owner.username }}
+          </button>
           <span v-if="room?.startedAt"> · 开播时间：{{ room.startedAt }}</span>
         </p>
       </div>
@@ -41,12 +48,13 @@
         </div>
       </div>
 
-      <aside class="chat soft-panel">
+      <aside class="side-col">
+        <div class="chat soft-panel">
         <div class="chat-head">
           <h2>实时弹幕</h2>
           <el-tag :type="connected ? 'success' : 'info'">{{ connected ? '已连接' : '未连接' }}</el-tag>
         </div>
-        <div class="messages">
+        <div ref="messagesRef" class="messages">
           <div v-for="message in messages" :key="message.id" class="message" :style="{ color: message.color }">
             {{ message.content }}
           </div>
@@ -66,13 +74,47 @@
             @click="color = c"
           />
         </div>
+        <div class="danmaku-type">
+          <span
+            v-for="t in DANMAKU_TYPES"
+            :key="t.value"
+            class="type-btn"
+            :class="{ active: danmakuType === t.value }"
+            @click="danmakuType = t.value"
+          >
+            {{ t.label }}
+          </span>
+        </div>
+        </div>
+
+        <div class="soft-panel recommend-panel">
+          <h3>推荐直播间</h3>
+          <div class="recommend-list">
+            <article
+              v-for="item in recommendedRooms"
+              :key="item.id"
+              class="recommend-item"
+              @click="router.push(`/live/${item.id}`)"
+            >
+              <div class="recommend-cover">
+                <img v-if="item.coverUrl" :src="mediaUrl(item.coverUrl)" :alt="item.title" />
+                <span v-else>Live</span>
+              </div>
+              <div class="recommend-body">
+                <strong>{{ item.title }}</strong>
+                <span>{{ item.owner?.nickname || item.owner?.username || '主播' }} · {{ formatCount(item.viewerCount) }} 人观看</span>
+              </div>
+            </article>
+            <el-empty v-if="!recommendedRooms.length" description="暂无推荐直播间" />
+          </div>
+        </div>
       </aside>
     </section>
   </main>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { VideoPlay } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -81,20 +123,34 @@ import { liveApi } from '@/api/live'
 import VideoPlayer from '@/components/common/VideoPlayer.vue'
 import { useAuthStore } from '@/store/auth'
 import type { Danmaku, LiveRoom } from '@/types'
+import { formatCount, mediaUrl } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
-const roomId = Number(route.params.id)
+const roomId = computed(() => Number(route.params.id))
 const connected = ref(false)
 const loading = ref(false)
 const ending = ref(false)
 const room = ref<LiveRoom>()
+const messagesRef = ref<HTMLElement>()
 const text = ref('')
 const color = ref('#FFFFFF')
+const danmakuType = ref('scroll')
 const viewerCount = ref(0)
 const streamReady = ref(false)
-const DANMAKU_COLORS = ['#FFFFFF', '#FF5555', '#55FF55', '#5555FF', '#FFFF55', '#FF55FF', '#55FFFF', '#FF8C00', '#FF69B4', '#00CED1', '#FFD700', '#FF6347']
+const recommendedRooms = ref<LiveRoom[]>([])
+const DANMAKU_COLORS = [
+  '#FFFFFF', '#000000',
+  '#FF5555', '#55FF55', '#5555FF', '#FFFF55', 
+  '#FF55FF', '#55FFFF', '#FF8C00', '#FF69B4', 
+  '#00CED1', '#FFD700', '#FF6347'
+]
+const DANMAKU_TYPES = [
+  { label: '滚动', value: 'scroll' },
+  { label: '顶部', value: 'top' },
+  { label: '底部', value: 'bottom' }
+]
 const messages = ref<Danmaku[]>([])
 let ws: DanmakuWebSocket | null = null
 let streamTimer: ReturnType<typeof setInterval> | null = null
@@ -108,6 +164,7 @@ const canManageRoom = computed(() => {
 
 onMounted(async () => {
   await loadRoom()
+  loadRecommendations()
   startStreamProbe()
   connectDanmaku()
 })
@@ -117,10 +174,22 @@ onUnmounted(() => {
   stopStreamProbe()
 })
 
+watch(() => route.params.id, async () => {
+  ws?.disconnect()
+  stopStreamProbe()
+  connected.value = false
+  streamReady.value = false
+  messages.value = []
+  await loadRoom()
+  loadRecommendations()
+  startStreamProbe()
+  connectDanmaku()
+})
+
 async function loadRoom() {
   loading.value = true
   try {
-    const res = await liveApi.detail(roomId)
+    const res = await liveApi.detail(roomId.value)
     room.value = res.data
     viewerCount.value = res.data.viewerCount || 0
   } catch (error: any) {
@@ -133,9 +202,13 @@ async function loadRoom() {
 function connectDanmaku() {
   if (!authStore.isLoggedIn || !authStore.token) return
   ws = new DanmakuWebSocket({
-    roomId,
+    roomId: roomId.value,
     token: authStore.token,
-    onMessage: (item) => messages.value.push(item),
+    onMessage: (item) => {
+      const shouldStickToBottom = isMessagesNearBottom()
+      messages.value.push(item)
+      if (shouldStickToBottom) scrollMessagesToBottom()
+    },
     onViewerCount: (count) => {
       viewerCount.value = count
       connected.value = true
@@ -195,17 +268,7 @@ function send() {
     return
   }
   if (!text.value.trim()) return
-  ws?.send(text.value.trim(), color.value)
-  messages.value.push({
-    id: Date.now(),
-    videoId: roomId,
-    userId: authStore.userInfo?.id || 0,
-    content: text.value.trim(),
-    time: 0,
-    color: color.value,
-    fontSize: 'medium',
-    type: 'scroll',
-  })
+  ws?.send(text.value.trim(), color.value, 'medium', danmakuType.value)
   text.value = ''
 }
 
@@ -217,6 +280,29 @@ function handlePlayerError() {
     ElMessage.warning('直播流暂未就绪，请确认 OBS 已开始推流')
     lastPlayerErrorAt = now
   }
+}
+async function loadRecommendations() {
+  try {
+    const res = await liveApi.list({ page: 1, pageSize: 8 })
+    recommendedRooms.value = res.data.list
+      .filter(item => item.id !== roomId.value && item.status === 'live')
+      .slice(0, 6)
+  } catch {
+    recommendedRooms.value = []
+  }
+}
+
+function isMessagesNearBottom() {
+  const el = messagesRef.value
+  if (!el) return true
+  return el.scrollHeight - el.scrollTop - el.clientHeight < 48
+}
+
+async function scrollMessagesToBottom() {
+  await nextTick()
+  const el = messagesRef.value
+  if (!el) return
+  el.scrollTop = el.scrollHeight
 }
 </script>
 
@@ -230,6 +316,19 @@ function handlePlayerError() {
   margin: 8px 0 0;
 }
 
+.owner-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.owner-link:hover {
+  color: #00aeec;
+}
+
 .room-status {
   display: flex;
   gap: 8px;
@@ -239,19 +338,22 @@ function handlePlayerError() {
 .live-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
+  align-items: start;
   gap: 18px;
 }
 
 .stage {
   overflow: hidden;
-  min-height: 540px;
+  height: min(540px, calc(100vh - 190px));
+  min-height: 420px;
   padding: 0;
   background: #0b1020;
 }
 
 .stage-placeholder {
   display: grid;
-  min-height: 540px;
+  height: 100%;
+  min-height: 420px;
   place-items: center;
   align-content: center;
   gap: 12px;
@@ -271,10 +373,18 @@ function handlePlayerError() {
   color: rgba(255, 255, 255, 0.74);
 }
 
+.side-col {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
 .chat {
   display: grid;
   grid-template-rows: auto 1fr auto auto;
-  min-height: 540px;
+  height: min(540px, calc(100vh - 190px));
+  min-height: 420px;
+  min-width: 0;
   padding: 16px;
 }
 
@@ -292,7 +402,9 @@ function handlePlayerError() {
   display: grid;
   align-content: start;
   gap: 10px;
-  overflow: auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px 0;
 }
 
@@ -332,6 +444,94 @@ function handlePlayerError() {
 .color-dot.active {
   border-color: #165dff;
   transform: scale(1.1);
+}
+
+.danmaku-type {
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+  justify-content: center;
+}
+
+.type-btn {
+  padding: 4px 12px;
+  border-radius: 16px;
+  background: #f0f2f5;
+  color: #333;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.type-btn.active {
+  background: #165dff;
+  color: white;
+}
+
+.recommend-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.recommend-panel h3 {
+  margin: 0;
+}
+
+.recommend-list {
+  display: grid;
+  gap: 12px;
+}
+
+.recommend-item {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  gap: 10px;
+  cursor: pointer;
+}
+
+.recommend-cover {
+  display: grid;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  place-items: center;
+  border-radius: 8px;
+  background: #f1f2f3;
+  color: #00aeec;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.recommend-cover img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.recommend-body {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.recommend-body strong {
+  overflow: hidden;
+  color: #18191c;
+  font-size: 14px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recommend-item:hover .recommend-body strong {
+  color: #00aeec;
+}
+
+.recommend-body span {
+  color: #9499a0;
+  font-size: 12px;
 }
 
 @media (max-width: 920px) {

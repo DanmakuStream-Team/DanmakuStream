@@ -17,12 +17,13 @@ export const useVideoStore = defineStore('video', () => {
       tag?: string 
       category?: string
       sort?: 'hot' | 'date' | 'like' | 'collect'
-    }
+    },
+    append = false,
   ) {
     loading.value = true
     try {
       const res = await videoApi.list(params)
-      videoList.value = res.data.list
+      videoList.value = append ? [...videoList.value, ...res.data.list] : res.data.list
       total.value = res.data.total
     } finally {
       loading.value = false

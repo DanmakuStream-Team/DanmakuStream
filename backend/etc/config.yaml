@@ -7,7 +7,7 @@ Auth:
   AccessExpire: 86400  # 24 hours in seconds
 
 Database:
-  DataSource: "root:password@tcp(mysql:3306)/danmakustream?charset=utf8mb4&parseTime=True&loc=Local"
+  DataSource: "root:2y561783n@tcp(localhost:3306)/danmakustream?charset=utf8mb4&parseTime=True&loc=Local"
 
 VideoDir: "data"
 

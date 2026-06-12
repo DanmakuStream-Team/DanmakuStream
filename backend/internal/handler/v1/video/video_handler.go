@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -86,6 +87,7 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		title := c.PostForm("title")
 		description := c.PostForm("description")
 		tags := c.PostForm("tags")
+		category := c.PostForm("category")
 
 		if title == "" {
 			response.Fail(c, http.StatusBadRequest, "标题不能为空")
@@ -131,6 +133,7 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			Title:       title,
 			Description: description,
 			Tags:        tags,
+			Category:    category,
 			AuthorID:    userID,
 			Status:      "pending",
 		}
@@ -190,6 +193,107 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 
 		response.Ok(c, video)
 	}
+}
+
+func DownloadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint(middleware.CtxKeyUserID)
+		role := c.GetString(middleware.CtxKeyRole)
+
+		videoID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || videoID == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的视频 ID")
+			return
+		}
+
+		var video model.Video
+		if err := svcCtx.DB.First(&video, videoID).Error; err != nil {
+			response.Fail(c, http.StatusNotFound, "视频不存在")
+			return
+		}
+
+		if video.Status != "approved" && video.AuthorID != userID && role != "admin" {
+			response.Fail(c, http.StatusForbidden, "无权下载该视频")
+			return
+		}
+		if video.VideoURL == "" {
+			response.Fail(c, http.StatusBadRequest, "视频尚未转码完成，暂时无法下载")
+			return
+		}
+
+		sourcePath, err := mediaPathToLocalPath(svcCtx.VideoDir, video.VideoURL)
+		if err != nil {
+			response.Fail(c, http.StatusBadRequest, "视频地址无效")
+			return
+		}
+		if _, err := os.Stat(sourcePath); err != nil {
+			response.Fail(c, http.StatusNotFound, "视频文件不存在或尚未生成")
+			return
+		}
+
+		fileName := safeDownloadName(video.Title) + ".mp4"
+		if strings.HasSuffix(strings.ToLower(sourcePath), ".m3u8") {
+			tmpFile, err := os.CreateTemp("", "danmakustream-download-*.mp4")
+			if err != nil {
+				response.Fail(c, http.StatusInternalServerError, "创建下载文件失败")
+				return
+			}
+			tmpPath := tmpFile.Name()
+			tmpFile.Close()
+			defer os.Remove(tmpPath)
+
+			cmd := exec.Command("ffmpeg",
+				"-y",
+				"-allowed_extensions", "ALL",
+				"-i", sourcePath,
+				"-c", "copy",
+				"-bsf:a", "aac_adtstoasc",
+				tmpPath,
+			)
+			if output, err := cmd.CombinedOutput(); err != nil {
+				fmt.Printf("video %d download remux failed: %s\n", video.ID, string(output))
+				response.Fail(c, http.StatusInternalServerError, "生成下载文件失败")
+				return
+			}
+
+			c.FileAttachment(tmpPath, fileName)
+			return
+		}
+
+		c.FileAttachment(sourcePath, fileName)
+	}
+}
+
+func mediaPathToLocalPath(videoDir string, url string) (string, error) {
+	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
+		return "", errors.New("remote media is not supported")
+	}
+	cleanURL := strings.TrimPrefix(url, "/")
+	const mediaPrefix = "media/"
+	if !strings.HasPrefix(cleanURL, mediaPrefix) {
+		return "", errors.New("invalid media path")
+	}
+	relative := strings.TrimPrefix(cleanURL, mediaPrefix)
+	return filepath.Join(videoDir, filepath.FromSlash(relative)), nil
+}
+
+func safeDownloadName(title string) string {
+	name := strings.TrimSpace(title)
+	if name == "" {
+		name = "danmaku-video"
+	}
+	replacer := strings.NewReplacer(
+		"\\", "_",
+		"/", "_",
+		":", "_",
+		"*", "_",
+		"?", "_",
+		"\"", "_",
+		"<", "_",
+		">", "_",
+		"|", "_",
+	)
+	return replacer.Replace(name)
 }
 
 func cleanupUploadRecord(svcCtx *svc.ServiceContext, videoID uint, tmpPath, videoDir string) {
@@ -438,6 +542,7 @@ func AdminListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 				DanmakuCount: video.DanmakuCount,
 				Status:       video.Status,
 				Tags:         video.Tags,
+				Category:     video.Category,
 				CreatedAt:    video.CreatedAt.Format("2006-01-02 15:04:05"),
 				Author: &model.UserInfo{
 					ID:       video.Author.ID,

@@ -8,6 +8,12 @@ export const danmakuApi = {
   send(data: Pick<Danmaku, 'videoId' | 'content' | 'time' | 'color' | 'fontSize' | 'type'>) {
     return request.post<Danmaku>('/danmaku', data)
   },
+  uploadAdvanced(videoId: number, file: File) {
+    const form = new FormData()
+    form.append('videoId', String(videoId))
+    form.append('file', file)
+    return request.post<{ list: Danmaku[]; count: number }>('/danmaku/advanced/upload', form)
+  },
   adminList(params: { page: number; pageSize: number; videoId?: number; keyword?: string; blocked?: boolean }) {
     return request.get<PageResult<Danmaku>>('/admin/danmaku', { params })
   },
@@ -19,6 +25,7 @@ export const danmakuApi = {
 export class DanmakuWebSocket {
   private ws: WebSocket | null = null
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private shouldReconnect = true
 
   constructor(
     private options: {
@@ -31,6 +38,7 @@ export class DanmakuWebSocket {
 
   connect() {
     if (!this.options.token) return
+    this.shouldReconnect = true
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
     this.ws = new WebSocket(`${protocol}://${location.host}/ws/live/${this.options.roomId}?token=${this.options.token}`)
     this.ws.onmessage = (event) => {
@@ -42,6 +50,7 @@ export class DanmakuWebSocket {
       if (data.type === 'viewer_count') this.options.onViewerCount(data.payload)
     }
     this.ws.onclose = () => {
+      if (!this.shouldReconnect) return
       this.reconnectTimer = setTimeout(() => this.connect(), 3000)
     }
   }
@@ -53,6 +62,7 @@ export class DanmakuWebSocket {
   }
 
   disconnect() {
+    this.shouldReconnect = false
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer)
     this.ws?.close()
     this.ws = null

@@ -22,7 +22,7 @@
       </div>
 
       <!-- 搜索模式：列表布局 -->
-      <div v-if="isSearching" v-loading="videoStore.loading" class="search-layout">
+      <div v-if="isSearching" v-loading="isInitialLoading" class="search-layout">
         <div class="search-header">
           <h2 class="search-result-title">搜索结果</h2>
         </div>
@@ -30,7 +30,7 @@
           v-for="video in videoStore.videoList"
           :key="video.id"
           class="search-item"
-          @click="router.push(`/video/${video.id}`)"
+          @click="openVideo(video)"
         >
           <div class="search-cover">
             <img v-if="video.coverUrl" :src="mediaUrl(video.coverUrl)" :alt="video.title" />
@@ -40,7 +40,9 @@
           <div class="search-body">
             <h3>{{ video.title }}</h3>
             <p class="search-author">
-              <span>{{ video.author?.nickname || '匿名用户' }}</span>
+              <button class="user-link" type="button" :disabled="!video.author?.id" @click.stop="openUser(video.author?.id)">
+                {{ video.author?.nickname || '匿名用户' }}
+              </button>
               <em>{{ formatCount(video.viewCount) }} 播放</em>
             </p>
             <p class="search-desc">{{ video.description || '暂无简介' }}</p>
@@ -52,23 +54,45 @@
       </div>
 
       <!-- 正常模式：精选+网格 -->
-      <div v-else ref="feedLayoutRef" v-loading="videoStore.loading" class="feed-layout">
-        <article v-if="featuredVideo" class="feature-card" @click="router.push(`/video/${featuredVideo.id}`)">
+      <div v-else ref="feedLayoutRef" v-loading="isInitialLoading" class="feed-layout">
+        <div v-if="featuredVideo" class="featured-section">
+          <article class="feature-card" @click="openVideo(featuredVideo)">
           <div class="feature-cover">
             <img v-if="featuredVideo.coverUrl" :src="mediaUrl(featuredVideo.coverUrl)" :alt="featuredVideo.title" />
             <div v-else class="feature-fallback">DanmakuStream</div>
             <div class="feature-title">
               <h3>{{ featuredVideo.title }}</h3>
-              <p>{{ featuredVideo.author?.nickname || '匿名用户' }}</p>
+              <button class="feature-author" type="button" :disabled="!featuredVideo.author?.id" @click.stop="openUser(featuredVideo.author?.id)">
+                {{ featuredVideo.author?.nickname || '匿名用户' }}
+              </button>
             </div>
           </div>
-        </article>
+          </article>
+
+          <div class="featured-side-grid">
+            <article
+              v-for="video in featuredSideVideos"
+              :key="video.id"
+              class="side-video-card"
+              @click="openVideo(video)"
+            >
+              <div class="side-cover">
+                <img v-if="video.coverUrl" :src="mediaUrl(video.coverUrl)" :alt="video.title" />
+                <div v-else class="side-fallback">Danmaku</div>
+              </div>
+              <div class="side-video-body">
+                <h3>{{ video.title }}</h3>
+                <span>{{ formatCount(video.viewCount) }} 鎾斁</span>
+              </div>
+            </article>
+          </div>
+        </div>
 
         <VideoCard
-          v-for="video in gridVideos"
+          v-for="video in restGridVideos"
           :key="video.id"
           :video="video"
-          @open="router.push(`/video/${video.id}`)"
+          @open="openVideo(video)"
         />
 
         <div v-if="!videoStore.videoList.length" class="empty-card">
@@ -76,15 +100,10 @@
         </div>
       </div>
 
-      <div class="pager">
-        <el-pagination
-          v-model:current-page="page"
-          :page-size="currentPageSize"
-          :total="videoStore.total"
-          background
-          layout="prev, pager, next"
-          @current-change="loadVideos"
-        />
+      <div v-if="videoStore.videoList.length && !loadError" ref="loadMoreRef" class="load-more">
+        <span v-if="videoStore.loading">加载中...</span>
+        <span v-else-if="hasMoreVideos">继续下滑加载更多</span>
+        <span v-else>没有更多了</span>
       </div>
     </section>
   </main>
@@ -94,16 +113,21 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import VideoCard from '@/components/common/VideoCard.vue'
+import { useAuthStore } from '@/store/auth'
 import { useVideoStore } from '@/store/video'
+import type { VideoInfo } from '@/types'
 import { formatCount, formatDuration, mediaUrl } from '@/utils/format'
 
 const router = useRouter()
 const route = useRoute()
+const authStore = useAuthStore()
 const videoStore = useVideoStore()
 const page = ref(1)
 const feedLayoutRef = ref<HTMLElement>()
+const loadMoreRef = ref<HTMLElement>()
 const feedColumnCount = ref(4)
 let resizeObserver: ResizeObserver | undefined
+let loadMoreObserver: IntersectionObserver | undefined
 const categoryList = ref([
   { label: '全部', value: '' },
   { label: '游戏', value: 'game' },
@@ -116,6 +140,7 @@ const categoryList = ref([
 const activeCategory = ref('')
 const keyword = ref(String(route.query.keyword || ''))
 const loadError = ref('')
+const recommendKey = 'danmaku:recommend-tags'
 
 const featureDescriptions: Record<string, string> = {
   video: '列表 / 搜索 / 详情',
@@ -131,13 +156,13 @@ const activeFeatureText = computed(() => {
 })
 
 const isSearching = computed(() => Boolean(keyword.value.trim()))
+const isInitialLoading = computed(() => videoStore.loading && page.value === 1)
+const hasMoreVideos = computed(() => videoStore.videoList.length < videoStore.total)
 const featuredVideo = computed(() => videoStore.videoList[0])
-const gridVideos = computed(() => videoStore.videoList.slice(featuredVideo.value ? 1 : 0))
+const featuredSideVideos = computed(() => videoStore.videoList.slice(featuredVideo.value ? 1 : 0, featuredVideo.value ? 5 : 0))
+const restGridVideos = computed(() => videoStore.videoList.slice(featuredVideo.value ? 5 : 0))
 const currentPageSize = computed(() => {
-  const columns = Math.max(feedColumnCount.value, 1)
-  if (isSearching.value || columns < 2) return columns * 6
-  const rows = columns >= 5 ? 4 : 5
-  return Math.max(columns * rows - 3, columns)
+  return isSearching.value ? 20 : 24
 })
 
 function updateFeedColumnCount() {
@@ -153,15 +178,24 @@ function updateFeedColumnCount() {
 }
 
 
-async function loadVideos() {
+async function loadVideos(options: { append?: boolean } = {}) {
   loadError.value = ''
+  if (videoStore.loading) return
+
+  const nextPage = options.append ? page.value + 1 : 1
   try {
     await videoStore.fetchVideoList({
-      page: page.value,
+      page: nextPage,
       pageSize: currentPageSize.value,
       keyword: keyword.value.trim() || undefined,
+      tag: String(route.query.tag || '').trim() || undefined,
       category: activeCategory.value || undefined,
-    })
+      sort: 'hot',
+    }, options.append)
+    page.value = nextPage
+    rankRecommendedVideos()
+    await nextTick()
+    observeLoadMore()
   } catch (error: any) {
     loadError.value = '后端服务暂未连接，当前只显示空状态。'
   }
@@ -170,8 +204,116 @@ async function loadVideos() {
 
 function selectCategory(catValue: string) {
   activeCategory.value = catValue
+  resetAndLoadVideos()
+}
+
+function openUser(userId?: number) {
+  if (!userId) return
+  router.push(`/user/${userId}`)
+}
+
+function openVideo(video: VideoInfo) {
+  rememberVideoPreference(video)
+  router.push(`/video/${video.id}`)
+}
+
+function resetAndLoadVideos() {
   page.value = 1
   loadVideos()
+}
+
+function observeLoadMore() {
+  loadMoreObserver?.disconnect()
+  if (!loadMoreRef.value) return
+
+  loadMoreObserver = new IntersectionObserver((entries) => {
+    const entry = entries[0]
+    if (!entry?.isIntersecting || !hasMoreVideos.value || videoStore.loading || loadError.value) return
+    loadVideos({ append: true })
+  }, { rootMargin: '360px 0px' })
+  loadMoreObserver.observe(loadMoreRef.value)
+}
+
+function rankRecommendedVideos() {
+  if (isSearching.value) {
+    dedupeVideos()
+    return
+  }
+
+  const weights = readRecommendWeights()
+  const seed = authStore.userInfo?.id || getAnonSeed()
+  const unique = dedupeVideos(false)
+
+  videoStore.videoList = unique.sort((a, b) => recommendScore(b, weights, seed) - recommendScore(a, weights, seed))
+}
+
+function recommendScore(video: VideoInfo, weights: Record<string, number>, seed: number) {
+  const tags = parseTags(video.tags)
+  const preferenceScore = tags.reduce((sum, tag) => sum + (weights[tag] || 0), 0)
+  const engagementScore = video.likeCount * 5 + video.collectCount * 4 + video.danmakuCount * 2 + video.viewCount
+  const freshScore = Date.parse(video.createdAt || '') || 0
+  const stableNoise = hashNumber(`${seed}:${video.id}`) % 1000
+
+  return preferenceScore * 10000 + engagementScore * 10 + freshScore / 100000000 + stableNoise / 1000
+}
+
+function dedupeVideos(writeBack = true) {
+  const map = new Map<number, VideoInfo>()
+  for (const video of videoStore.videoList) {
+    if (!map.has(video.id)) map.set(video.id, video)
+  }
+  const list = Array.from(map.values())
+  if (writeBack) videoStore.videoList = list
+  return list
+}
+
+function rememberVideoPreference(video: VideoInfo) {
+  const tags = parseTags(video.tags)
+  if (!tags.length) return
+
+  const weights = readRecommendWeights()
+  for (const tag of tags) {
+    weights[tag] = Math.min(20, (weights[tag] || 0) + 1)
+  }
+  localStorage.setItem(recommendKey, JSON.stringify(weights))
+}
+
+function readRecommendWeights() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(recommendKey) || '{}')
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .filter(([key, value]) => key && typeof value === 'number')
+        .map(([key, value]) => [key, Math.max(0, Math.min(20, value as number))]),
+    ) as Record<string, number>
+  } catch {
+    return {}
+  }
+}
+
+function parseTags(tags: VideoInfo['tags']) {
+  const list = Array.isArray(tags) ? tags : String(tags || '').split(',')
+  return list.map(tag => tag.trim()).filter(Boolean)
+}
+
+function getAnonSeed() {
+  const key = 'danmaku:recommend-seed'
+  const cached = Number(localStorage.getItem(key))
+  if (Number.isFinite(cached) && cached > 0) return cached
+
+  const seed = Math.floor(Math.random() * 1000000000)
+  localStorage.setItem(key, String(seed))
+  return seed
+}
+
+function hashNumber(value: string) {
+  let hash = 2166136261
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+  return Math.abs(hash)
 }
 
 onMounted(async () => {
@@ -193,16 +335,19 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
+  loadMoreObserver?.disconnect()
 })
 watch(() => route.query.keyword, (value) => {
   keyword.value = String(value || '')
-  page.value = 1
-  loadVideos()
+  resetAndLoadVideos()
+})
+
+watch(() => route.query.tag, () => {
+  resetAndLoadVideos()
 })
 
 watch(() => route.query.feature, () => {
-  page.value = 1
-  loadVideos()
+  resetAndLoadVideos()
 })
 </script>
 
@@ -277,15 +422,24 @@ watch(() => route.query.feature, () => {
   min-height: 360px;
 }
 
+.featured-section {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.9fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
 .feature-card {
-  grid-column: span 2;
-  grid-row: span 2;
+  align-self: start;
+  min-height: 100%;
   cursor: pointer;
 }
 
 .feature-cover {
   position: relative;
   overflow: hidden;
+  aspect-ratio: 16 / 9;
   height: 100%;
   border-radius: 10px;
   background: #f1f2f3;
@@ -326,10 +480,99 @@ watch(() => route.query.feature, () => {
   white-space: nowrap;
 }
 
-.feature-title p {
+.feature-author {
+  display: block;
   overflow: hidden;
   margin: 8px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: rgba(255, 255, 255, 0.76);
+  cursor: pointer;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feature-author:not(:disabled):hover {
+  color: #fff;
+}
+
+.feature-author:disabled {
+  cursor: default;
+}
+
+.featured-side-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.side-video-card {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 45% minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 10px;
+  background: #f7f9fc;
+  cursor: pointer;
+  transition: background 0.16s ease, transform 0.16s ease;
+}
+
+.side-video-card:hover {
+  background: #eef8fd;
+  transform: translateY(-1px);
+}
+
+.side-cover {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  background: #f1f2f3;
+}
+
+.side-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.side-fallback {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: #00aeec;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.side-video-body {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.side-video-body h3 {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: #18191c;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.side-video-body span {
+  overflow: hidden;
+  color: #9499a0;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -441,6 +684,27 @@ watch(() => route.query.feature, () => {
   font-style: normal;
 }
 
+.user-link {
+  max-width: 180px;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-link:not(:disabled):hover {
+  color: #00aeec;
+}
+
+.user-link:disabled {
+  cursor: default;
+}
+
 .search-desc {
   margin: 0;
   font-size: 13px;
@@ -459,10 +723,14 @@ watch(() => route.query.feature, () => {
   place-items: center;
 }
 
-.pager {
-  display: flex;
-  justify-content: center;
-  margin-top: 28px;
+.load-more {
+  display: grid;
+  min-height: 68px;
+  place-items: center;
+  margin-top: 22px;
+  color: #9499a0;
+  font-size: 14px;
+  font-weight: 800;
 }
 
 @media (max-width: 1100px) {
@@ -470,9 +738,12 @@ watch(() => route.query.feature, () => {
     grid-template-columns: 1fr;
   }
 
-  .feature-card {
-    grid-column: span 1;
-    grid-row: span 1;
+  .featured-section {
+    grid-template-columns: 1fr;
+  }
+
+  .featured-side-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .features {
@@ -491,6 +762,14 @@ watch(() => route.query.feature, () => {
 
   .search-item {
     grid-template-columns: 1fr;
+  }
+
+  .featured-side-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .side-video-card {
+    grid-template-columns: 128px minmax(0, 1fr);
   }
 }
 </style>

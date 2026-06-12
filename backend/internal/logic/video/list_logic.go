@@ -48,6 +48,7 @@ type VideoInfo struct {
 	DanmakuCount int64           `json:"danmakuCount"`
 	Status       string          `json:"status"`
 	Tags         string          `json:"tags"`
+	Category     string          `json:"category"`
 	CreatedAt    string          `json:"createdAt"`
 	Author       *model.UserInfo `json:"author"`
 }
@@ -135,6 +136,7 @@ func (l *ListVideoLogic) List(req *VideoListReq) (*PageResult[VideoInfo], error)
 			DanmakuCount: video.DanmakuCount,
 			Status:       video.Status,
 			Tags:         video.Tags,
+			Category:     video.Category,
 			CreatedAt:    video.CreatedAt.Format("2006-01-02 15:04:05"),
 			Author: &model.UserInfo{
 				ID:       video.Author.ID,

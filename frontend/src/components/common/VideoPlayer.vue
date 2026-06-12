@@ -12,7 +12,31 @@
       @ended="isPaused = true"
       @error="handleVideoError"
     />
-    <DanmakuLayer :items="danmakus" :current-time="currentTime" :paused="isPaused" />
+    <DanmakuLayer
+      :items="danmakus"
+      :current-time="currentTime"
+      :paused="isPaused"
+      :visible="danmakuVisible"
+      :opacity="danmakuOpacity / 100"
+    />
+
+    <div class="player-brand">DanmakuStream</div>
+    <div v-if="qualityOptions.length > 1" class="player-controls">
+      <el-select
+        v-model="selectedQuality"
+        class="quality-select"
+        size="small"
+        @change="switchQuality"
+      >
+        <el-option label="自动" :value="-1" />
+        <el-option
+          v-for="option in qualityOptions"
+          :key="option.value"
+          :label="option.label"
+          :value="option.value"
+        />
+      </el-select>
+    </div>
   </div>
 </template>
 
@@ -23,12 +47,28 @@ import type { Danmaku } from '@/types'
 import { mediaUrl } from '@/utils/format'
 import DanmakuLayer from './DanmakuLayer.vue'
 
-const props = defineProps<{ url: string; poster?: string; danmakus: Danmaku[]; autoplay?: boolean }>()
-const emit = defineEmits<{ timeupdate: [time: number]; error: [message: string] }>()
+const props = withDefaults(defineProps<{
+  url: string
+  poster?: string
+  danmakus: Danmaku[]
+  autoplay?: boolean
+  danmakuVisible?: boolean
+  danmakuOpacity?: number
+}>(), {
+  danmakuVisible: true,
+  danmakuOpacity: 85,
+})
+
+const emit = defineEmits<{
+  timeupdate: [time: number]
+  error: [message: string]
+}>()
 
 const videoRef = ref<HTMLVideoElement>()
 const currentTime = ref(0)
 const isPaused = ref(true)
+const selectedQuality = ref(-1)
+const qualityOptions = ref<{ label: string; value: number }[]>([])
 const sourceUrl = computed(() => mediaUrl(props.url))
 let hls: Hls | null = null
 
@@ -42,6 +82,8 @@ async function setupSource(url: string) {
   if (!video) return
 
   destroyHls()
+  qualityOptions.value = []
+  selectedQuality.value = -1
   video.removeAttribute('src')
   video.load()
   currentTime.value = 0
@@ -57,18 +99,18 @@ async function setupSource(url: string) {
     }
 
     if (Hls.isSupported()) {
-      hls = new Hls()
-      hls.on(Hls.Events.ERROR, (_, data) => {
-        if (data.fatal) {
-          emit('error', '视频加载失败，请确认资源已转码完成')
-          destroyHls()
-        }
-      })
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        if (props.autoplay) video.play().catch(() => {})
-      })
+      hls = new Hls({ enableWorker: true })
       hls.loadSource(url)
       hls.attachMedia(video)
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        qualityOptions.value = hls?.levels.map((level, index) => ({
+          label: `${level.height || '未知'}P`,
+          value: index,
+        })) || []
+      })
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) emit('error', '视频加载失败，请确认资源已转码完成')
+      })
       return
     }
 
@@ -78,17 +120,17 @@ async function setupSource(url: string) {
 
   video.src = url
   video.load()
-  if (props.autoplay) video.play().catch(() => {})
-}
-
-function destroyHls() {
-  if (!hls) return
-  hls.destroy()
-  hls = null
 }
 
 function isHlsSource(url: string) {
   return /\.m3u8($|\?)/i.test(url)
+}
+
+function destroyHls() {
+  if (hls) {
+    hls.destroy()
+    hls = null
+  }
 }
 
 function emitTime() {
@@ -98,6 +140,11 @@ function emitTime() {
 
 function handleVideoError() {
   emit('error', '视频加载失败，请确认资源已转码完成')
+}
+
+function switchQuality(value: number) {
+  if (!hls) return
+  hls.currentLevel = value
 }
 
 defineExpose({
@@ -115,15 +162,56 @@ defineExpose({
 .player {
   position: relative;
   overflow: hidden;
-  border-radius: 10px;
-  background: #0b1020;
+  width: 100%;
   aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  background: #05070d;
+  box-shadow: 0 16px 40px rgb(15 23 42 / 16%);
 }
 
 video {
+  display: block;
   width: 100%;
   height: 100%;
-  display: block;
   object-fit: contain;
+  background: #000;
+}
+
+.player-brand {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  z-index: 3;
+  color: rgb(255 255 255 / 72%);
+  font-size: 13px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.player-controls {
+  position: absolute;
+  right: 14px;
+  bottom: 48px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 42%);
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.player:hover .player-controls,
+.player:focus-within .player-controls {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.quality-select {
+  width: 92px;
 }
 </style>
