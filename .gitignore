@@ -16,12 +16,6 @@ backend/server
 *.test
 *.out
 
-# Python
-ai-service/__pycache__/
-ai-service/.venv/
-ai-service/*.pyc
-ai-service/.env
-
 # IDE
 .vscode/
 .idea/
@@ -37,6 +31,13 @@ Thumbs.db
 *.env
 !*.env.example
 
+# Python（recommendation / conda）
+recommendation/__pycache__/
+recommendation/*.pyc
+recommendation/data/
+.conda-envs/
+.conda-pkgs/
+.conda-home/
 
 # test
 /backend/data
