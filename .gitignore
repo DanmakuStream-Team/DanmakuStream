@@ -32,8 +32,8 @@ Thumbs.db
 !*.env.example
 
 # Python（recommendation / conda）
-recommendation/__pycache__/
-recommendation/*.pyc
+__pycache__/
+*.py[cod]
 recommendation/data/
 .conda-envs/
 .conda-pkgs/
