@@ -37,16 +37,6 @@ services:
       - ./backend/etc/config.yaml:/app/etc/config.yaml
       - video_data:/app/data
 
-  # ── AI Service (Python) ───────────────────────────────────────────
-  ai-service:
-    build:
-      context: ./ai-service
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    env_file:
-      - ./ai-service/.env
-
   # ── Frontend (Nginx) ──────────────────────────────────────────────
   frontend:
     build:

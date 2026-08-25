@@ -16,7 +16,7 @@
         </div>
         <el-progress
           type="dashboard"
-          :percentage="Math.round(metrics?.storage.usagePercent || 0)"
+          :percentage="boundedPercent(metrics?.storage.usagePercent)"
           :color="storageColor"
         />
         <div class="metric-meta">
@@ -51,7 +51,7 @@
         </div>
         <el-progress
           type="dashboard"
-          :percentage="Math.round(metrics?.cpu.usagePercent || 0)"
+          :percentage="boundedPercent(metrics?.cpu.usagePercent)"
           :color="cpuColor"
         />
         <div class="metric-meta">
@@ -141,6 +141,10 @@ function formatBytes(value = 0) {
 
 function formatPercent(value = 0) {
   return `${value.toFixed(value >= 10 ? 1 : 2)}%`
+}
+
+function boundedPercent(value = 0) {
+  return Math.min(100, Math.max(0, Math.round(value)))
 }
 </script>
 

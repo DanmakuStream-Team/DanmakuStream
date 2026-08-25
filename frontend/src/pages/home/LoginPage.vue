@@ -42,7 +42,7 @@ async function submit() {
   try {
     await authStore.login(form.nickname.trim(), form.password)
     ElMessage.success('登录成功')
-    router.push(String(route.query.redirect || '/'))
+    router.push(authStore.isStaff ? '/admin' : String(route.query.redirect || '/'))
   } finally {
     loading.value = false
   }

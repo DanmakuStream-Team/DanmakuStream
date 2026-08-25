@@ -14,7 +14,6 @@ DanmakuStream 是一个前后端分离的视频社区系统，支持视频点播
 | 后端 | Go · Gin · GORM · MySQL |
 | 直播 | SRS · RTMP 推流 · HLS 播放 |
 | 视频处理 | FFmpeg · HLS 分片 · 首帧封面 |
-| AI 服务 | Python · FastAPI · LangChain · DeepSeek |
 | 部署 | Docker Compose · 前端容器内置 Nginx |
 
 ## 目录结构
@@ -23,7 +22,6 @@ DanmakuStream 是一个前后端分离的视频社区系统，支持视频点播
 DanmakuStream/
 ├── frontend/          # Vue 3 前端应用和 Nginx 配置
 ├── backend/           # Gin API 服务
-├── ai-service/        # Python FastAPI AI 微服务
 ├── scripts/           # 数据库初始化和测试脚本
 ├── docker-compose.yml
 └── README.md
@@ -36,15 +34,11 @@ DanmakuStream/
 - Docker 和 Docker Compose
 - Go 1.22+，仅本地开发需要
 - Node.js 20+，仅本地开发需要
-- Python 3.12+，仅 AI 服务本地开发需要
 - FFmpeg，本地运行后端转码时需要；Docker 后端镜像内会安装
 
 ### Docker Compose 启动
 
 ```bash
-cp ai-service/.env.example ai-service/.env
-# 按需编辑 ai-service/.env，填写 LLM API Key
-
 docker compose up -d --build
 ```
 
@@ -56,7 +50,6 @@ docker compose up -d --build
 | 后端 API | 前端 Nginx 代理到 `/api/v1/*` |
 | SRS RTMP | `rtmp://localhost:1935/live/<streamKey>` |
 | SRS HLS | `http://localhost:8081/live/<streamKey>.m3u8` |
-| AI 服务 | `http://localhost:8000` |
 
 公网部署时需要把 [backend/etc/config.yaml](backend/etc/config.yaml) 里的直播地址改成公网可访问地址：
 

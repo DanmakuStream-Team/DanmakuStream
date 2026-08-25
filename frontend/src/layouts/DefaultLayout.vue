@@ -3,12 +3,12 @@
     <el-header class="topbar">
       <div class="topbar-inner">
         <div class="topbar-left">
-          <button class="brand" type="button" @click="router.push('/')">
+          <button class="brand" type="button" @click="router.push(authStore.isStaff ? '/admin' : '/')">
             <span class="brand-script">Danmaku</span>
             <span class="brand-name">Stream</span>
           </button>
 
-          <nav class="nav">
+          <nav v-if="visibleNavItems.length" class="nav">
             <button
               v-for="item in visibleNavItems"
               :key="item.key"
@@ -136,6 +136,20 @@
           <span />
           <span />
         </button>
+
+        <section v-if="authStore.isStaff" class="side-section primary-section">
+          <button
+            v-for="item in visibleAdminNavItems"
+            :key="item.key"
+            class="side-item"
+            :class="{ active: isActive(item.key) }"
+            type="button"
+            @click="router.push(item.path)"
+          >
+            <el-icon><component :is="item.icon" /></el-icon>
+            <span>{{ item.label }}</span>
+          </button>
+        </section>
 
         <section v-if="!authStore.isStaff" class="side-section primary-section">
           <button class="side-item" :class="{ active: isActive('home') }" type="button" @click="router.push('/')">
@@ -365,8 +379,21 @@ const navItems = [
 ]
 
 const visibleNavItems = computed(() => {
-  if (authStore.isStaff) return navItems.filter((item) => item.key === 'admin')
+  if (authStore.isStaff) return []
   return navItems.filter((item) => item.key !== 'admin')
+})
+
+const adminNavItems = [
+  { key: 'admin-dashboard', label: '后台首页', path: '/admin', icon: HomeFilled, adminOnly: false },
+  { key: 'admin-videos', label: '视频审核', path: '/admin/videos', icon: VideoCamera, adminOnly: false },
+  { key: 'admin-danmaku', label: '弹幕管理', path: '/admin/danmaku', icon: CollectionTag, adminOnly: false },
+  { key: 'admin-users', label: '用户管理', path: '/admin/users', icon: UserFilled, adminOnly: true },
+  { key: 'admin-operations', label: '运营管理', path: '/admin/operations', icon: Notebook, adminOnly: true },
+  { key: 'admin-infrastructure', label: '系统状态', path: '/admin/infrastructure', icon: Notebook, adminOnly: true },
+]
+
+const visibleAdminNavItems = computed(() => {
+  return adminNavItems.filter((item) => !item.adminOnly || authStore.isAdmin)
 })
 
 function goNav(item: (typeof navItems)[number]) {
@@ -388,6 +415,24 @@ function isActive(key: string) {
   }
   if (key === 'admin') {
     return route.path.startsWith('/admin')
+  }
+  if (key === 'admin-dashboard') {
+    return route.path === '/admin'
+  }
+  if (key === 'admin-videos') {
+    return route.path.startsWith('/admin/videos')
+  }
+  if (key === 'admin-danmaku') {
+    return route.path.startsWith('/admin/danmaku')
+  }
+  if (key === 'admin-users') {
+    return route.path.startsWith('/admin/users')
+  }
+  if (key === 'admin-operations') {
+    return route.path.startsWith('/admin/operations')
+  }
+  if (key === 'admin-infrastructure') {
+    return route.path.startsWith('/admin/infrastructure')
   }
   if (key === 'history') {
     return route.path === '/me/history'
