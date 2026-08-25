@@ -72,7 +72,44 @@
           <span>{{ user.videoCount || 0 }} 视频</span>
         </div>
       </div>
-      <el-button v-if="!isSelf" type="primary" @click="follow">{{ user.followed ? '已关注' : '关注' }}</el-button>
+      <div v-if="!isSelf" class="relationship-actions">
+        <el-button @click="router.push(`/messages/${user.id}`)">私信</el-button>
+        <el-button :disabled="user.blocked" :type="user.followed ? 'default' : 'primary'" @click="follow">
+          {{ user.blocked ? '已拉黑' : (user.followed ? '已关注' : '关注') }}
+        </el-button>
+        <el-button
+          v-if="membershipPlan?.enabled || membershipStatus.active"
+          class="membership-action"
+          :class="{ active: membershipStatus.active }"
+          :disabled="user.blocked"
+          @click="openSubscriptionDialog"
+        >
+          <el-icon><Star /></el-icon>
+          {{ subscriptionButtonText }}
+        </el-button>
+        <el-select
+          v-if="user.followed"
+          :model-value="user.groupId || 0"
+          class="group-select"
+          aria-label="关注分组"
+          @change="changeGroup"
+        >
+          <el-option label="未分组" :value="0" />
+          <el-option v-for="group in followGroups" :key="group.id" :label="group.name" :value="group.id" />
+        </el-select>
+        <el-popconfirm
+          :title="user.blocked ? '确定将该用户移出黑名单吗？' : '拉黑后将自动解除双方关注，确定继续吗？'"
+          confirm-button-text="确定"
+          cancel-button-text="取消"
+          @confirm="toggleBlock"
+        >
+          <template #reference>
+            <el-button class="icon-button" :aria-label="user.blocked ? '解除拉黑' : '拉黑'">
+              <el-icon><MoreFilled /></el-icon>
+            </el-button>
+          </template>
+        </el-popconfirm>
+      </div>
     </section>
 
     <section>
@@ -86,6 +123,30 @@
         <el-empty description="暂无公开视频" />
       </div>
     </section>
+
+    <el-dialog v-model="subscriptionVisible" title="付费特别关注" width="460px">
+      <div v-if="membershipPlan" class="subscription-dialog">
+        <div class="subscription-creator">
+          <el-avatar :size="48" :src="avatarSrc">{{ user?.nickname?.slice(0, 1) }}</el-avatar>
+          <div><strong>{{ user?.nickname }}</strong><span>{{ membershipPlan.benefits || '特别关注标识、优先接收创作者动态' }}</span></div>
+        </div>
+        <label>
+          <span>订阅时长</span>
+          <el-segmented v-model="subscriptionMonths" :options="subscriptionMonthOptions" />
+        </label>
+        <div class="subscription-total">
+          <span>{{ subscriptionMonths }} 个月</span>
+          <strong>{{ formatMembershipPrice(subscriptionTotalCents) }}</strong>
+        </div>
+        <el-alert title="这是项目演示支付，不会产生真实扣款。" type="info" :closable="false" show-icon />
+      </div>
+      <template #footer>
+        <el-button @click="subscriptionVisible = false">取消</el-button>
+        <el-button type="primary" :loading="subscriptionPaying" @click="confirmSubscription">
+          {{ membershipStatus.active ? '确认续费' : '确认订阅' }}
+        </el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="cropVisible" title="选择头像显示区域" width="520px" @closed="resetCrop">
       <div class="cropper">
@@ -114,12 +175,19 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { MoreFilled, Star } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import VideoCard from '@/components/common/VideoCard.vue'
-import { userApi } from '@/api/user'
+import { userApi, type FollowGroupInfo } from '@/api/user'
 import { authApi } from '@/api/auth'
 import { videoApi } from '@/api/video'
+import {
+  formatMembershipPrice,
+  membershipApi,
+  type CreatorSubscriptionInfo,
+  type MembershipPlan,
+} from '@/api/membership'
 import { useAuthStore } from '@/store/auth'
 import type { UserInfo, VideoInfo } from '@/types'
 import { mediaUrl } from '@/utils/format'
@@ -146,6 +214,17 @@ const cropOffsetY = ref(0)
 let cropDragStart: { x: number; y: number; offsetX: number; offsetY: number } | null = null
 const user = ref<UserInfo | null>(null)
 const videos = ref<VideoInfo[]>([])
+const followGroups = ref<FollowGroupInfo[]>([])
+const membershipPlan = ref<MembershipPlan | null>(null)
+const membershipStatus = ref<{ active: boolean; subscription: CreatorSubscriptionInfo | null }>({ active: false, subscription: null })
+const subscriptionVisible = ref(false)
+const subscriptionMonths = ref(1)
+const subscriptionPaying = ref(false)
+const subscriptionMonthOptions = [
+  { label: '1 个月', value: 1 },
+  { label: '3 个月', value: 3 },
+  { label: '12 个月', value: 12 },
+]
 const isSelf = computed(() => Boolean(user.value && authStore.userInfo?.id === user.value.id))
 const avatarSrc = computed(() => {
   const url = mediaUrl(user.value?.avatar)
@@ -155,6 +234,13 @@ const avatarSrc = computed(() => {
 const cropImageStyle = computed(() => ({
   transform: `translate(${cropOffsetX.value}px, ${cropOffsetY.value}px) scale(${cropScale.value})`,
 }))
+const subscriptionTotalCents = computed(() => (membershipPlan.value?.priceCents || 0) * subscriptionMonths.value)
+const subscriptionButtonText = computed(() => {
+  if (membershipStatus.value.active && membershipStatus.value.subscription) {
+    return `特别关注 · 剩余 ${membershipStatus.value.subscription.daysRemaining} 天`
+  }
+  return `${formatMembershipPrice(membershipPlan.value?.priceCents || 0)}/月`
+})
 
 onMounted(load)
 onUnmounted(resetCrop)
@@ -164,12 +250,20 @@ async function load() {
   const id = Number(route.params.id)
   loading.value = true
   try {
-    const [profileRes, videosRes] = await Promise.all([
+    const [profileRes, videosRes, groupsRes, planRes, statusRes] = await Promise.all([
       userApi.profile(id),
       videoApi.userVideos(id, { page: 1, pageSize: 20 }),
+      authStore.isLoggedIn ? userApi.followGroups() : Promise.resolve({ data: { list: [] } }),
+      membershipApi.plan(id),
+      authStore.isLoggedIn && authStore.userInfo?.id !== id
+        ? membershipApi.status(id)
+        : Promise.resolve({ data: { active: false, subscription: null } }),
     ])
     user.value = profileRes.data
     videos.value = videosRes.data.list
+    followGroups.value = groupsRes.data.list
+    membershipPlan.value = planRes.data
+    membershipStatus.value = statusRes.data
   } finally {
     loading.value = false
   }
@@ -185,6 +279,59 @@ async function follow() {
   const res = await userApi.follow(user.value.id)
   user.value.followed = res.data.followed
   user.value.fanCount += res.data.followed ? 1 : -1
+  if (!res.data.followed) {
+    user.value.special = false
+    user.value.groupId = null
+  }
+}
+
+function openSubscriptionDialog() {
+  if (!authStore.isLoggedIn) {
+    router.push({ path: '/login', query: { redirect: route.fullPath } })
+    return
+  }
+  subscriptionMonths.value = 1
+  subscriptionVisible.value = true
+}
+
+async function confirmSubscription() {
+  if (!user.value || !membershipPlan.value) return
+  subscriptionPaying.value = true
+  try {
+    const wasFollowed = Boolean(user.value.followed)
+    const order = await membershipApi.createOrder(user.value.id, subscriptionMonths.value)
+    const paid = await membershipApi.demoPay(order.data.orderNo)
+    membershipStatus.value = { active: true, subscription: paid.data }
+    user.value.special = true
+    user.value.followed = true
+    if (!wasFollowed) user.value.fanCount += 1
+    subscriptionVisible.value = false
+    ElMessage.success('付费特别关注已开通')
+  } catch (error: any) {
+    ElMessage.error(error.message || '订阅失败')
+  } finally {
+    subscriptionPaying.value = false
+  }
+}
+
+async function changeGroup(groupId: number) {
+  if (!user.value?.followed) return
+  await userApi.updateFollowSettings(user.value.id, { groupId })
+  user.value.groupId = groupId || null
+  ElMessage.success(groupId ? '关注分组已更新' : '已移至未分组')
+}
+
+async function toggleBlock() {
+  if (!user.value) return
+  const res = await userApi.block(user.value.id)
+  user.value.blocked = res.data.blocked
+  if (res.data.blocked) {
+    if (user.value.followed) user.value.fanCount = Math.max(0, user.value.fanCount - 1)
+    user.value.followed = false
+    user.value.special = false
+    user.value.groupId = null
+  }
+  ElMessage.success(res.data.blocked ? '已加入黑名单' : '已移出黑名单')
 }
 
 function triggerAvatarInput() {
@@ -609,10 +756,87 @@ h1 {
   gap: 18px;
 }
 
+.relationship-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.relationship-actions .el-button + .el-button {
+  margin-left: 0;
+}
+
+.icon-button {
+  width: 34px;
+  padding: 0;
+}
+
+.icon-button.active {
+  border-color: #fb7299;
+  color: #fb7299;
+}
+
+.membership-action.active {
+  border-color: #fb7299;
+  color: #fb7299;
+}
+
+.subscription-dialog {
+  display: grid;
+  gap: 20px;
+}
+
+.subscription-creator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.subscription-creator > div,
+.subscription-dialog label {
+  display: grid;
+  gap: 6px;
+}
+
+.subscription-creator strong {
+  color: #18191c;
+}
+
+.subscription-creator span,
+.subscription-dialog label > span,
+.subscription-total span {
+  color: #667085;
+  font-size: 13px;
+}
+
+.subscription-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border: 1px solid #e4e7ec;
+  border-radius: 6px;
+}
+
+.subscription-total strong {
+  color: #fb7299;
+  font-size: 22px;
+}
+
+.group-select {
+  width: 118px;
+}
+
 @media (max-width: 820px) {
   .profile-hero,
   .video-grid {
     grid-template-columns: 1fr;
+  }
+
+  .relationship-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }
 </style>

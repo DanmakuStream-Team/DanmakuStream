@@ -5,8 +5,10 @@ import (
 	"strconv"
 	"strings"
 
+	chatlogic "danmakustream/backend/internal/logic/chat"
 	danmakulogic "danmakustream/backend/internal/logic/danmaku"
 	"danmakustream/backend/internal/middleware"
+	model "danmakustream/backend/internal/model/mysql"
 	"danmakustream/backend/internal/svc"
 
 	"github.com/gin-gonic/gin"
@@ -29,6 +31,46 @@ func LiveWebSocketHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			return
 		}
 
+		userID, _ := getUserIDFromLiveRequest(c, svcCtx)
+		monitor := c.Query("monitor") == "1"
+		if monitor {
+			var count int64
+			if userID == 0 || svcCtx.DB.Model(&model.LiveRoom{}).Where("id = ? AND owner_id = ?", roomID, userID).Count(&count).Error != nil || count == 0 {
+				c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+				return
+			}
+		}
+		var userInfo *model.UserInfo
+		if userID > 0 {
+			var user model.User
+			if err := svcCtx.DB.First(&user, userID).Error; err == nil {
+				userInfo = &model.UserInfo{ID: user.ID, Username: user.Username, Nickname: user.Nickname, Avatar: user.Avatar, Role: user.Role}
+			}
+		}
+
+		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+		if err != nil {
+			return
+		}
+
+		client := &danmakulogic.Client{
+			Hub:     hub,
+			Conn:    conn,
+			RoomID:  uint(roomID),
+			UserID:  userID,
+			User:    userInfo,
+			Monitor: monitor,
+			Send:    make(chan []byte, 256),
+		}
+		hub.Register <- client
+		go client.WritePump()
+		go client.ReadPump()
+	}
+}
+
+func ChatWebSocketHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	hub := chatlogic.GetHub(svcCtx)
+	return func(c *gin.Context) {
 		userID, ok := getUserIDFromLiveRequest(c, svcCtx)
 		if !ok {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
@@ -39,15 +81,13 @@ func LiveWebSocketHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		if err != nil {
 			return
 		}
-
-		client := &danmakulogic.Client{
+		client := &chatlogic.Client{
 			Hub:    hub,
 			Conn:   conn,
-			RoomID: uint(roomID),
 			UserID: userID,
-			Send:   make(chan []byte, 256),
+			Send:   make(chan []byte, 128),
 		}
-		hub.Register <- client
+		hub.Register(client)
 		go client.WritePump()
 		go client.ReadPump()
 	}

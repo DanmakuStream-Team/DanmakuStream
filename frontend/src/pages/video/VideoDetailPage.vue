@@ -9,7 +9,9 @@
           :poster="video.coverUrl"
           :danmakus="danmakus"
           :danmaku-opacity="danmakuOpacity"
-          @timeupdate="currentTime = $event"
+          :chapters="chapters"
+          @timeupdate="handleTimeUpdate"
+          @ended="playNextVideo"
           @error="ElMessage.error($event)"
         />
 
@@ -23,6 +25,9 @@
           <div class="actions">
             <el-button @click="toggleLike">点赞 {{ formatCount(video.likeCount) }}</el-button>
             <el-button @click="toggleCollect">收藏 {{ formatCount(video.collectCount) }}</el-button>
+            <el-button :loading="watchLaterLoading" @click="toggleWatchLater">
+              {{ watchLaterSaved ? '已加入稍后再看' : '稍后再看' }}
+            </el-button>
             <el-button :loading="downloading" @click="downloadVideo">下载</el-button>
           </div>
           <div class="tags">
@@ -30,6 +35,12 @@
             <el-tag v-for="tag in normalizeTags(video.tags)" :key="tag">{{ tag }}</el-tag>
           </div>
           <p>{{ video.description || '这个视频暂无简介。' }}</p>
+          <div v-if="chapters.length" class="chapter-list" aria-label="视频章节">
+            <button v-for="chapter in chapters" :key="chapter.time" type="button" @click="playerRef?.seek(chapter.time)">
+              <span>{{ formatChapterTime(chapter.time) }}</span>
+              {{ chapter.label }}
+            </button>
+          </div>
         </div>
 
         <section class="soft-panel comments">
@@ -212,7 +223,17 @@
         </div>
 
         <div class="soft-panel recommend-panel">
-          <h3>相关推荐</h3>
+          <div class="recommend-head">
+            <h3>相关推荐</h3>
+            <label><span>自动续播</span><el-switch v-model="autoplayNext" size="small" /></label>
+          </div>
+          <div v-if="playQueue.length" class="queue-block">
+            <div class="queue-title"><strong>播放队列</strong><button type="button" @click="clearQueue">清空</button></div>
+            <button v-for="item in playQueue" :key="item.id" class="queue-item" type="button" @click="openRecommendedVideo(item)">
+              <span>{{ item.title }}</span>
+              <small @click.stop="removeFromQueue(item.id)">移除</small>
+            </button>
+          </div>
           <div class="recommend-list">
             <article
               v-for="item in recommendedVideos"
@@ -227,6 +248,7 @@
               <div class="recommend-body">
                 <strong>{{ item.title }}</strong>
                 <span>{{ formatCount(item.viewCount) }} 播放 · {{ formatCount(item.danmakuCount) }} 弹幕</span>
+                <button type="button" @click.stop="addToQueue(item)">加入队列</button>
               </div>
             </article>
             <el-empty v-if="!recommendedVideos.length" description="暂无推荐" />
@@ -242,7 +264,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import VideoPlayer from '@/components/common/VideoPlayer.vue'
@@ -252,12 +274,15 @@ import { commentApi } from '@/api/comment'
 import { danmakuApi } from '@/api/danmaku'
 import { userApi } from '@/api/user'
 import { videoApi } from '@/api/video'
+import { libraryApi } from '@/api/library'
 import { useAuthStore } from '@/store/auth'
 import { useCommentStore } from '@/store/comment'
 import { useVideoStore } from '@/store/video'
 import type { Comment, Danmaku, UserInfo, VideoCollectionInfo, VideoInfo } from '@/types'
 import { formatCount, formatTime, mediaUrl, normalizeTags } from '@/utils/format'
 import { removeUserLibraryRecord, upsertUserLibraryRecord } from '@/utils/userLibrary'
+import { loadPlayQueue, readAutoplay, saveAutoplay, savePlayQueue } from '@/utils/playQueue'
+import { parseVideoChapters } from '@/utils/videoChapters'
 
 const route = useRoute()
 const router = useRouter()
@@ -285,7 +310,11 @@ const commentText = ref('')
 const commentsCollapsed = ref(false)
 const downloading = ref(false)
 const uploadingAdvanced = ref(false)
+const watchLaterLoading = ref(false)
+const watchLaterSaved = ref(false)
 const recommendedVideos = ref<VideoInfo[]>([])
+const playQueue = ref<VideoInfo[]>(loadPlayQueue())
+const autoplayNext = ref(readAutoplay())
 const videoCollections = ref<VideoCollectionInfo[]>([])
 const myCollections = ref<VideoCollectionInfo[]>([])
 const selectedCollectionDetail = ref<VideoCollectionInfo | null>(null)
@@ -294,6 +323,7 @@ const newCollectionTitle = ref('')
 const collaboratorKeyword = ref('')
 const collaboratorOptions = ref<UserInfo[]>([])
 const video = computed(() => videoStore.currentVideo)
+const chapters = computed(() => parseVideoChapters(video.value?.description || ''))
 const canManageVideo = computed(() => Boolean(
   authStore.userInfo &&
   video.value &&
@@ -301,23 +331,32 @@ const canManageVideo = computed(() => Boolean(
 ))
 let touchStartY = 0
 const SWIPE_THRESHOLD = 50
+let historySyncing = false
+let lastHistorySyncAt = 0
+let lastSavedPosition = -1
 
 onMounted(load)
 onUnmounted(() => {
-  saveHistory()
+  void saveHistory(true)
   videoStore.clearCurrent()
   commentStore.clearComments()
 })
 
 watch(() => route.params.id, () => {
+  void saveHistory(true)
   videoStore.clearCurrent()
   commentStore.clearComments()
   danmakus.value = []
   recommendedVideos.value = []
   videoCollections.value = []
   selectedCollectionDetail.value = null
+  currentTime.value = 0
+  lastSavedPosition = -1
+  watchLaterSaved.value = false
   load()
 })
+
+watch(autoplayNext, saveAutoplay)
 
 function handleTouchStart(e: TouchEvent) {
   touchStartY = e.touches[0].clientY
@@ -349,8 +388,9 @@ async function load() {
       commentStore.fetchComments(id),
     ])
     danmakus.value = danmakuRes.data
-    await Promise.all([loadRecommendations(), loadVideoCollections(), loadMyCollections()])
-    saveHistory()
+    await Promise.all([loadRecommendations(), loadVideoCollections(), loadMyCollections(), loadWatchLaterStatus()])
+    await restoreHistory()
+    await saveHistory(true)
   } finally {
     loading.value = false
   }
@@ -395,6 +435,38 @@ async function loadMyCollections() {
 
 function openRecommendedVideo(item: VideoInfo) {
   router.push(`/video/${item.id}`)
+}
+
+function addToQueue(item: VideoInfo) {
+  if (item.id === video.value?.id || playQueue.value.some((queued) => queued.id === item.id)) {
+    ElMessage.info('这个视频已经在队列中')
+    return
+  }
+  playQueue.value.push(item)
+  savePlayQueue(playQueue.value)
+  ElMessage.success('已加入播放队列')
+}
+
+function removeFromQueue(id: number) {
+  playQueue.value = playQueue.value.filter((item) => item.id !== id)
+  savePlayQueue(playQueue.value)
+}
+
+function clearQueue() {
+  playQueue.value = []
+  savePlayQueue([])
+}
+
+function playNextVideo() {
+  if (!autoplayNext.value) return
+  const queued = playQueue.value.find((item) => item.id !== video.value?.id)
+  if (queued) {
+    removeFromQueue(queued.id)
+    openRecommendedVideo(queued)
+    return
+  }
+  const recommended = recommendedVideos.value[0]
+  if (recommended) openRecommendedVideo(recommended)
 }
 
 async function openCollection(id: number) {
@@ -470,6 +542,30 @@ async function toggleCollect() {
   } else {
     current.collectCount = Math.max(0, current.collectCount - 1)
     removeUserLibraryRecord('collections', current.id)
+  }
+}
+
+async function loadWatchLaterStatus() {
+  if (!authStore.isLoggedIn || !video.value) return
+  try {
+    const res = await libraryApi.watchLaterStatus(video.value.id)
+    watchLaterSaved.value = res.data.saved
+  } catch {
+    watchLaterSaved.value = false
+  }
+}
+
+async function toggleWatchLater() {
+  if (!ensureLogin() || !video.value) return
+  watchLaterLoading.value = true
+  try {
+    const res = await libraryApi.toggleWatchLater(video.value.id)
+    watchLaterSaved.value = res.data.saved
+    ElMessage.success(res.data.saved ? '已加入稍后再看' : '已从稍后再看移除')
+  } catch (error: any) {
+    ElMessage.error(error.message || '稍后再看操作失败')
+  } finally {
+    watchLaterLoading.value = false
   }
 }
 
@@ -588,11 +684,48 @@ function ensureLogin() {
   return false
 }
 
-function saveHistory() {
+function handleTimeUpdate(time: number) {
+  currentTime.value = time
+  if (Date.now() - lastHistorySyncAt >= 10_000) {
+    lastHistorySyncAt = Date.now()
+    void saveHistory()
+  }
+}
+
+async function restoreHistory() {
+  if (!authStore.isLoggedIn || !video.value) return
+  let position = Number(route.query.t)
+  if (!Number.isFinite(position) || position <= 0) {
+    try {
+      const res = await libraryApi.historyDetail(video.value.id)
+      position = res.data.position
+    } catch {
+      position = 0
+    }
+  }
+  if (position <= 0) return
+  currentTime.value = position
+  lastSavedPosition = Math.floor(position)
+  await nextTick()
+  playerRef.value?.seek(position)
+}
+
+async function saveHistory(force = false) {
   if (!authStore.isLoggedIn || !video.value) return
   const duration = video.value.duration || 0
   const progress = duration > 0 ? Math.min(100, Math.round((currentTime.value / duration) * 100)) : 0
   upsertUserLibraryRecord('history', video.value, progress)
+  const position = Math.max(0, Math.floor(currentTime.value))
+  if (historySyncing || (!force && position === lastSavedPosition)) return
+  historySyncing = true
+  try {
+    await libraryApi.saveHistory(video.value.id, position)
+    lastSavedPosition = position
+  } catch {
+    // Local history remains available if the network is temporarily unavailable.
+  } finally {
+    historySyncing = false
+  }
 }
 
 function categoryLabel(value: string) {
@@ -605,6 +738,15 @@ function categoryLabel(value: string) {
     knowledge: '知识',
   }
   return map[value] || value
+}
+
+function formatChapterTime(value: number) {
+  const seconds = Math.floor(value % 60).toString().padStart(2, '0')
+  const minutes = Math.floor(value / 60) % 60
+  const hours = Math.floor(value / 3600)
+  return hours > 0
+    ? `${hours}:${minutes.toString().padStart(2, '0')}:${seconds}`
+    : `${minutes.toString().padStart(2, '0')}:${seconds}`
 }
 </script>
 
@@ -667,6 +809,11 @@ function categoryLabel(value: string) {
   color: #475467;
   line-height: 1.8;
 }
+
+.chapter-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.chapter-list button { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; color: #344054; cursor: pointer; }
+.chapter-list button:hover { border-color: #00aeec; color: #00aeec; }
+.chapter-list span { color: #00aeec; font-variant-numeric: tabular-nums; font-weight: 700; }
 
 .author-panel,
 .collaborator-panel,
@@ -865,6 +1012,16 @@ function categoryLabel(value: string) {
   display: grid;
   gap: 12px;
 }
+
+.recommend-head, .recommend-head label, .queue-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.recommend-head label { color: #667085; font-size: 12px; }
+.queue-block { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid #eef0f3; border-bottom: 1px solid #eef0f3; }
+.queue-title { margin-bottom: 3px; font-size: 13px; }
+.queue-title button, .queue-item, .recommend-body button { padding: 0; border: 0; background: transparent; color: #667085; cursor: pointer; }
+.queue-title button, .queue-item small, .recommend-body button { color: #00aeec; font-size: 12px; }
+.queue-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 6px 0; color: #344054; text-align: left; }
+.queue-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recommend-body button { justify-self: start; }
 
 .recommend-item {
   display: grid;
