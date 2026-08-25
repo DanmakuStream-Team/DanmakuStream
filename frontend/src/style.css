@@ -17,16 +17,14 @@
   box-sizing: border-box;
 }
 
-body,
-button,
 input,
-textarea,
-.el-button,
-.el-input__inner,
-.el-dropdown-menu__item {
+.el-input__inner {
   white-space: nowrap;
 }
 
+button,
+.el-button,
+.el-dropdown-menu__item,
 p,
 textarea,
 .search-desc,

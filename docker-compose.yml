@@ -18,10 +18,14 @@ services:
   # ── Live Streaming (SRS) ──────────────────────────────────────────
   srs:
     image: ossrs/srs:5
+    command: ["./objs/srs", "-c", "conf/danmakustream.conf"]
     ports:
       - "1935:1935"
       - "1985:1985"
       - "8081:8080"
+    volumes:
+      - ./deploy/srs.conf:/usr/local/srs/conf/danmakustream.conf:ro
+      - ./backend/data/live:/usr/local/srs/objs/nginx/html/live
 
   # ── Backend (Go) ──────────────────────────────────────────────────
   backend:

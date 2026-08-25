@@ -30,6 +30,9 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		&model.Danmaku{},
 		&model.Comment{},
 		&model.LiveRoom{},
+		&model.LiveLike{},
+		&model.LiveGift{},
+		&model.LiveReplay{},
 		&model.DynamicPost{},
 		&model.LiveSchedule{},
 		&model.LiveReservation{},
@@ -37,10 +40,20 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		&model.SiteBanner{},
 		&model.SiteAnnouncement{},
 		&model.TrafficStat{},
+		&model.CreatorDailyStat{},
+		&model.VideoDailyStat{},
+		&model.FollowGroup{},
 		&model.Follow{},
+		&model.UserBlock{},
+		&model.ChatMessage{},
+		&model.CreatorMembershipPlan{},
+		&model.CreatorSubscription{},
+		&model.SubscriptionOrder{},
 		&model.Like{},
 		&model.Collect{},
 		&model.CommentLike{},
+		&model.WatchHistory{},
+		&model.WatchLater{},
 	)
 
 	videoDir := c.VideoDir
@@ -52,6 +65,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	os.MkdirAll(filepath.Join(absDir, "covers"), 0755)
 	os.MkdirAll(filepath.Join(absDir, "avatars"), 0755)
 	os.MkdirAll(filepath.Join(absDir, "images"), 0755)
+	os.MkdirAll(filepath.Join(absDir, "live"), 0755)
 
 	return &ServiceContext{
 		Config:   c,

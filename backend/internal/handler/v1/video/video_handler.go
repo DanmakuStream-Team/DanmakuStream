@@ -15,6 +15,7 @@ import (
 	"gorm.io/gorm"
 
 	"danmakustream/backend/internal/handler/response"
+	analyticslogic "danmakustream/backend/internal/logic/analytics"
 	videologic "danmakustream/backend/internal/logic/video"
 	"danmakustream/backend/internal/middleware"
 	model "danmakustream/backend/internal/model/mysql"
@@ -448,7 +449,7 @@ func CollectHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		}
 
 		var video model.Video
-		if err := svcCtx.DB.Select("id", "status").First(&video, videoID).Error; err != nil {
+		if err := svcCtx.DB.Select("id", "status", "author_id").First(&video, videoID).Error; err != nil {
 			response.Fail(c, http.StatusNotFound, "视频不存在")
 			return
 		}
@@ -468,9 +469,19 @@ func CollectHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 					return err
 				}
 				collected = false
-				return tx.Model(&model.Video{}).
+				result := tx.Model(&model.Video{}).
 					Where("id = ? AND collect_count > 0", videoID).
-					UpdateColumn("collect_count", gorm.Expr("collect_count - ?", 1)).Error
+					UpdateColumn("collect_count", gorm.Expr("collect_count - ?", 1))
+				if result.Error != nil {
+					return result.Error
+				}
+				if result.RowsAffected == 0 {
+					return nil
+				}
+				if err := analyticslogic.AddCreatorDailyStat(tx, video.AuthorID, 0, -1, 0); err != nil {
+					return err
+				}
+				return analyticslogic.AddVideoDailyStat(tx, video.AuthorID, uint(videoID), 0, -1)
 			}
 
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -485,9 +496,15 @@ func CollectHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			}
 
 			collected = true
-			return tx.Model(&model.Video{}).
+			if err := tx.Model(&model.Video{}).
 				Where("id = ?", videoID).
-				UpdateColumn("collect_count", gorm.Expr("collect_count + ?", 1)).Error
+				UpdateColumn("collect_count", gorm.Expr("collect_count + ?", 1)).Error; err != nil {
+				return err
+			}
+			if err := analyticslogic.AddCreatorDailyStat(tx, video.AuthorID, 0, 1, 0); err != nil {
+				return err
+			}
+			return analyticslogic.AddVideoDailyStat(tx, video.AuthorID, uint(videoID), 0, 1)
 		})
 
 		if err != nil {
