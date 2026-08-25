@@ -24,6 +24,8 @@ type Hub struct {
 	svcCtx     *svc.ServiceContext
 	chatMu     sync.Mutex
 	lastChatAt map[uint]map[uint]time.Time
+	// persistDanmaku is injectable in tests. Production uses svcCtx.DB.
+	persistDanmaku func(*model.Danmaku) error
 }
 
 type RoomMessage struct {
@@ -96,12 +98,7 @@ func (h *Hub) Run() {
 
 func (h *Hub) broadcastViewerCount(roomID uint) {
 	h.mu.RLock()
-	count := 0
-	for client := range h.rooms[roomID] {
-		if !client.Monitor {
-			count++
-		}
-	}
+	count := countRoomViewers(h.rooms[roomID])
 	h.mu.RUnlock()
 
 	// Sync viewer count to MySQL
@@ -198,7 +195,11 @@ func (c *Client) ReadPump() {
 			FontSize: fontSize,
 			Type:     danmakuType,
 		}
-		c.Hub.svcCtx.DB.Create(&danmaku)
+		if err := c.Hub.saveDanmaku(&danmaku); err != nil {
+			log.Println("[WS] persist live danmaku error:", err)
+			c.sendEvent("chat_error", map[string]any{"message": "弹幕发送失败，请稍后重试", "retryAfter": 0})
+			continue
+		}
 
 		// Broadcast to room
 		outgoing, _ := json.Marshal(map[string]any{
@@ -216,6 +217,32 @@ func (c *Client) ReadPump() {
 		})
 		c.Hub.Broadcast <- &RoomMessage{RoomID: c.RoomID, Payload: outgoing}
 	}
+}
+
+// countRoomViewers counts each authenticated viewer once per room. Anonymous
+// viewers have no stable identity, so each anonymous connection counts once.
+// Broadcaster monitor connections never count as viewers.
+func countRoomViewers(clients map[*Client]bool) int {
+	uniqueUsers := make(map[uint]struct{})
+	anonymousConnections := 0
+	for client := range clients {
+		if client.Monitor {
+			continue
+		}
+		if client.UserID == 0 {
+			anonymousConnections++
+			continue
+		}
+		uniqueUsers[client.UserID] = struct{}{}
+	}
+	return len(uniqueUsers) + anonymousConnections
+}
+
+func (h *Hub) saveDanmaku(danmaku *model.Danmaku) error {
+	if h.persistDanmaku != nil {
+		return h.persistDanmaku(danmaku)
+	}
+	return h.svcCtx.DB.Create(danmaku).Error
 }
 
 func (h *Hub) canSendChat(roomID, userID uint) (bool, string, int) {

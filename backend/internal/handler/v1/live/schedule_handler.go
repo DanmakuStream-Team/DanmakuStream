@@ -17,7 +17,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+var errScheduleConflict = errors.New("同一开播时间已存在待开始的直播预约")
 
 type createScheduleReq struct {
 	Title       string `json:"title" binding:"required"`
@@ -149,12 +152,34 @@ func CreateScheduleHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		}
 
 		err = svcCtx.DB.Transaction(func(tx *gorm.DB) error {
+			// Serialize schedule creation for the same owner. Locking the user row
+			// also closes the race where two transactions both see no schedule yet.
+			var owner model.User
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+				Select("id").First(&owner, userID).Error; err != nil {
+				return err
+			}
+
+			var conflictCount int64
+			if err := tx.Model(&model.LiveSchedule{}).
+				Where("owner_id = ? AND scheduled_at = ? AND status = ?", userID, scheduledAt, "pending").
+				Count(&conflictCount).Error; err != nil {
+				return err
+			}
+			if conflictCount > 0 {
+				return errScheduleConflict
+			}
+
 			if err := tx.Create(&schedule).Error; err != nil {
 				return err
 			}
 			return notifyLiveFollowers(tx, userID, "live_schedule", "你关注的主播创建了直播预约", title, "/live-schedules")
 		})
 		if err != nil {
+			if errors.Is(err, errScheduleConflict) {
+				response.Fail(c, http.StatusConflict, errScheduleConflict.Error())
+				return
+			}
 			response.Fail(c, http.StatusInternalServerError, "直播预约创建失败")
 			return
 		}
