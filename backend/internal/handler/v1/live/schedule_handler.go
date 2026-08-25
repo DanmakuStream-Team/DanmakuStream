@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"danmakustream/backend/internal/handler/response"
+	analyticslogic "danmakustream/backend/internal/logic/analytics"
 	"danmakustream/backend/internal/middleware"
 	model "danmakustream/backend/internal/model/mysql"
 	"danmakustream/backend/internal/svc"
@@ -341,6 +342,9 @@ func startScheduledLive(svcCtx *svc.ServiceContext, schedule model.LiveSchedule)
 			}
 		}
 
+		if err := analyticslogic.AddCreatorDailyStat(tx, schedule.OwnerID, 0, 0, 1); err != nil {
+			return err
+		}
 		return notifyScheduleReservationUsers(tx, schedule.ID, schedule.OwnerID, schedule.Title, "/live")
 	})
 }

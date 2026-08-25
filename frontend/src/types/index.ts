@@ -11,6 +11,9 @@ export interface UserInfo {
   followCount: number
   fanCount: number
   followed?: boolean
+  special?: boolean
+  groupId?: number | null
+  blocked?: boolean
   videoCount?: number
   createdAt?: string
 }
@@ -55,6 +58,7 @@ export interface Danmaku {
   type: 'scroll' | 'top' | 'bottom' | 'advanced'
   blocked?: boolean
   createdAt?: string
+	 author?: UserInfo
 }
 
 export interface Comment {
@@ -79,10 +83,96 @@ export interface LiveRoom {
   streamUrl: string
   status: 'idle' | 'live' | 'ended'
   viewerCount: number
+	 viewerPeak: number
+	 likeCount: number
+  giftValue: number
+	 heat: number
+  chatMode: 'everyone' | 'followers' | 'members'
+  slowModeSeconds: number
+  pinnedMessage: string
   ownerId: number
   owner?: UserInfo
   startedAt?: string
   endedAt?: string
+  createdAt: string
+}
+
+export interface VideoChapter {
+  time: number
+  label: string
+}
+
+export interface LiveGiftDefinition {
+	key: 'flower' | 'star' | 'rocket'
+	name: string
+	value: number
+}
+
+export interface LiveSupportRankItem {
+	userId: number
+	user?: UserInfo
+	value: number
+	giftCount: number
+}
+
+export interface LiveInteraction {
+	likeCount: number
+	giftValue: number
+	heat: number
+	gifts: LiveGiftDefinition[]
+	supportRank: LiveSupportRankItem[]
+	superChats: LiveMonitorSuperChat[]
+}
+
+export interface LiveGiftEvent {
+	id?: number
+	user?: UserInfo
+	gift: LiveGiftDefinition
+	count: number
+	value: number
+	giftValue: number
+	heat: number
+	supportRank: LiveSupportRankItem[]
+	createdAt?: string
+	message?: string
+	displaySeconds?: number
+}
+
+export interface LiveMonitorSuperChat {
+  id: number
+  user?: UserInfo
+  gift: LiveGiftDefinition
+  count: number
+  value: number
+  createdAt: string
+  message: string
+  displaySeconds: number
+}
+
+export interface LiveMonitorSnapshot {
+  messages: Danmaku[]
+  superChats: LiveMonitorSuperChat[]
+}
+
+export interface LiveChatSettings {
+  chatMode: LiveRoom['chatMode']
+  slowModeSeconds: number
+  pinnedMessage: string
+}
+
+export interface LiveReplay {
+  id: number
+  roomId: number
+  title: string
+  coverUrl: string
+  replayUrl: string
+  status: 'processing' | 'ready' | 'unavailable'
+  duration: number
+  viewerPeak: number
+  ownerId: number
+  owner?: UserInfo
+  startedAt: string
+  endedAt: string
   createdAt: string
 }
 
@@ -124,6 +214,38 @@ export interface PageResult<T> {
   total: number
   page: number
   pageSize: number
+}
+
+export interface CreatorAnalyticsPoint {
+  date: string
+  views: number
+  collects: number
+  growthSpeed: number
+  streams: number
+}
+
+export interface CreatorAnalytics {
+  days: number
+  selectedVideoId: number
+  summary: {
+    totalViews: number
+    totalCollects: number
+    totalStreams: number
+    rangeViews: number
+    rangeCollects: number
+    rangeStreams: number
+    averageDailyViews: number
+  }
+  points: CreatorAnalyticsPoint[]
+  topVideos: Array<{
+    id: number
+    title: string
+    coverUrl: string
+    status: VideoStatus
+    viewCount: number
+    likeCount: number
+    collectCount: number
+  }>
 }
 
 export interface ApiResponse<T = unknown> {

@@ -3,6 +3,7 @@ package danmakulogic
 import (
 	"encoding/json"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"danmakustream/backend/internal/svc"
 
 	"github.com/gorilla/websocket"
+	"gorm.io/gorm"
 )
 
 // Hub maintains the set of active clients and broadcasts messages.
@@ -20,11 +22,22 @@ type Hub struct {
 	Unregister chan *Client
 	Broadcast  chan *RoomMessage
 	svcCtx     *svc.ServiceContext
+	chatMu     sync.Mutex
+	lastChatAt map[uint]map[uint]time.Time
 }
 
 type RoomMessage struct {
 	RoomID  uint
 	Payload []byte
+}
+
+// BroadcastEvent publishes a typed live-room event to every connected viewer.
+func (h *Hub) BroadcastEvent(roomID uint, eventType string, payload any) {
+	data, err := json.Marshal(map[string]any{"type": eventType, "payload": payload})
+	if err != nil {
+		return
+	}
+	h.Broadcast <- &RoomMessage{RoomID: roomID, Payload: data}
 }
 
 var (
@@ -40,6 +53,7 @@ func GetHub(svcCtx *svc.ServiceContext) *Hub {
 			Unregister: make(chan *Client, 256),
 			Broadcast:  make(chan *RoomMessage, 1024),
 			svcCtx:     svcCtx,
+			lastChatAt: make(map[uint]map[uint]time.Time),
 		}
 		go globalHub.Run()
 	})
@@ -82,13 +96,21 @@ func (h *Hub) Run() {
 
 func (h *Hub) broadcastViewerCount(roomID uint) {
 	h.mu.RLock()
-	count := len(h.rooms[roomID])
+	count := 0
+	for client := range h.rooms[roomID] {
+		if !client.Monitor {
+			count++
+		}
+	}
 	h.mu.RUnlock()
 
 	// Sync viewer count to MySQL
 	go func() {
 		h.svcCtx.DB.Model(&model.LiveRoom{}).Where("id = ? AND status = ?", roomID, "live").
-			Update("viewer_count", count)
+			Updates(map[string]any{
+				"viewer_count": count,
+				"viewer_peak":  gorm.Expr("GREATEST(viewer_peak, ?)", count),
+			})
 	}()
 
 	payload, _ := json.Marshal(map[string]any{
@@ -100,11 +122,13 @@ func (h *Hub) broadcastViewerCount(roomID uint) {
 
 // Client represents a connected WebSocket client.
 type Client struct {
-	Hub    *Hub
-	Conn   *websocket.Conn
-	RoomID uint
-	UserID uint
-	Send   chan []byte
+	Hub     *Hub
+	Conn    *websocket.Conn
+	RoomID  uint
+	UserID  uint
+	User    *model.UserInfo
+	Monitor bool
+	Send    chan []byte
 }
 
 const (
@@ -146,7 +170,12 @@ func (c *Client) ReadPump() {
 		if err := json.Unmarshal(message, &incoming); err != nil {
 			continue
 		}
-		if incoming.Type != "danmaku" || incoming.Content == "" {
+		incoming.Content = strings.TrimSpace(incoming.Content)
+		if incoming.Type != "danmaku" || incoming.Content == "" || c.UserID == 0 {
+			continue
+		}
+		if allowed, message, retryAfter := c.Hub.canSendChat(c.RoomID, c.UserID); !allowed {
+			c.sendEvent("chat_error", map[string]any{"message": message, "retryAfter": retryAfter})
 			continue
 		}
 
@@ -182,9 +211,59 @@ func (c *Client) ReadPump() {
 				"time":        incoming.Time,
 				"fontSize":    fontSize,
 				"danmakuType": danmakuType,
+				"author":      c.User,
 			},
 		})
 		c.Hub.Broadcast <- &RoomMessage{RoomID: c.RoomID, Payload: outgoing}
+	}
+}
+
+func (h *Hub) canSendChat(roomID, userID uint) (bool, string, int) {
+	var room model.LiveRoom
+	if err := h.svcCtx.DB.Select("id", "owner_id", "chat_mode", "slow_mode_seconds").First(&room, roomID).Error; err != nil {
+		return false, "直播间不存在", 0
+	}
+	if userID != room.OwnerID {
+		switch room.ChatMode {
+		case "followers":
+			var count int64
+			h.svcCtx.DB.Model(&model.Follow{}).Where("follower_id = ? AND followee_id = ?", userID, room.OwnerID).Count(&count)
+			if count == 0 {
+				return false, "当前直播间仅关注者可以发言", 0
+			}
+		case "members":
+			var count int64
+			h.svcCtx.DB.Model(&model.CreatorSubscription{}).
+				Where("subscriber_id = ? AND creator_id = ? AND status = ? AND expires_at > ?", userID, room.OwnerID, "active", time.Now()).Count(&count)
+			if count == 0 {
+				return false, "当前直播间仅付费订阅者可以发言", 0
+			}
+		}
+	}
+	if room.SlowModeSeconds <= 0 || userID == room.OwnerID {
+		return true, "", 0
+	}
+	h.chatMu.Lock()
+	defer h.chatMu.Unlock()
+	if h.lastChatAt[roomID] == nil {
+		h.lastChatAt[roomID] = make(map[uint]time.Time)
+	}
+	remaining := room.SlowModeSeconds - int(time.Since(h.lastChatAt[roomID][userID]).Seconds())
+	if !h.lastChatAt[roomID][userID].IsZero() && remaining > 0 {
+		return false, "慢速模式已开启，请稍后再发送", remaining
+	}
+	h.lastChatAt[roomID][userID] = time.Now()
+	return true, "", 0
+}
+
+func (c *Client) sendEvent(eventType string, payload any) {
+	data, err := json.Marshal(map[string]any{"type": eventType, "payload": payload})
+	if err != nil {
+		return
+	}
+	select {
+	case c.Send <- data:
+	default:
 	}
 }
 
