@@ -1,0 +1,179 @@
+' 项目：DanmakuStream
+' 版本：v1.0
+' 作者：E
+' 日期：2026-08-26
+' 对应用例/需求：UC06 个人视频资料库 - 系统级顺序图
+
+@startuml SYS-SEQ06
+skinparam sequence {
+    ArrowColor #2c3e50
+    ActorBorderColor #2c3e50
+    LifeLineBorderColor #2c3e50
+    ParticipantBorderColor #34495e
+    ParticipantBackgroundColor #ecf0f1
+    ActorBackgroundColor #3498db
+    ActorFontColor #ffffff
+    BoxBorderColor #95a5a6
+    BoxBackgroundColor #f8f9fa
+}
+
+actor "普通用户" as User
+box "DanmakuStream 系统边界" #f8f9fa
+    participant "前端浏览器\n(UserLibraryPage.vue)" as Frontend
+    participant "localStorage\n(本地存储)" as Storage
+    participant "API网关\n(Gin Router)" as Gateway
+    participant "engagement-service\n(互动微服务)" as Engagement
+    participant "content-service\n(内容微服务)" as Content
+    participant "user-service\n(用户微服务)" as UserSvc
+end box
+
+autonumber
+
+== 主流程：查看历史记录 ==
+User -> Frontend: 点击「历史记录」菜单
+Frontend -> Storage: getUserLibraryRecords('history')
+Storage --> Frontend: 返回本地历史记录列表
+note right of Frontend
+  // TODO: 代码中未找到后端 history API 实现
+  当前UC06历史记录仅使用localStorage本地存储
+end note
+Frontend --> User: 展示历史记录列表（含播放进度）
+
+== 扩展流程：未登录查看历史 ==
+alt 用户未登录
+    Frontend -> Frontend: 检查登录状态(authStore.isLoggedIn=false)
+    Frontend --> User: 展示本地历史记录
+    note right
+        未登录时数据仅存本地浏览器
+        不进行后端同步
+    end note
+end
+
+== 主流程：保存播放进度 ==
+User -> Frontend: 播放视频（timeupdate事件）
+activate Frontend
+Frontend -> Frontend: 监听播放时间变化(currentTime)
+Frontend -> Gateway: GET /videos/:id (加载视频详情)
+activate Gateway
+Gateway -> Content: 调用DetailLogic.Detail()
+activate Content
+Content --> Gateway: 返回VideoInfo(duration, status='approved')
+deactivate Content
+Gateway --> Frontend: 返回视频详情
+deactivate Gateway
+
+== 页面卸载时保存进度 ==
+Frontend -> Frontend: onUnmounted() 触发 saveHistory()
+Frontend -> Frontend: 计算 progress = currentTime/duration * 100
+Frontend -> Storage: upsertUserLibraryRecord('history', video, progress)
+Storage --> Frontend: 写入成功
+note right of Storage
+  Key: danmaku:user-library:history
+  限制：最多保存80条记录
+end note
+deactivate Frontend
+
+== 主流程：点赞视频（间接加入资料库） ==
+User -> Frontend: 点击「点赞」按钮
+Frontend -> Frontend: ensureLogin() 检查登录
+alt 已登录
+    Frontend -> Gateway: POST /videos/:id/like (需Bearer Token)
+    activate Gateway
+    Gateway -> UserSvc: AuthMiddleware 验证Token
+    activate UserSvc
+    UserSvc --> Gateway: 返回userID
+    deactivate UserSvc
+    Gateway -> Engagement: 执行LikeHandler()
+    activate Engagement
+    Engagement -> Engagement: 检查Like记录是否存在
+    alt 已点赞（取消点赞）
+        Engagement -> Engagement: DB.Delete(Like)
+        Engagement --> Gateway: 返回 {liked: false}
+    else 未点赞（新增点赞）
+        Engagement -> Engagement: DB.Create(Like)
+        Engagement --> Gateway: 返回 {liked: true}
+    end
+    deactivate Engagement
+    Gateway --> Frontend: 返回点赞结果
+    deactivate Gateway
+
+    alt 点赞成功(liked=true)
+        Frontend -> Storage: upsertUserLibraryRecord('liked', video)
+        Storage --> Frontend: 本地点赞列表已更新
+    else 取消点赞(liked=false)
+        Frontend -> Storage: removeUserLibraryRecord('liked', videoId)
+        Storage --> Frontend: 本地点赞列表已移除
+    end
+    Frontend --> User: 更新点赞按钮状态
+else 未登录
+    Frontend --> User: ElMessage.warning('请先登录')
+    Frontend -> Frontend: router.push('/login')
+end
+
+== 主流程：收藏视频（间接加入资料库） ==
+User -> Frontend: 点击「收藏」按钮
+Frontend -> Frontend: ensureLogin() 检查登录
+alt 已登录
+    Frontend -> Gateway: POST /videos/:id/collect (需Bearer Token)
+    activate Gateway
+    Gateway -> Engagement: 执行CollectHandler()
+    activate Engagement
+    Engagement -> Engagement: 检查Collect记录是否存在
+    alt 已收藏（取消收藏）
+        Engagement -> Engagement: DB.Delete(Collect)
+        Engagement --> Gateway: 返回 {collected: false}
+    else 未收藏（新增收藏）
+        Engagement -> Engagement: DB.Create(Collect)
+        Engagement --> Gateway: 返回 {collected: true}
+    end
+    deactivate Engagement
+    Gateway --> Frontend: 返回收藏结果
+    deactivate Gateway
+
+    alt 收藏成功(collected=true)
+        Frontend -> Storage: upsertUserLibraryRecord('collections', video)
+        Storage --> Frontend: 本地收藏列表已更新
+    else 取消收藏(collected=false)
+        Frontend -> Storage: removeUserLibraryRecord('collections', videoId)
+        Storage --> Frontend: 本地收藏列表已移除
+    end
+    Frontend --> User: 更新收藏按钮状态
+end
+
+== 主流程：删除单条资料库记录 ==
+User -> Frontend: 点击某条记录的「删除」按钮
+Frontend -> Storage: removeUserLibraryRecord(kind, videoId)
+Storage --> Frontend: 已从本地移除
+note right of Storage
+  // TODO: 代码中未找到后端删除历史记录 API
+  当前仅删除本地localStorage
+end note
+Frontend -> Frontend: loadRecords() 刷新列表
+Frontend --> User: 记录已从列表中消失
+
+== 主流程：清空资料库记录 ==
+User -> Frontend: 点击「清空」按钮
+Frontend -> Frontend: ElMessageBox.confirm 二次确认
+alt 用户确认清空
+    Frontend -> Storage: clearUserLibraryRecords(kind)
+    Storage --> Frontend: 本地数据已清空
+    note right of Storage
+      // TODO: 代码中未找到后端清空历史记录 API
+      当前仅清空本地localStorage
+    end note
+    Frontend -> Frontend: loadRecords() 刷新列表
+    Frontend --> User: 展示空状态(暂无记录)
+else 用户取消
+    Frontend --> User: 关闭确认框，无变化
+end
+
+== 异常：记录不存在 ==
+alt 加载视频详情时视频不存在
+    Frontend -> Gateway: GET /videos/:id
+    Gateway -> Content: DetailLogic.Detail()
+    Content --> Gateway: 返回 error "视频不存在"
+    Gateway --> Frontend: 404 NotFound
+    Frontend --> User: 展示 "视频不存在或尚未通过审核"
+end
+
+@enduml

@@ -1,0 +1,173 @@
+' 项目：DanmakuStream
+' 版本：v1.0
+' 作者：E
+' 日期：2026-08-26
+' 对应用例/需求：改造后Kubernetes部署图（微服务拆分）
+
+@startuml deployment-k8s
+skinparam deployment {
+    BackgroundColor #f8f9fa
+    BorderColor #2c3e50
+    ArrowColor #2c3e50
+    NodeBorderColor #34495e
+    NodeBackgroundColor #ecf0f1
+    ArtifactBorderColor #2980b9
+    ArtifactBackgroundColor #e8f4fd
+    DatabaseBorderColor #27ae60
+    DatabaseBackgroundColor #e8f8f0
+}
+
+actor "用户浏览器" as Browser
+actor "创作者 OBS" as OBS
+
+node "Kubernetes Cluster" as K8sCluster #e3f2fd {
+
+    ' ========== Ingress 命名空间 ==========
+    rectangle "Namespace: ingress-nginx" as NS_Ingress {
+        component "Ingress:\ndanmakustream-ingress\n(host: danmakustream.local)" as Ingress
+        note right of Ingress
+          路由规则:
+          /              -> frontend-svc
+          /api/v1/*      -> api-gateway-svc
+          /media/*       -> api-gateway-svc
+          /live/*        -> srs-svc:8080
+          /ws/*          -> api-gateway-svc
+        end note
+        component "Ingress Controller\n(Nginx Ingress)" as IngressCtrl
+    }
+    Ingress -- IngressCtrl
+
+    ' ========== 核心业务命名空间 ==========
+    rectangle "Namespace: danmakustream" as NS_Core {
+
+        component "ConfigMap: app-config\nDB主机/端口/日志级别" as ConfigMap
+        component "Secret: app-secrets\nDB密码/JWT密钥" as Secret
+
+        ' --- API Gateway ---
+        node "Deployment: api-gateway\n(Pod: nginx+lua)" as GWDeploy {
+            artifact "api-gateway-pod" as GWPod
+            note right of GWPod
+              Port: 80
+              liveness:  GET /health :80
+              readiness: GET /ready  :80
+            end note
+        }
+        component "Service: api-gateway-svc\n(ClusterIP :80)" as GWSvc
+        GWPod -- GWSvc
+
+        ' --- frontend ---
+        node "Deployment: frontend (2副本)" as FE_Deploy {
+            artifact "frontend-pod (Nginx SPA)" as FEPod
+            note right of FEPod
+              Port: 80
+              liveness/readiness: GET /
+            end note
+        }
+        component "Service: frontend-svc\n(ClusterIP :80)" as FESvc
+        FEPod -- FESvc
+
+        ' --- user-service ---
+        node "Deployment: user-service (2副本)" as UserDeploy {
+            artifact "user-service-pod" as UserPod
+            note right of UserPod
+              Port: 8081
+              liveness:  GET /healthz :8081
+              readiness: GET /readyz  :8081
+            end note
+        }
+        component "Service: user-svc\n(ClusterIP :8081)" as UserSvc
+        UserPod -- UserSvc
+
+        ' --- content-service ---
+        node "Deployment: content-service (2副本)" as ContentDeploy {
+            artifact "content-service-pod" as ContentPod
+            note right of ContentPod
+              Port: 8082
+              liveness:  GET /healthz :8082
+              readiness: GET /readyz  :8082
+            end note
+        }
+        component "Service: content-svc\n(ClusterIP :8082)" as ContentSvc
+        ContentPod -- ContentSvc
+
+        ' --- engagement-service ---
+        node "Deployment: engagement-service (3副本)" as EngDeploy {
+            artifact "engagement-service-pod" as EngPod
+            note right of EngPod
+              Port: 8083
+              liveness:  GET /healthz :8083
+              readiness: GET /readyz  :8083
+            end note
+        }
+        component "Service: engagement-svc\n(ClusterIP :8083)" as EngSvc
+        EngPod -- EngSvc
+
+        ' --- SRS ---
+        node "Deployment: srs-live (1副本)" as SRS_Deploy {
+            artifact "srs-pod (ossrs/srs:5)" as SRSPod
+            note right of SRSPod
+              Ports: 1935 / 1985 / 8080
+              liveness:  tcpSocket :1985
+              readiness: GET /api/v1/versions :1985
+            end note
+        }
+        component "Service: srs-svc\n(NodePort 1935/1985/8080)" as SRSSvc
+        SRSPod -- SRSSvc
+
+        ' --- MySQL StatefulSet ---
+        node "StatefulSet: mysql (1副本)" as MySQLDeploy {
+            database "mysql-pod-0 (PV: mysql-pv-0)" as MySQLPod {
+                folder "user_schema" as UserDB
+                folder "content_schema" as ContentDB
+                folder "engagement_schema" as EngDB
+            }
+        }
+        component "Service: mysql-svc\n(Headless ClusterIP :3306)" as MySQLSvc
+        MySQLPod -- MySQLSvc
+
+        ' --- PV层 ---
+        folder "PersistentVolumes (StorageClass)" as PVs {
+            artifact "mysql-data-pv 10Gi RWO" as MySQLPV
+            artifact "video-media-pv 50Gi RWX" as VideoPV
+        }
+        MySQLPod "1" *-- "PVC" MySQLPV
+        ContentPod "1" *-- "PVC" VideoPV
+    }
+
+    ' 注入Config/Secret
+    UserPod ..> ConfigMap : envFrom
+    ContentPod ..> ConfigMap : envFrom
+    EngPod ..> ConfigMap : envFrom
+    UserPod ..> Secret : secretKeyRef
+    ContentPod ..> Secret : secretKeyRef
+    EngPod ..> Secret : secretKeyRef
+    GWPod ..> Secret : TLS
+}
+
+' ========== 外部流量 ==========
+Browser -> Ingress : HTTPS :443
+OBS -> SRSSvc : RTMP :31935 (NodePort)
+
+' ========== Ingress 转发 ==========
+IngressCtrl -> FESvc : / -> :80
+IngressCtrl -> GWSvc : /api/* /media/* -> :80
+IngressCtrl -> SRSSvc : /live/* -> HLS :8080
+
+' ========== Gateway 内部路由(HTTP) ==========
+GWSvc -> UserSvc : /api/v1/auth/*\n/api/v1/users/*  :8081
+GWSvc -> ContentSvc : /api/v1/videos/*\n/api/v1/collections/*  :8082
+GWSvc -> EngSvc : /api/v1/danmaku/*\n/api/v1/comments/*\n/api/v1/notifications/*  :8083
+
+' ========== 微服务间同步调用 ==========
+EngSvc -> UserSvc : HTTP 内部调用\n(校验用户身份)
+ContentSvc -> UserSvc : HTTP 内部调用\n(查询作者信息)
+
+' ========== 各服务连对应Schema ==========
+UserSvc -> UserDB : MySQL :3306\n仅 user_schema
+ContentSvc -> ContentDB : MySQL :3306\n仅 content_schema
+EngSvc -> EngDB : MySQL :3306\n仅 engagement_schema
+
+' ========== SRS 回调 ==========
+SRSSvc -> GWSvc : HTTP回调 /api/v1/live/callback/*
+
+@enduml

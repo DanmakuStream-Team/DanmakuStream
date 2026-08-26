@@ -1,0 +1,181 @@
+' 项目：DanmakuStream
+' 版本：v1.0
+' 作者：E
+' 日期：2026-08-26
+' 对应用例/需求：总用例图 UC01~UC10、UC12~UC14（共13个）
+
+@startuml usecase-overview
+skinparam usecase {
+    BackgroundColor #ecf0f1
+    BorderColor #2c3e50
+    ArrowColor #2c3e50
+    FontColor #2c3e50
+}
+skinparam actor {
+    BorderColor #2c3e50
+    FontColor #2c3e50
+}
+
+left to right direction
+
+' ========== 4类参与者 ==========
+actor "普通用户\n(RegularUser)" as RegularUser #3498db
+actor "创作者\n(Creator)" as Creator #e67e22
+actor "审核员\n(Moderator)" as Moderator #9b59b6
+actor "管理员\n(Admin)" as Admin #e74c3c
+
+' ========== 系统边界 ==========
+package "DanmakuStream 视频直播平台" {
+
+    ' --- UC01 注册登录 ---
+    usecase "UC01 用户注册与登录" as UC01
+    note left of UC01
+      注册新账号、账号登录、
+      Token鉴权、获取当前用户
+      代码：auth_handler.go
+    end note
+
+    ' --- UC02 视频浏览搜索 ---
+    usecase "UC02 视频浏览与搜索" as UC02
+    note bottom of UC02
+      视频列表分页、关键词搜索、
+      分类/标签过滤、热度排序
+      代码：video_handler.ListHandler
+    end note
+
+    ' --- UC03 视频上传管理 ---
+    usecase "UC03 视频上传与管理" as UC03
+    note right of UC03
+      上传视频文件、设置封面、
+      编辑元数据、删除视频、
+      视频共创成员管理
+      代码：video_handler.UploadHandler
+    end note
+
+    ' --- UC04 视频播放 ---
+    usecase "UC04 视频播放" as UC04
+    note bottom of UC04
+      HLS流媒体播放、进度拖拽、
+      观看量统计、视频下载
+      代码：video_handler.DetailHandler
+    end note
+
+    ' --- UC05 弹幕互动 ---
+    usecase "UC05 弹幕互动" as UC05
+    note right of UC05
+      发送普通/高级弹幕、
+      弹幕列表拉取、.danmaku文件上传
+      代码：danmaku_handler.SendHandler
+    end note
+
+    ' --- UC06 个人视频资料库 ---
+    usecase "UC06 个人视频资料库" as UC06
+    note bottom of UC06
+      观看历史记录、播放进度保存、
+      稍后再看管理、历史清空、
+      赞过/收藏/下载内容管理
+      代码：UserLibraryPage.vue
+    end note
+
+    ' --- UC07 评论与点赞 ---
+    usecase "UC07 评论与互动" as UC07
+    note right of UC07
+      发表/回复/删除评论、
+      评论点赞、视频点赞/收藏
+      代码：comment_handler, LikeHandler
+    end note
+
+    ' --- UC08 关注与关系 ---
+    usecase "UC08 关注与社交关系" as UC08
+    note left of UC08
+      关注/取关用户、
+      关注列表/粉丝列表、
+      关注状态查询
+      代码：user_handler.FollowHandler
+    end note
+
+    ' --- UC09 直播推拉流 ---
+    usecase "UC09 直播与预约" as UC09
+    note right of UC09
+      创建直播间、开播/结束直播、
+      直播预约与提醒、
+      WebSocket实时弹幕
+      代码：live_handler, ws_handler
+    end note
+
+    ' --- UC10 视频合集 ---
+    usecase "UC10 视频合集管理" as UC10
+    note left of UC10
+      创建合集、添加/移除合集视频、
+      查看合集详情、我的合集列表
+      代码：collection_handler
+    end note
+
+    ' --- UC12 创作者中心 ---
+    usecase "UC12 创作者中心" as UC12
+    note bottom of UC12
+      创作者投稿管理、按状态筛选、
+      数据概览、直播间管理
+      代码：CreatorDashboardPage.vue
+    end note
+
+    ' --- UC13 内容审核 ---
+    usecase "UC13 内容审核" as UC13
+    note right of UC13
+      视频状态审核(通过/驳回)、
+      弹幕屏蔽、待审核列表
+      代码：video_handler.AdminUpdateStatusHandler
+    end note
+
+    ' --- UC14 系统管理 ---
+    usecase "UC14 系统后台管理" as UC14
+    note left of UC14
+      用户角色管理、Banner管理、
+      公告管理、基础设施监控、
+      运营数据仪表盘
+      代码：admin_handler
+    end note
+}
+
+' ========== 普通用户关联 ==========
+RegularUser --> UC01
+RegularUser --> UC02
+RegularUser --> UC04
+RegularUser --> UC06
+
+' 需要登录的普通用户功能
+RegularUser --> UC05 : <<include>>
+RegularUser --> UC07 : <<include>>
+RegularUser --> UC08 : <<include>>
+RegularUser --> UC10 : 浏览合集
+
+' ========== 创作者关联（继承普通用户所有能力） ==========
+Creator --|> RegularUser
+Creator --> UC03
+Creator --> UC09
+Creator --> UC10 : 创建/管理合集
+Creator --> UC12
+
+' ========== 审核员关联 ==========
+Moderator --> UC01
+Moderator --> UC13
+
+' ========== 管理员关联 ==========
+Admin --|> Moderator
+Admin --> UC14
+
+' ========== 用例间的 include / extend 关系 ==========
+UC03 .up.> UC01 : <<include>>\n需要登录
+UC05 .up.> UC01 : <<include>>\n需要登录
+UC07 .up.> UC01 : <<include>>\n需要登录
+UC08 .up.> UC01 : <<include>>\n需要登录
+UC09 .up.> UC01 : <<include>>\n需要登录
+UC10 .up.> UC01 : <<include>>\n需要登录(管理)
+UC12 .up.> UC03 : <<include>>\n包含投稿管理
+
+UC06 .up.> UC04 : <<extend>>\n播放时自动记录历史
+UC06 .left.> UC07 : <<extend>>\n点赞/收藏进入资料库
+
+UC14 .right.> UC13 : <<include>>\n管理员包含审核功能
+
+@enduml

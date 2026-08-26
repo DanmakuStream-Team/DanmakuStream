@@ -1,0 +1,232 @@
+' 项目：DanmakuStream
+' 版本：v1.0
+' 作者：E
+' 日期：2026-08-26
+' 对应用例/需求：架构组件图（微服务拆分 + 数据隔离）
+
+@startuml component-architecture
+skinparam component {
+    BackgroundColor #ecf0f1
+    BorderColor #2c3e50
+    ArrowColor #2c3e50
+    FontColor #2c3e50
+}
+skinparam interface {
+    BackgroundColor #d5f5e3
+    BorderColor #1e8449
+    FontColor #1e8449
+}
+skinparam database {
+    BackgroundColor #eaf2f8
+    BorderColor #2471a3
+    FontColor #2471a3
+}
+
+' ========== 客户端 ==========
+actor "普通用户 / 创作者" as UserClient
+actor "审核员 / 管理员" as StaffClient
+actor "OBS 推流端" as OBSClient
+
+' ========== 接入网关层 ==========
+package "接入网关层" as GatewayLayer {
+    component "API Gateway\n(Nginx / Kong)" as APIGateway
+    note right of APIGateway
+      统一入口：
+      + 路由分发
+      + JWT鉴权
+      + 限流熔断
+      + 请求日志
+    end note
+    component "Nginx Frontend\n(静态资源/SPA)" as FrontendStatic
+}
+
+UserClient -> APIGateway : HTTPS :443
+StaffClient -> APIGateway : HTTPS :443
+OBSClient -> APIGateway : RTMP :31935
+UserClient -> FrontendStatic : 加载SPA资源
+
+' ========== 基础设施 ==========
+package "基础设施层" as InfraLayer {
+    component "SRS 流媒体" as SRS {
+        note right
+          + RTMP推流接收
+          + HLS/FLV拉流
+          + HTTP API 回调
+        end note
+    }
+    component "Prometheus + Grafana\n(监控/告警)" as Monitoring
+    component "Loki / ELK\n(日志中心)" as Logging
+}
+APIGateway -> SRS : /live/* 直播HLS转发
+OBSClient -> SRS : RTMP推流
+
+' ========== user-service ==========
+package "user-service :8081 (用户域)" as UserServicePkg {
+    component "AuthController" as AuthCtrl
+    component "UserController" as UserCtrl
+    component "FollowController" as FollowCtrl
+
+    component "AuthService" as AuthSvc
+    component "UserService" as UserSvc
+    component "FollowService" as FollowSvc
+
+    component "UserRepository" as UserRepo
+
+    interface "AuthAPI" as AuthAPI
+    interface "UserAPI" as UserAPI
+}
+AuthCtrl ..> AuthAPI
+UserCtrl ..> UserAPI
+FollowCtrl ..> UserAPI
+AuthCtrl -> AuthSvc : 调用
+UserCtrl -> UserSvc : 调用
+FollowCtrl -> FollowSvc : 调用
+AuthSvc -> UserRepo : DB读写
+UserSvc -> UserRepo : DB读写
+FollowSvc -> UserRepo : DB读写
+
+' ========== content-service ==========
+package "content-service :8082 (内容域)" as ContentServicePkg {
+    component "VideoController" as VideoCtrl
+    component "CollectionController" as ColCtrl
+    component "MediaController" as MediaCtrl
+
+    component "VideoDetailLogic" as VideoDetailLogic
+    component "VideoListLogic" as VideoListLogic
+    component "VideoUploadService" as UploadSvc
+
+    component "VideoRepository" as VideoRepo
+    component "CollectionRepository" as ColRepo
+
+    interface "VideoAPI" as VideoAPI
+    interface "CollectionAPI" as ColAPI
+    interface "MediaAPI" as MediaAPI
+}
+VideoCtrl ..> VideoAPI
+ColCtrl ..> ColAPI
+MediaCtrl ..> MediaAPI
+VideoCtrl -> VideoDetailLogic : 详情
+VideoCtrl -> VideoListLogic : 列表
+VideoCtrl -> UploadSvc : 上传/删除
+ColCtrl -> ColRepo : 合集操作
+VideoDetailLogic -> VideoRepo : 查
+VideoListLogic -> VideoRepo : 查
+UploadSvc -> VideoRepo : 写
+
+' ========== engagement-service ==========
+package "engagement-service :8083 (互动域 - UC06归属)" as EngServicePkg {
+    component "DanmakuController" as DanmakuCtrl
+    component "CommentController" as CmtCtrl
+    component "NotificationController" as NotifCtrl
+    component "LiveController" as LiveCtrl
+    component "DynamicController" as DynCtrl
+
+    component "HistoryService" as HistorySvc2
+    note left of HistorySvc2
+      // TODO: 代码中未实现
+      UC06-历史记录后端服务
+    end note
+    component "ProgressService" as ProgressSvc2
+    note left of ProgressSvc2
+      // TODO: 代码中未实现
+      UC06-播放进度后端服务
+    end note
+    component "WatchLaterService" as WLSvc2
+    note left of WLSvc2
+      // TODO: 代码中未实现
+      UC06-稍后再看后端服务
+    end note
+    component "LikeService" as LikeSvc2
+    component "CollectService" as ColSvc2
+
+    component "DanmakuRepository" as DanmakuRepo
+    component "CommentRepository" as CmtRepo
+    component "EngagementRepository" as EngRepo
+
+    interface "DanmakuAPI" as DanmakuAPI
+    interface "CommentAPI" as CmtAPI
+    interface "NotifAPI" as NotifAPI
+    interface "LiveAPI" as LiveAPI
+    interface "LibraryAPI (UC06)" as LibAPI
+    note right of LibAPI
+      // TODO: 代码中未找到 UC06 后端 API
+      规划接口:
+      GET    /engagement/history
+      POST   /engagement/progress
+      POST   /engagement/watch-later
+      DELETE /engagement/watch-later/:id
+      DELETE /engagement/history/all
+    end note
+}
+DanmakuCtrl ..> DanmakuAPI
+CmtCtrl ..> CmtAPI
+NotifCtrl ..> NotifAPI
+LiveCtrl ..> LiveAPI
+HistorySvc2 ..> LibAPI
+ProgressSvc2 ..> LibAPI
+WLSvc2 ..> LibAPI
+LikeSvc2 ..> LibAPI
+ColSvc2 ..> LibAPI
+
+DanmakuCtrl -> DanmakuRepo : 读写
+CmtCtrl -> CmtRepo : 读写
+LiveCtrl -> EngRepo : 直播预约
+NotifCtrl -> EngRepo : 通知
+DynCtrl -> EngRepo : 动态
+HistorySvc2 -> EngRepo : UC06历史读写
+ProgressSvc2 -> EngRepo : UC06进度读写
+WLSvc2 -> EngRepo : UC06稍后再看读写
+LikeSvc2 -> EngRepo : 点赞(已实现)
+ColSvc2 -> EngRepo : 收藏(已实现)
+
+' ========== Gateway 路由 ==========
+APIGateway -> AuthAPI : /api/v1/auth/* (HTTP)
+APIGateway -> UserAPI : /api/v1/users/* (HTTP)
+APIGateway -> VideoAPI : /api/v1/videos/* (HTTP)
+APIGateway -> ColAPI : /api/v1/collections/* (HTTP)
+APIGateway -> MediaAPI : /media/* (HTTP)
+APIGateway -> DanmakuAPI : /api/v1/danmaku/* (HTTP+WS)
+APIGateway -> CmtAPI : /api/v1/comments/* (HTTP)
+APIGateway -> NotifAPI : /api/v1/notifications/* (HTTP)
+APIGateway -> LiveAPI : /api/v1/live* /ws/live* (HTTP+WS)
+APIGateway -> LibAPI : /api/v1/library/* (HTTP)
+
+' ========== 服务间同步 HTTP 调用 ==========
+EngServicePkg -> UserAPI : GET /users/:id\n(查询用户信息/权限)
+ContentServicePkg -> UserAPI : GET /users/:id\n(Preload Author信息)
+SRS -> LiveAPI : 直播事件回调\n(开播/关播)
+
+' ========== 数据持久化层：三独立Schema ==========
+package "数据持久化层 (MySQL 8.0)\n数据隔离：三个独立Schema" as DBLayer {
+
+    database "user_schema" as UserDB {
+        folder "users / follows\n(用户/关注表)" as UserTables
+    }
+
+    database "content_schema" as ContentDB {
+        folder "videos / video_collections\n/ video_collection_items\n/ video_collaborators\n/ dynamic_posts / banners / announcements" as ContentTables
+    }
+
+    database "engagement_schema" as EngDB {
+        folder "danmakus / comments / comment_likes\n/ likes / collects" as InterTables
+        folder "history_records / play_progress / watch_later\n(UC06三表)" as UC06Tables
+        folder "live_rooms / live_schedules / live_reservations\n/ notifications / traffic_stats" as LiveTables
+    }
+}
+
+UserRepo -> UserDB : GORM读写\n仅 user_schema 权限
+VideoRepo -> ContentDB : GORM读写\n仅 content_schema 权限
+ColRepo -> ContentDB : GORM读写\n仅 content_schema 权限
+DanmakuRepo -> EngDB : GORM读写\n仅 engagement_schema 权限
+CmtRepo -> EngDB : GORM读写\n仅 engagement_schema 权限
+EngRepo -> EngDB : GORM读写\n仅 engagement_schema 权限
+
+' ========== 横切关注点 ==========
+UserServicePkg -> Monitoring : /metrics (Prometheus)
+ContentServicePkg -> Monitoring : /metrics (Prometheus)
+EngServicePkg -> Monitoring : /metrics (Prometheus)
+UserServicePkg -> Logging : 结构化日志 (stdout)
+ContentServicePkg -> Logging : 结构化日志 (stdout)
+EngServicePkg -> Logging : 结构化日志 (stdout)
+
+@enduml
