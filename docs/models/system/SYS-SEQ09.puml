@@ -1,0 +1,25 @@
+@startuml SYS-SEQ09
+!include ../_theme.puml
+title SYS-SEQ09 UC09 直播预约与用户预约（系统级）
+actor "主播" as A
+actor "普通用户" as V
+participant "DanmakuStream 系统" as S
+participant "计划任务" as T
+
+A -> S: 发布直播计划
+alt 标题和时间合法
+  S --> A: 返回 pending 计划
+  S --> V: 展示计划/产生关注通知
+else 参数非法或时间冲突
+  S --> A: 拒绝创建并说明原因
+end
+V -> S: 预约计划
+alt 计划可预约且非本人
+  S --> V: 已预约、人数 + 1
+else 不可预约
+  S --> V: 返回失败原因
+end
+T -> S: 扫描到期计划
+S --> V: 计划转为 live 并产生开播通知
+@enduml
+

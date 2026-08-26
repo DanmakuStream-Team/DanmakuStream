@@ -1,54 +1,75 @@
-@startuml
-title DEPLOY-K8S 改造后 Kubernetes 部署图
-skinparam componentStyle rectangle
-skinparam shadowing false
-actor "普通用户/创作者" as User
-actor "审核员/管理员" as Admin
-actor "直播主播\nOBS/推流工具" as Streamer
-cloud "公网/Ingress" as Ingress
-node "Kubernetes Cluster" as Cluster {
+@startuml DEPLOY-K8S
+!include ../_theme.puml
+title 改造后：Kubernetes 部署图
+left to right direction
+
+actor "用户浏览器" as User
+actor "主播推流端" as Anchor
+cloud "Internet" as Internet
+
+node "Kubernetes Cluster" as K8S {
+  node "Ingress / LoadBalancer" as Ingress {
+    component "HTTP / WebSocket / HLS 路由" as Routes
+  }
   node "Namespace: danmakustream" as NS {
-    node "frontend Deployment\nNginx Pods" as Frontend
-    node "api-gateway Deployment\nGateway Pods" as Gateway
+    node "frontend Deployment" as Frontend {
+      component "Nginx + Vue\nreplicas >= 2" as Web
+    }
+    node "api-gateway Deployment" as Gateway {
+      component "Gateway / JWT / routing\nreplicas >= 2" as API
+    }
     node "user-service Deployment" as UserSvc
     node "content-service Deployment" as ContentSvc
     node "engagement-service Deployment" as EngagementSvc
     node "live-service Deployment" as LiveSvc
     node "notification-service Deployment" as NotifySvc
-    node "worker Deployment" as Worker
-    node "srs Deployment" as SRS {
-      component "RTMP" as RTMP
-      component "HTTP/HLS" as HLS
+    node "worker Deployment" as WorkerNode {
+      component "Schedule Worker\nleader/幂等任务" as Worker
     }
-    database "MySQL StatefulSet" as MySQL
+    node "srs Deployment / StatefulSet" as SRS {
+      component "RTMP / HLS" as Media
+    }
+    node "MySQL StatefulSet / 托管数据库" as MySQL {
+      database "danmakustream" as DB
+    }
     database "Redis" as Redis
-    folder "PersistentVolume\nmedia-data" as Media
+    storage "PersistentVolume\nmedia-data" as PV
+    component "ConfigMap" as Config
+    component "Secret" as Secret
+    component "HPA" as HPA
   }
 }
-User --> Ingress
-Admin --> Ingress
-Streamer --> Ingress : RTMP
-Ingress --> Frontend : HTTPS
-Ingress --> Gateway : /api, /ws
-Frontend --> Gateway : API/WebSocket
-Gateway --> UserSvc : auth/profile
-Gateway --> ContentSvc : video/media
-Gateway --> EngagementSvc : danmaku/comment/like
-Gateway --> LiveSvc : live/schedule
-Gateway --> NotifySvc : notification/message
-Worker --> MySQL : scheduled jobs
-ContentSvc --> MySQL
-UserSvc --> MySQL
-EngagementSvc --> MySQL
-LiveSvc --> MySQL
-NotifySvc --> MySQL
+
+User --> Internet
+Anchor --> Internet
+Internet --> Routes
+Routes --> Web : /
+Routes --> API : /api /ws
+Routes --> Media : /live /rtmp
+API --> UserSvc : auth/profile
+API --> ContentSvc : video/media
+API --> EngagementSvc : danmaku/comment/like
+API --> LiveSvc : live/schedule
+API --> NotifySvc : notification/message
+Worker --> DB : scheduled jobs
+UserSvc --> DB
+ContentSvc --> DB
+EngagementSvc --> DB
+LiveSvc --> DB
+NotifySvc --> DB
 EngagementSvc --> Redis : hub/cache/rate limit
 LiveSvc --> SRS : stream metadata
-Streamer --> RTMP : publish
-Frontend --> HLS : playback
-ContentSvc --> Media : upload/transcode
-Worker --> Media : FFmpeg jobs
-note right of Cluster
+API --> PV : video/cover
+Media --> PV : HLS segments
+Config --> Web
+Config --> API
+Config --> Media
+Secret --> API
+Secret --> DB
+HPA ..> Web : CPU/traffic scaling
+HPA ..> API : CPU/connection scaling
+
+note right of K8S
 改造后按领域拆分部署；服务通过内部 API 访问
 用户、内容、互动、直播和通知边界，数据层集中持久化
 end note

@@ -1,0 +1,64 @@
+@startuml
+title OBJ-SEQ13 UC13 对象级顺序图（代表流程：管理员修改用户角色）
+
+autonumber
+hide footbox
+skinparam responseMessageBelowArrow true
+
+actor "管理员" as Admin
+boundary ":AdminUsersPage" as Page
+control ":adminApi" as Api
+control ":request(Axios)" as Request
+control ":GinEngine" as Gin
+control ":AuthMiddleware" as AuthMW
+control ":AdminMiddleware" as AdminMW
+control ":UpdateUserRoleHandler" as Handler
+entity ":gorm.DB" as Gorm
+entity ":User" as UserModel
+database ":MySQL" as MySQL
+
+Admin -> Page: 选择目标用户的新角色
+Page -> Api: updateUserRole(user.id, user.role)
+Api -> Request: put("/admin/users/{id}/role", {role})
+Request -> Gin: PUT /api/v1/admin/users/{id}/role\nAuthorization: Bearer token
+Gin -> AuthMW: AuthMiddleware(secret)
+
+alt Token 缺失、无效或过期
+  AuthMW --> Request: 401 {message: "未授权，请先登录"}
+  Request --> Page: Promise rejected
+  Page --> Admin: 显示失败提示
+else Token 有效
+  AuthMW -> AdminMW: role 写入 Gin Context
+  alt role != admin
+    AdminMW --> Request: 403 {message: "权限不足"}
+    Request --> Page: Promise rejected
+    Page --> Admin: 显示权限不足
+  else role == admin
+    AdminMW -> Handler: 执行 UpdateUserRoleHandler
+    Handler -> Handler: ParseUint(id) + ShouldBindJSON(req)
+    alt ID/JSON/角色值非法
+      Handler --> Request: 400 参数错误/角色不支持
+      Request --> Page: Promise rejected
+      Page --> Admin: 显示参数错误
+    else 参数有效
+      Handler -> Gorm: Model(User).Where(id).Update("role", req.Role)
+      Gorm -> UserModel: 映射 users 表更新
+      UserModel -> MySQL: UPDATE users SET role=? WHERE id=?
+      alt 数据库更新失败
+        MySQL --> Handler: error
+        Handler --> Request: 500 角色更新失败
+        Request --> Page: Promise rejected
+        Page --> Admin: 显示保存失败
+      else 更新成功
+        MySQL --> Gorm: success
+        Gorm --> Handler: result
+        Handler --> Request: 200 {id, role}
+        Request --> Api: response
+        Api --> Page: 更新成功
+        Page --> Admin: ElMessage.success("角色已更新")
+      end
+    end
+  end
+end
+
+@enduml

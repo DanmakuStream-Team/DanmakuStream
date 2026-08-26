@@ -1,0 +1,22 @@
+?   	danmakustream/backend/api	[no test files]
+?   	danmakustream/backend/internal/config	[no test files]
+?   	danmakustream/backend/internal/handler/response	[no test files]
+ok  	danmakustream/backend/internal/handler/v1/admin	(cached)
+?   	danmakustream/backend/internal/handler/v1/auth	[no test files]
+?   	danmakustream/backend/internal/handler/v1/collection	[no test files]
+?   	danmakustream/backend/internal/handler/v1/comment	[no test files]
+?   	danmakustream/backend/internal/handler/v1/danmaku	[no test files]
+?   	danmakustream/backend/internal/handler/v1/dynamic	[no test files]
+?   	danmakustream/backend/internal/handler/v1/live	[no test files]
+?   	danmakustream/backend/internal/handler/v1/media	[no test files]
+?   	danmakustream/backend/internal/handler/v1/notification	[no test files]
+?   	danmakustream/backend/internal/handler/v1/user	[no test files]
+ok  	danmakustream/backend/internal/handler/v1/video	(cached)
+?   	danmakustream/backend/internal/handler/ws	[no test files]
+?   	danmakustream/backend/internal/logic/auth	[no test files]
+?   	danmakustream/backend/internal/logic/danmaku	[no test files]
+?   	danmakustream/backend/internal/logic/video	[no test files]
+?   	danmakustream/backend/internal/metrics	[no test files]
+ok  	danmakustream/backend/internal/middleware	(cached)
+?   	danmakustream/backend/internal/model/mysql	[no test files]
+?   	danmakustream/backend/internal/svc	[no test files]
