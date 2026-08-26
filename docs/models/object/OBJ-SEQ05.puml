@@ -1,0 +1,29 @@
+@startuml OBJ-SEQ05
+!include ../_theme.puml
+title OBJ-SEQ05 UC05 视频观看互动（对象级）
+actor "用户" as user
+participant "videoDetailPage: VideoDetailPage" as page
+participant "videoApi / danmakuApi / commentApi" as api
+participant "authMiddleware" as auth
+participant "video / danmaku / commentHandler" as handler
+participant "db: *gorm.DB" as db
+participant "relation: Like / Collect / Danmaku / Comment" as relation
+
+user -> page: 点击发送弹幕
+page -> api: danmakuApi.send(dto)
+api -> auth: POST /api/v1/danmaku
+auth -> handler: SendHandler(context)
+handler -> db: First(Video, videoId)
+handler -> relation: new Danmaku(userId, videoId, time, content)
+handler -> db: Create(danmaku)
+db --> handler: 持久化成功
+handler --> api: Danmaku + UserInfo
+api --> page: 更新弹幕列表
+user -> page: 点击点赞/收藏
+page -> api: toggleLike / toggleCollect(videoId)
+api -> handler: LikeHandler / CollectHandler
+handler -> db: Transaction(find/create/delete relation, update count)
+db --> handler: 事务提交
+handler --> api: liked / collected + count
+api --> page: 更新互动状态
+@enduml

@@ -1,0 +1,39 @@
+@startuml OBJ-SEQ10
+!include ../_theme.puml
+title OBJ-SEQ10 UC10 直播发布、观看与实时互动（对象级）
+actor "观众" as viewer
+participant "liveRoomPage: LiveRoomPage" as page
+participant "ws: DanmakuWebSocket" as socket
+participant "LiveWebSocketHandler" as wsHandler
+participant "client: Client" as client
+participant "hub: Hub" as hub
+participant "InteractionHandler" as interaction
+participant "tx: *gorm.DB" as tx
+participant "room: LiveRoom" as room
+participant "gift: LiveGift" as gift
+
+page -> socket: connect(roomId, token)
+socket -> wsHandler: Upgrade /ws/live/:id
+wsHandler -> client: new Client(roomId, userId, monitor=false)
+wsHandler -> hub: Register <- client
+hub -> room: viewer_count = 登录用户去重数 + 匿名连接数
+hub --> socket: viewer_count event
+viewer -> page: 发送弹幕
+page -> socket: send(content,...)
+socket -> client: WebSocket message
+client -> hub: canSendChat(roomId, userId)
+alt 允许发言
+  client -> tx: Create(Danmaku{scene=live})
+  client -> hub: Broadcast(danmaku)
+  hub --> socket: danmaku event
+else 权限/慢速模式/持久化失败
+  client --> socket: chat_error
+end
+viewer -> page: 赠送礼物和留言
+page -> interaction: GiftHandler(roomId, key, count, message)
+interaction -> tx: 锁定 LiveRoom
+interaction -> gift: Create(value, displaySeconds)
+interaction -> room: gift_value += value
+interaction -> hub: BroadcastEvent(live_gift, payload)
+hub --> socket: live_gift event
+@enduml

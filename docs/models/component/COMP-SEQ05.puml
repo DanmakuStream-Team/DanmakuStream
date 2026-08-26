@@ -1,0 +1,29 @@
+@startuml COMP-SEQ05
+!include ../_theme.puml
+title COMP-SEQ05 UC05 视频观看互动（组件级）
+actor "用户" as U
+participant "VideoDetailPage / VideoPlayer" as P
+participant "HTTP API Client" as A
+participant "Gin Router / Auth" as R
+participant "Video / Danmaku / Comment Handler" as H
+database "MySQL" as D
+
+U -> P: 打开视频详情
+P -> A: 查询视频、弹幕、评论与互动状态
+A -> R: GET 请求
+R -> H: 分派并解析可选用户
+H -> D: 查询审核通过视频及互动数据
+D --> H: 视频及互动数据
+H --> R: 业务响应
+R --> A: HTTP 200
+A --> P: 返回页面数据
+U -> P: 发送弹幕/评论/切换点赞收藏
+P -> A: POST 请求
+A -> R: Bearer Token + DTO
+R -> H: 鉴权后分派
+H -> D: 事务写关系和计数
+D --> H: 事务提交结果
+H --> R: 最新对象或状态
+R --> A: HTTP 响应
+A --> P: 更新页面状态
+@enduml

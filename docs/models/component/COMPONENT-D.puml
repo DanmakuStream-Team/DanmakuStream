@@ -1,0 +1,46 @@
+@startuml COMPONENT-D
+!include ../_theme.puml
+title 当前单体实现组件图
+left to right direction
+
+package "Vue 前端" {
+  [VideoDetailPage / VideoPlayer] as VideoPage
+  [LiveListPage] as LiveList
+  [LiveStudioPage] as Studio
+  [LiveRoomPage] as LiveRoomPage
+  [HTTP API Client] as API
+  [DanmakuWebSocket] as WSC
+}
+package "Gin 后端" {
+  [路由与鉴权中间件] as Router
+  [Video / Danmaku / Comment Handler] as VideoHandlers
+  [Live Schedule Handler] as ScheduleHandler
+  [Live / Interaction Handler] as LiveHandler
+  [Live / Publish WebSocket Handler] as WSHandler
+  [Live Danmaku Hub] as Hub
+  [Schedule Worker] as Worker
+}
+database "MySQL" as DB
+node "SRS" as SRS
+
+VideoPage --> API
+LiveList --> API
+Studio --> API
+LiveRoomPage --> API
+Studio --> WSC
+LiveRoomPage --> WSC
+API --> Router
+WSC --> WSHandler
+Router --> VideoHandlers
+Router --> ScheduleHandler
+Router --> LiveHandler
+WSHandler --> Hub
+VideoHandlers --> DB
+ScheduleHandler --> DB
+LiveHandler --> DB
+Hub --> DB
+Worker --> DB
+WSHandler --> SRS
+SRS --> LiveRoomPage
+@enduml
+
