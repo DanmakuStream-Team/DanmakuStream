@@ -140,20 +140,26 @@ type Notification struct {
 }
 
 type SiteBanner struct {
-	gorm.Model
-	Title    string `gorm:"size:120;not null"`
-	ImageURL string `gorm:"size:500"`
-	Link     string `gorm:"size:500"`
-	Enabled  bool   `gorm:"default:true;index"`
-	Sort     int    `gorm:"default:0"`
+	ID        uint           `gorm:"primarykey" json:"id"`
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	Title     string         `gorm:"size:120;not null" json:"title"`
+	ImageURL  string         `gorm:"size:500" json:"imageUrl"`
+	Link      string         `gorm:"size:500" json:"link"`
+	Enabled   bool           `gorm:"default:true;index" json:"enabled"`
+	Sort      int            `gorm:"default:0" json:"sort"`
 }
 
 type SiteAnnouncement struct {
-	gorm.Model
-	Content   string `gorm:"size:500;not null"`
-	Enabled   bool   `gorm:"default:true;index"`
-	StartedAt *time.Time
-	EndedAt   *time.Time
+	ID        uint           `gorm:"primarykey" json:"id"`
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	Content   string         `gorm:"size:500;not null" json:"content"`
+	Enabled   bool           `gorm:"default:true;index" json:"enabled"`
+	StartedAt *time.Time     `json:"startedAt"`
+	EndedAt   *time.Time     `json:"endedAt"`
 }
 
 type TrafficStat struct {
