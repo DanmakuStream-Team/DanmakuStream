@@ -1,15 +1,17 @@
+import { execSync } from 'node:child_process'
 import { request as playwrightRequest } from '@playwright/test'
 import { API, USERS } from './test-data'
 
-async function ensureUser(api: Awaited<ReturnType<typeof playwrightRequest.newContext>>, nickname: string, password: string) {
+type ApiContext = Awaited<ReturnType<typeof playwrightRequest.newContext>>
+
+async function ensureUser(api: ApiContext, nickname: string, password: string) {
   await api.post(`${API}/auth/register`, { data: { nickname, password } })
   const response = await api.post(`${API}/auth/login`, { data: { nickname, password } })
   if (!response.ok()) throw new Error(`cannot prepare ${nickname}: ${await response.text()}`)
   return (await response.json()).data as { token: string; userInfo: { id: number } }
 }
 
-export default async function globalSetup() {
-  const api = await playwrightRequest.newContext()
+async function prepareEngagementData(api: ApiContext) {
   const owner = await ensureUser(api, USERS.owner.nickname, USERS.owner.password)
   await ensureUser(api, USERS.viewer.nickname, USERS.viewer.password)
   const headers = { Authorization: `Bearer ${owner.token}` }
@@ -29,5 +31,42 @@ export default async function globalSetup() {
       if (schedule.ownerId === owner.userInfo.id) await api.delete(`${API}/live-schedules/${schedule.id}`, { headers })
     }
   }
-  await api.dispose()
+}
+
+async function prepareUC13Data(api: ApiContext) {
+  for (const user of [USERS.target, USERS.moderator, USERS.admin, USERS.plain]) {
+    await ensureUser(api, user.nickname, user.password)
+  }
+
+  const mysqlCommand = process.env.MYSQL_CMD
+    ?? (process.platform === 'linux' ? 'mysql -S /home/haoyue/dms-mysql.sock -uroot -ppassword danmakustream' : '')
+  if (!mysqlCommand) throw new Error('UC13 E2E setup requires MYSQL_CMD on this platform')
+
+  execSync(
+    `${mysqlCommand} -e "
+    UPDATE users SET role='user'      WHERE nickname='${USERS.target.nickname}';
+    UPDATE users SET role='moderator' WHERE nickname='${USERS.moderator.nickname}';
+    UPDATE users SET role='admin'     WHERE nickname='${USERS.admin.nickname}';
+    UPDATE users SET role='user'      WHERE nickname='${USERS.plain.nickname}';
+    DELETE FROM videos   WHERE title LIKE 'E2E-UC13-%';
+    DELETE FROM danmakus WHERE content LIKE 'E2E-UC13-%';
+    DELETE FROM site_banners        WHERE title LIKE 'E2E-UC13-%';
+    DELETE FROM site_announcements  WHERE content LIKE 'E2E-UC13-%';
+    INSERT INTO videos (created_at,updated_at,title,video_url,status,author_id) VALUES
+      (NOW(),NOW(),'E2E-UC13-待审视频','/data/videos/e2e.mp4','pending',(SELECT id FROM users WHERE nickname='${USERS.target.nickname}'));
+    INSERT INTO danmakus (created_at,updated_at,video_id,user_id,content,time) VALUES
+      (NOW(),NOW(),(SELECT id FROM videos WHERE title='E2E-UC13-待审视频'),
+       (SELECT id FROM users WHERE nickname='${USERS.target.nickname}'),'E2E-UC13-待屏蔽弹幕',5);"`,
+    { stdio: 'pipe' },
+  )
+}
+
+export default async function globalSetup() {
+  const api = await playwrightRequest.newContext()
+  try {
+    await prepareEngagementData(api)
+    if (process.env.E2E_SKIP_UC13_SETUP !== '1') await prepareUC13Data(api)
+  } finally {
+    await api.dispose()
+  }
 }

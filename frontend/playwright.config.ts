@@ -1,5 +1,9 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const isDEngagementRun = process.argv.some((argument) => argument.includes('d-engagement'))
+if (isDEngagementRun) process.env.E2E_SKIP_UC13_SETUP = '1'
+const backendConfig = process.env.E2E_BACKEND_CONFIG ?? 'etc/config.yaml'
+
 export default defineConfig({
   testDir: './e2e',
   globalSetup: './e2e/global-setup.ts',
@@ -8,7 +12,12 @@ export default defineConfig({
   retries: 0,
   reporter: [
     ['list'],
-    ['html', { outputFolder: '../docs/tests/reports/D-engagement-e2e-report', open: 'never' }],
+    ['html', {
+      outputFolder: isDEngagementRun
+        ? '../docs/tests/reports/D-engagement-e2e-report'
+        : '../docs/tests/reports/UC13-e2e-report',
+      open: 'never',
+    }],
   ],
   use: {
     baseURL: 'http://127.0.0.1:5173',
@@ -21,7 +30,7 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {
-      command: 'go run api/main.go -f etc/config.yaml',
+      command: `go run api/main.go -f "${backendConfig}"`,
       cwd: '../backend',
       url: 'http://127.0.0.1:8080/api/v1/live',
       reuseExistingServer: true,
