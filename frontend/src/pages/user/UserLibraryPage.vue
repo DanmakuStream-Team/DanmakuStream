@@ -9,9 +9,9 @@
       <el-button :icon="Delete" :disabled="!records.length" @click="clearRecords">清空</el-button>
     </section>
 
-    <section v-if="records.length" class="library-list">
+    <section v-loading="loading" v-if="records.length" class="library-list">
       <article v-for="record in records" :key="record.video.id" class="library-item soft-panel">
-        <button class="cover-button" type="button" @click="router.push(`/video/${record.video.id}`)">
+        <button class="cover-button" type="button" @click="openVideo(record)">
           <img v-if="record.video.coverUrl" :src="mediaUrl(record.video.coverUrl)" :alt="record.video.title" />
           <span v-else>Danmaku</span>
         </button>
@@ -33,7 +33,7 @@
           </div>
         </div>
         <div class="item-actions">
-          <el-button type="primary" @click="router.push(`/video/${record.video.id}`)">播放</el-button>
+          <el-button type="primary" @click="openVideo(record)">{{ kind === 'history' && record.position ? '继续观看' : '播放' }}</el-button>
           <el-button
             v-if="kind !== 'downloads'"
             :icon="Download"
@@ -59,6 +59,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Close, Delete, Download, Star, User, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { videoApi } from '@/api/video'
+import { libraryApi, type ServerLibraryRecord } from '@/api/library'
 import type { VideoInfo } from '@/types'
 import { formatCount, formatTime, mediaUrl } from '@/utils/format'
 import {
@@ -74,10 +75,11 @@ const route = useRoute()
 const router = useRouter()
 const records = ref<UserLibraryRecord[]>([])
 const downloadingId = ref<number>()
+const loading = ref(false)
 
 const kind = computed<UserLibraryKind>(() => {
   const value = route.params.kind
-  return value === 'liked' || value === 'collections' || value === 'downloads' ? value : 'history'
+  return value === 'watchlater' || value === 'liked' || value === 'collections' || value === 'downloads' ? value : 'history'
 })
 
 const activeMeta = computed(() => {
@@ -87,6 +89,12 @@ const activeMeta = computed(() => {
       title: '历史记录',
       description: '继续观看最近打开过的视频，进度会保存在本机浏览器。',
       empty: '暂无历史记录',
+    },
+    watchlater: {
+      tag: '稍后再看',
+      title: '稍后再看',
+      description: '保存想看的内容，并在任意已登录设备上继续访问。',
+      empty: '暂未添加稍后再看的视频',
     },
     liked: {
       tag: '互动记录',
@@ -110,15 +118,43 @@ const activeMeta = computed(() => {
   return map[kind.value]
 })
 
-watch(kind, loadRecords, { immediate: true })
+watch(kind, () => void loadRecords(), { immediate: true })
 
-function loadRecords() {
-  records.value = getUserLibraryRecords(kind.value)
+async function loadRecords() {
+  loading.value = true
+  try {
+    if (kind.value === 'history') {
+      const res = await libraryApi.history({ page: 1, pageSize: 100 })
+      records.value = res.data.list
+      return
+    }
+    if (kind.value === 'watchlater') {
+      const res = await libraryApi.watchLater({ page: 1, pageSize: 100 })
+      records.value = res.data.list
+      return
+    }
+    records.value = getUserLibraryRecords(kind.value)
+  } catch (error: any) {
+    records.value = []
+    ElMessage.error(error.message || '列表加载失败')
+  } finally {
+    loading.value = false
+  }
 }
 
-function removeRecord(videoId: number) {
+async function removeRecord(videoId: number) {
+  if (kind.value === 'history') {
+    await libraryApi.removeHistory(videoId)
+    await loadRecords()
+    return
+  }
+  if (kind.value === 'watchlater') {
+    await libraryApi.removeWatchLater(videoId)
+    await loadRecords()
+    return
+  }
   removeUserLibraryRecord(kind.value, videoId)
-  loadRecords()
+  await loadRecords()
 }
 
 async function clearRecords() {
@@ -127,8 +163,19 @@ async function clearRecords() {
     confirmButtonText: '清空',
     cancelButtonText: '取消',
   })
-  clearUserLibraryRecords(kind.value)
-  loadRecords()
+  if (kind.value === 'history') {
+    await libraryApi.clearHistory()
+  } else if (kind.value === 'watchlater') {
+    await libraryApi.clearWatchLater()
+  } else {
+    clearUserLibraryRecords(kind.value)
+  }
+  await loadRecords()
+}
+
+function openVideo(record: UserLibraryRecord | ServerLibraryRecord) {
+  const query = kind.value === 'history' && record.position ? { t: String(record.position) } : undefined
+  router.push({ path: `/video/${record.video.id}`, query })
 }
 
 async function downloadVideo(video: VideoInfo) {
