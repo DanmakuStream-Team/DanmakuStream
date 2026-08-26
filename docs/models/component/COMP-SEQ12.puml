@@ -1,0 +1,33 @@
+@startuml COMP-SEQ12
+!include ../_theme.puml
+title COMP-SEQ12 UC12 创作者数据分析（组件级）
+
+actor "创作者" as Creator
+participant "CreatorDashboardPage" as Page
+participant "MetricLineChart" as Chart
+participant "videoApi / Axios" as Api
+participant "Gin Router / AuthMiddleware" as Router
+participant "AnalyticsHandler" as Handler
+database "MySQL\nvideos / creator_daily_stats / video_daily_stats" as DB
+
+Creator -> Page: 打开创作中心
+Page -> Api: creatorAnalytics(days, videoId?)
+Api -> Router: GET /api/v1/creator/analytics + Bearer Token
+Router -> Handler: AnalyticsHandler(context)
+Handler -> Handler: 从登录上下文取得 creatorId 并校验 days
+opt 指定 videoId
+  Handler -> DB: 校验视频归属当前创作者
+  DB --> Handler: 存在 / 不存在
+end
+Handler -> DB: 查询范围内创作者每日统计
+opt 指定 videoId
+  Handler -> DB: 查询作品每日统计
+end
+Handler -> Handler: 按自然日补零并计算范围汇总、日均值
+Handler -> DB: 汇总累计播放/收藏、推流及前五作品
+DB --> Handler: 汇总与排行记录
+Handler --> Api: CreatorAnalytics / HTTP 400、404、500
+Api --> Page: 更新分析状态
+Page -> Chart: 传入播放、收藏和增长趋势点
+Chart --> Creator: 展示指标卡、折线图和作品排行
+@enduml

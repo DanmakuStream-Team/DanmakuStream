@@ -1,0 +1,39 @@
+@startuml OBJ-SEQ02
+!include ../_theme.puml
+title OBJ-SEQ02 UC02 视频发现、搜索与播放（对象级）
+
+actor "用户" as User
+participant "page: VideoDetailPage" as Page
+participant "player: VideoPlayer" as Player
+participant "videoApi" as Api
+participant "router: gin.Engine" as Router
+participant "handler: DetailHandler" as Handler
+participant "logic: DetailVideoLogic" as Logic
+participant "db: *gorm.DB" as DB
+participant "video: Video" as Video
+participant "creatorStat: CreatorDailyStat" as CreatorStat
+participant "videoStat: VideoDailyStat" as VideoStat
+
+User -> Page: 打开 /video/:id
+Page -> Api: detail(id)
+Api -> Router: GET /api/v1/videos/:id
+Router -> Handler: DetailHandler(svcCtx)(c)
+Handler -> Logic: NewDetailVideoLogic(...).Detail(req)
+Logic -> DB: First(target, id AND approved)
+DB --> Logic: id、author_id / ErrRecordNotFound
+alt 视频公开可见
+  Logic -> DB: Transaction(callback)
+  DB -> Video: UpdateColumn(view_count + 1)
+  DB -> CreatorStat: AddCreatorDailyStat(authorId, 1, 0, 0)
+  DB -> VideoStat: AddVideoDailyStat(authorId, videoId, 1, 0)
+  Logic -> DB: Preload(Author).First(video)
+  Logic -> DB: Count(Comment WHERE video_id)
+  Logic --> Handler: VideoDetailInfo
+  Handler --> Api: response.Ok(...)
+  Api --> Page: VideoInfo + commentCount
+  Page -> Player: 设置 videoUrl 并开始加载
+else 视频不存在或未通过
+  Logic --> Handler: error
+  Handler --> Page: HTTP 404
+end
+@enduml

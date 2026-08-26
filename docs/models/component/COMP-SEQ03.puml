@@ -1,0 +1,39 @@
+@startuml COMP-SEQ03
+!include ../_theme.puml
+title COMP-SEQ03 UC03 创作者投稿与状态跟踪（组件级）
+
+actor "创作者" as Creator
+participant "VideoUploadPage" as Page
+participant "videoApi / Axios" as Api
+participant "Gin Router / AuthMiddleware" as Router
+participant "UploadHandler" as Handler
+database "MySQL" as DB
+participant "本地文件系统" as FS
+participant "FFmpeg / FFprobe" as FFmpeg
+participant "CreatorDashboardPage" as Dashboard
+
+Creator -> Page: 填写信息并选择视频、可选封面
+Page -> Api: videoApi.upload(formData, progress, signal)
+Api -> Router: POST /api/v1/videos/upload + Bearer Token
+Router -> Handler: UploadHandler(context)
+Handler -> Handler: 校验标题并读取 multipart 文件
+Handler -> FS: 保存用户临时文件
+Handler -> DB: Create(Video{status: pending})
+DB --> Handler: video.id
+Handler -> FS: 创建视频目录并移动源文件
+opt 提供封面
+  Handler -> FS: 保存封面文件
+  Handler -> DB: Update cover_url
+end
+Handler -> FFmpeg: 异步 transcodeVideoAsync(...)
+Handler --> Api: 返回 pending 视频
+Api --> Page: 显示上传完成
+FFmpeg -> FS: 生成 HLS、缩略图并读取时长
+FFmpeg -> DB: 更新 video_url、duration、cover_url
+
+Creator -> Dashboard: 查看或筛选投稿状态
+Dashboard -> Api: videoApi.myVideos(params)
+Api -> Router: GET /api/v1/users/me/videos
+Router -> DB: MeVideosHandler 查询当前用户作品
+DB --> Dashboard: 投稿分页列表与状态
+@enduml

@@ -1,0 +1,37 @@
+@startuml COMP-SEQ02
+!include ../_theme.puml
+title COMP-SEQ02 UC02 视频发现、搜索与播放（组件级）
+
+actor "游客 / 普通用户" as User
+participant "HomePage / VideoDetailPage" as Page
+participant "videoApi / Axios" as Api
+participant "Gin Router" as Router
+participant "ListHandler / DetailHandler" as Handler
+participant "ListVideoLogic / DetailVideoLogic" as Logic
+database "MySQL" as DB
+participant "静态媒体服务" as Media
+
+User -> Page: 浏览或搜索视频
+Page -> Api: videoApi.list(params)
+Api -> Router: GET /api/v1/videos
+Router -> Handler: ListHandler(context)
+Handler -> Logic: List(VideoListReq)
+Logic -> DB: 查询 status=approved、筛选、排序和分页
+DB --> Logic: 视频及作者记录
+Logic --> Handler: PageResult<VideoInfo>
+Handler --> Api: HTTP 200
+Api --> Page: 渲染视频列表或空状态
+
+User -> Page: 打开目标视频
+Page -> Api: videoApi.detail(id)
+Api -> Router: GET /api/v1/videos/:id
+Router -> Handler: DetailHandler(context)
+Handler -> Logic: Detail(VideoDetailReq)
+Logic -> DB: 校验 approved 并事务增加播放和每日统计
+DB --> Logic: 视频、作者与评论计数
+Logic --> Handler: VideoDetailInfo
+Handler --> Api: HTTP 200 / 404
+Api --> Page: 展示详情或错误
+Page -> Media: GET /media/videos/:id/playlist.m3u8
+Media --> Page: HLS 清单和分片 / 资源错误
+@enduml
