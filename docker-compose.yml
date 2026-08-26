@@ -2,6 +2,7 @@ services:
   # ── Infrastructure ────────────────────────────────────────────────
   mysql:
     image: mysql:8.0
+    restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: password
       MYSQL_DATABASE: danmakustream
@@ -9,15 +10,18 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ppassword"]
       interval: 10s
-      retries: 5
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   # ── Live Streaming (SRS) ──────────────────────────────────────────
   srs:
     image: ossrs/srs:5
+    restart: unless-stopped
     command: ["./objs/srs", "-c", "conf/danmakustream.conf"]
     ports:
       - "1935:1935"
@@ -29,27 +33,47 @@ services:
 
   # ── Backend (Go) ──────────────────────────────────────────────────
   backend:
+    image: danmakustream/backend:monolith-0.1.0
     build:
       context: ./backend
       dockerfile: Dockerfile
+    restart: unless-stopped
     depends_on:
       mysql:
         condition: service_healthy
+      srs:
+        condition: service_started
     environment:
       - TZ=Asia/Shanghai
     volumes:
-      - ./backend/etc/config.yaml:/app/etc/config.yaml
+      # 容器网络内用服务名访问 MySQL/SRS，见 config.docker.yaml
+      - ./backend/etc/config.docker.yaml:/app/etc/config.yaml:ro
       - video_data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # ── Frontend (Nginx) ──────────────────────────────────────────────
   frontend:
+    image: danmakustream/frontend:monolith-0.1.0
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
       - "80:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
 volumes:
   mysql_data:

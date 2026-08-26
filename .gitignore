@@ -42,3 +42,8 @@ recommendation/data/
 # test
 /backend/data
 danmakustream-api
+/frontend/test-results/
+
+# 本地运行产物与真实 Kubernetes Secret
+/backups/
+/deploy/k8s/**/secret.yaml
