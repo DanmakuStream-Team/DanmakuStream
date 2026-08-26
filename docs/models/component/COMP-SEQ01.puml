@@ -1,0 +1,24 @@
+@startuml
+title COMP-SEQ01 UC01 用户服务组件顺序图
+autonumber
+actor 用户 as U
+participant "Web 前端" as UI
+participant "API Gateway" as GW
+participant "认证管理" as AUTH
+participant "资料管理" as PROFILE
+U -> UI: 提交注册/登录/资料操作
+UI -> GW: HTTP 请求
+alt 注册或登录
+  GW -> AUTH: register/login
+  AUTH --> GW: JWT 与用户资料/失败原因
+else 修改资料
+  GW -> AUTH: validateToken
+  AUTH --> GW: userId/401
+  opt 身份有效
+    GW -> PROFILE: updateProfile(userId, patch)
+    PROFILE --> GW: 最新资料/校验失败
+  end
+end
+GW --> UI: 操作结果
+UI --> U: 显示结果
+@enduml

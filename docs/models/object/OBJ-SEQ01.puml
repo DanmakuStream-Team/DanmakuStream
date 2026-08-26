@@ -1,0 +1,39 @@
+@startuml
+title OBJ-SEQ01 UC01 用户服务对象顺序图
+autonumber
+actor 用户 as U
+boundary UserHandler as H
+control AuthService as A
+control ProfileService as P
+database UserRepository as R
+control TokenService as T
+U -> H: submit(action, data)
+alt 注册
+  H -> A: register(data)
+  A -> R: existsByNickname(nickname)
+  R --> A: exists
+  alt 数据合法且昵称可用
+    A -> R: create(hashedUser)
+    R --> A: savedUser
+    A -> T: issue(savedUser)
+    T --> A: JWT
+    A --> H: session
+  else 数据非法或昵称重复
+    A --> H: validationError
+  end
+else 登录
+  H -> A: login(data)
+  A -> R: findByNickname(nickname)
+  R --> A: user/notFound
+  A -> A: comparePassword()
+  A -> T: issue(user)
+  T --> A: JWT
+  A --> H: session/invalidCredentials
+else 修改资料
+  H -> P: updateMe(userId, patch)
+  P -> R: updateProfile(userId, patch)
+  R --> P: updatedUser/error
+  P --> H: profileDTO/validationError
+end
+H --> U: 操作结果
+@enduml

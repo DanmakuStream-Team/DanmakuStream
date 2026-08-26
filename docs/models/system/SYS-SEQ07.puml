@@ -1,0 +1,17 @@
+@startuml
+title SYS-SEQ07 UC07 关注关系、分组、屏蔽与内容通知
+autonumber
+actor 用户 as U
+participant "DanmakuStream 系统" as S
+U -> S: 提交关注/取消/分组/特别关注/屏蔽
+S -> S: 校验身份、目标用户和操作规则
+alt 目标不存在或不能关注自己
+  S --> U: 拒绝操作并说明原因
+else 请求合法
+  S -> S: 幂等保存关系状态
+  opt 新增关注或特别关注
+    S -> S: 创建内容通知订阅
+  end
+  S --> U: 返回最新关系状态
+end
+@enduml

@@ -1,0 +1,38 @@
+@startuml
+title DanmakuStream 四个用例总览图
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+actor "游客" as Guest
+actor "普通用户" as User
+actor "创作者" as Creator
+
+rectangle "DanmakuStream" {
+  usecase "UC01\n用户注册、登录与资料维护" as UC01
+  usecase "UC07\n关注关系、分组、屏蔽与内容通知" as UC07
+  usecase "UC08\n创作者会员订阅" as UC08
+  usecase "UC11\n用户私信与媒体分享" as UC11
+  usecase "鉴权与 JWT 校验" as AUTH
+  usecase "通知发送" as NOTIFY
+  usecase "媒体引用校验" as MEDIA
+  usecase "订单幂等与支付确认" as PAYMENT
+}
+
+Guest --> UC01
+User --> UC01
+User --> UC07
+User --> UC08
+User --> UC11
+Creator --> UC07
+Creator --> UC08
+Creator --> UC11
+
+UC07 ..> AUTH : <<include>>
+UC08 ..> AUTH : <<include>>
+UC11 ..> AUTH : <<include>>
+UC07 ..> NOTIFY : <<include>>
+UC08 ..> PAYMENT : <<include>>
+UC11 ..> MEDIA : <<include>>
+UC11 ..> NOTIFY : <<include>>
+@enduml

@@ -1,0 +1,31 @@
+@startuml
+title SYS-SEQ01 UC01 用户注册、登录与资料维护
+autonumber
+actor 用户 as U
+participant "DanmakuStream 系统" as S
+alt 注册
+  U -> S: 提交昵称和密码
+  S -> S: 校验格式与昵称唯一性
+  alt 合法且昵称可用
+    S --> U: 注册成功（JWT、用户资料）
+  else 非法或重复
+    S --> U: 注册失败原因
+  end
+else 登录
+  U -> S: 提交昵称和密码
+  S -> S: 校验用户凭据
+  alt 凭据正确
+    S --> U: 登录成功（JWT、用户资料）
+  else 凭据错误
+    S --> U: 登录失败
+  end
+else 资料维护
+  U -> S: 提交昵称、简介或头像修改
+  S -> S: 校验 JWT 与资料
+  alt 校验通过
+    S --> U: 返回最新资料
+  else 身份失效或资料非法
+    S --> U: 修改失败原因
+  end
+end
+@enduml

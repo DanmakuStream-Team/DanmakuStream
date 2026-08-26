@@ -1,0 +1,31 @@
+@startuml
+title OBJ-SEQ11 UC11 私信与媒体分享对象顺序图
+autonumber
+actor 发送者 as U
+actor 接收者 as V
+boundary MessageHandler as H
+control MessageService as S
+database ConversationRepository as CR
+database MessageRepository as MR
+control MediaReferenceService as MS
+control NotificationService as NS
+U -> H: send(conversationId, payload, clientMessageId)
+H -> S: execute(currentUserId, command)
+S -> CR: assertMember(currentUserId, conversationId)
+CR --> S: member/notMember
+alt 无权限或会话不存在
+  S --> H: accessError
+else 权限通过
+  opt 媒体分享
+    S -> MS: validate(payload.mediaRef)
+    MS --> S: mediaDTO/invalid
+  end
+  S -> MR: createOnce(message, clientMessageId)
+  MR --> S: savedMessage/duplicate
+  S -> NS: createMessageNotification(savedMessage)
+  NS --> S: created
+  S --> H: messageDTO
+end
+H --> U: 发送结果
+H --> V: 新消息
+@enduml

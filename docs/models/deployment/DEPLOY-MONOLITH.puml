@@ -1,0 +1,49 @@
+@startuml
+title DEPLOY-MONOLITH 改造前单体部署图
+skinparam componentStyle rectangle
+skinparam shadowing false
+actor "普通用户/创作者" as User
+actor "审核员/管理员" as Admin
+actor "直播主播\nOBS/推流工具" as Streamer
+node "用户设备" as Client {
+  artifact "Web Browser" as Browser
+}
+node "Docker Compose Host" as Host {
+  node "frontend 容器\nNginx :80" as Frontend {
+    artifact "Vue 3 静态资源" as Vue
+    component "反向代理" as Proxy
+  }
+  node "backend 容器\nGo + Gin :8080" as Backend {
+    component "单体业务应用" as Monolith
+    component "JWT/角色中间件" as Auth
+    component "REST API" as Rest
+    component "WebSocket" as WS
+    component "FFmpeg" as FFmpeg
+  }
+  database "mysql 容器\nMySQL 8.0 :3306" as MySQL
+  node "srs 容器\nSRS 5" as SRS {
+    component "RTMP :1935" as RTMP
+    component "HTTP/HLS :8080\n宿主机映射 :8081" as HLS
+  }
+  folder "video_data 卷" as VideoData {
+    artifact "视频/封面/头像/图片" as Media
+  }
+  folder "mysql_data 卷" as MySQLData
+}
+User --> Browser : 访问系统
+Admin --> Browser : 访问管理后台
+Browser --> Frontend : HTTP :80
+Frontend --> Vue : 返回 HTML/CSS/JS
+Proxy --> Backend : /api、/media、/ws
+Monolith --> MySQL : GORM / TCP :3306
+MySQL --> MySQLData : 持久化
+Monolith --> VideoData : 读写媒体文件
+FFmpeg --> VideoData : 转码/截取封面
+Streamer --> RTMP : 推送直播流 :1935
+Browser --> HLS : 播放直播 :8081
+Backend ..> SRS : 生成推流/播放地址
+note right of Backend
+身份、视频、互动、直播、通知和后台管理
+均在同一个 Go 进程中运行
+end note
+@enduml

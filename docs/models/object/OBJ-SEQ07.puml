@@ -1,0 +1,28 @@
+@startuml
+title OBJ-SEQ07 UC07 关注关系对象顺序图
+autonumber
+actor 用户 as U
+boundary RelationshipHandler as H
+control RelationshipService as S
+database UserRepository as UR
+database RelationshipRepository as RR
+control NotificationService as NS
+U -> H: changeRelationship(targetId, type, groupId)
+H -> S: execute(currentId, command)
+S -> UR: exists(targetId)
+UR --> S: exists
+alt 目标不存在或目标是自己
+  S --> H: ruleViolation
+else 请求合法
+  S -> RR: find(currentId, targetId, type)
+  RR --> S: relation/none
+  S -> RR: upsertOrDelete(command)
+  RR --> S: relationState
+  opt 需要内容通知
+    S -> NS: createSubscription(relationState)
+    NS --> S: created
+  end
+  S --> H: relationshipDTO
+end
+H --> U: 最新关系状态/失败原因
+@enduml

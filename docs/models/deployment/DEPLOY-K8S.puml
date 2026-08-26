@@ -1,0 +1,55 @@
+@startuml
+title DEPLOY-K8S 改造后 Kubernetes 部署图
+skinparam componentStyle rectangle
+skinparam shadowing false
+actor "普通用户/创作者" as User
+actor "审核员/管理员" as Admin
+actor "直播主播\nOBS/推流工具" as Streamer
+cloud "公网/Ingress" as Ingress
+node "Kubernetes Cluster" as Cluster {
+  node "Namespace: danmakustream" as NS {
+    node "frontend Deployment\nNginx Pods" as Frontend
+    node "api-gateway Deployment\nGateway Pods" as Gateway
+    node "user-service Deployment" as UserSvc
+    node "content-service Deployment" as ContentSvc
+    node "engagement-service Deployment" as EngagementSvc
+    node "live-service Deployment" as LiveSvc
+    node "notification-service Deployment" as NotifySvc
+    node "worker Deployment" as Worker
+    node "srs Deployment" as SRS {
+      component "RTMP" as RTMP
+      component "HTTP/HLS" as HLS
+    }
+    database "MySQL StatefulSet" as MySQL
+    database "Redis" as Redis
+    folder "PersistentVolume\nmedia-data" as Media
+  }
+}
+User --> Ingress
+Admin --> Ingress
+Streamer --> Ingress : RTMP
+Ingress --> Frontend : HTTPS
+Ingress --> Gateway : /api, /ws
+Frontend --> Gateway : API/WebSocket
+Gateway --> UserSvc : auth/profile
+Gateway --> ContentSvc : video/media
+Gateway --> EngagementSvc : danmaku/comment/like
+Gateway --> LiveSvc : live/schedule
+Gateway --> NotifySvc : notification/message
+Worker --> MySQL : scheduled jobs
+ContentSvc --> MySQL
+UserSvc --> MySQL
+EngagementSvc --> MySQL
+LiveSvc --> MySQL
+NotifySvc --> MySQL
+EngagementSvc --> Redis : hub/cache/rate limit
+LiveSvc --> SRS : stream metadata
+Streamer --> RTMP : publish
+Frontend --> HLS : playback
+ContentSvc --> Media : upload/transcode
+Worker --> Media : FFmpeg jobs
+note right of Cluster
+改造后按领域拆分部署；服务通过内部 API 访问
+用户、内容、互动、直播和通知边界，数据层集中持久化
+end note
+@enduml

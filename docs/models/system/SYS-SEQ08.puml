@@ -1,0 +1,22 @@
+@startuml
+title SYS-SEQ08 UC08 创作者会员订阅
+autonumber
+actor 用户 as U
+participant "DanmakuStream 系统" as S
+U -> S: 选择会员方案并提交订阅
+S -> S: 校验创作者、方案、金额和订阅资格
+alt 规则无效
+  S --> U: 拒绝订阅并说明原因
+else 校验通过
+  S -> S: 创建待支付订单
+  S --> U: 返回支付信息
+  U -> S: 提交支付结果
+  S -> S: 幂等确认订单
+  alt 支付成功且订单有效
+    S -> S: 创建或续期有效订阅
+    S --> U: 返回订阅状态和有效期
+  else 支付失败或订单失效
+    S --> U: 返回失败原因
+  end
+end
+@enduml
