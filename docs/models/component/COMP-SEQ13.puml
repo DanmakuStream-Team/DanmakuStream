@@ -1,0 +1,58 @@
+@startuml
+title COMP-SEQ13 UC13 平台管理（组件级）
+
+autonumber
+hide footbox
+skinparam responseMessageBelowArrow true
+
+actor "审核员/管理员" as Staff
+boundary "后台管理页面\nVue 3" as AdminUI
+participant "Nginx 反向代理" as Nginx <<component>>
+participant "Gin Router" as Router <<component>>
+participant "AuthMiddleware" as AuthMW <<component>>
+participant "StaffMiddleware /\nAdminMiddleware" as RoleMW <<component>>
+participant "VideoHandler" as VideoHandler <<component>>
+participant "DanmakuHandler" as DanmakuHandler <<component>>
+participant "AdminHandler" as AdminHandler <<component>>
+participant "Metrics / OS 采集" as Metrics <<component>>
+database "GORM / MySQL" as DB
+
+Staff -> AdminUI: 进入后台并执行管理操作
+AdminUI -> Nginx: /api/v1/admin/** + Bearer Token
+Nginx -> Router: 转发 HTTP 请求
+Router -> AuthMW: 验证 JWT
+
+alt Token 缺失、无效或过期
+  AuthMW --> AdminUI: 401 未授权
+else Token 有效
+  AuthMW -> RoleMW: 传递 userId、username、role
+  alt 角色不满足接口要求
+    RoleMW --> AdminUI: 403 权限不足
+  else 角色有效
+    alt 视频审核
+      RoleMW -> VideoHandler: AdminList / AdminUpdateStatus
+      VideoHandler -> DB: 查询或更新 videos
+      DB --> VideoHandler: 查询/更新结果
+      VideoHandler --> AdminUI: 视频列表或审核结果
+    else 弹幕治理
+      RoleMW -> DanmakuHandler: AdminList / Block
+      DanmakuHandler -> DB: 查询或更新 danmakus
+      DB --> DanmakuHandler: 查询/更新结果
+      DanmakuHandler --> AdminUI: 弹幕列表或屏蔽结果
+    else 用户与运营管理
+      RoleMW -> AdminHandler: User / Banner / Announcement API
+      AdminHandler -> DB: 查询或更新业务表
+      DB --> AdminHandler: 查询/更新结果
+      AdminHandler --> AdminUI: 最新用户或运营数据
+    else 基础设施监控
+      RoleMW -> AdminHandler: InfrastructureHandler
+      AdminHandler -> Metrics: 读取磁盘、CPU、活动连接
+      AdminHandler -> DB: 汇总流量和直播数据
+      Metrics --> AdminHandler: 主机与进程指标
+      DB --> AdminHandler: 流量与直播统计
+      AdminHandler --> AdminUI: 指标、阈值和来源
+    end
+  end
+end
+
+@enduml
