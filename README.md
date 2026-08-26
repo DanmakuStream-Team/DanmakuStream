@@ -53,7 +53,7 @@ scripts/seed-test-data.sh
 | 服务 | 地址 |
 |---|---|
 | 前端 | `http://localhost` |
-| 后端 API | 前端 Nginx 代理到 `/api/v1/*` |
+| 后端 API | `http://localhost:8080/api/v1/*`，同时可由前端 Nginx 代理到 `/api/v1/*` |
 | 健康检查 | `http://localhost/api/v1/health`（`data.status=ok`、`data.db=up`） |
 | SRS RTMP | `rtmp://localhost:1935/live/<streamKey>` |
 | SRS HLS | `http://localhost:8081/live/<streamKey>.m3u8` |

@@ -30,6 +30,16 @@ services:
     volumes:
       - ./deploy/srs.conf:/usr/local/srs/conf/danmakustream.conf:ro
       - ./backend/data/live:/usr/local/srs/objs/nginx/html/live
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          (command -v curl >/dev/null && curl -fsS http://localhost:1985/api/v1/versions >/dev/null) ||
+          (command -v wget >/dev/null && wget -qO- http://localhost:1985/api/v1/versions >/dev/null)
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   # ── Backend (Go) ──────────────────────────────────────────────────
   backend:
@@ -42,9 +52,11 @@ services:
       mysql:
         condition: service_healthy
       srs:
-        condition: service_started
+        condition: service_healthy
     environment:
       - TZ=Asia/Shanghai
+    ports:
+      - "8080:8080"
     volumes:
       # 容器网络内用服务名访问 MySQL/SRS，见 config.docker.yaml
       - ./backend/etc/config.docker.yaml:/app/etc/config.yaml:ro
