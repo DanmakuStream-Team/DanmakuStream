@@ -1,0 +1,217 @@
+@startuml IMPLEMENTATION-CLASS-D
+!include ../_theme.puml
+title 互动与直播域实现类图
+hide empty fields
+
+class VideoDetailPage {
+  - videoId: number
+  - currentTime: number
+  + load()
+  + sendDanmaku()
+  + submitComment()
+  + toggleLike()
+  + toggleCollect()
+}
+class VideoPlayer {
+  - source: string
+  - currentTime: number
+  + setupSource(url)
+  + seek(time)
+  + togglePlayback()
+}
+class LiveListPage {
+  - schedules: LiveSchedule[]
+  - rooms: LiveRoom[]
+  + loadLiveRooms()
+  + loadLiveSchedules()
+  + createLiveSchedule()
+  + toggleReserve(schedule)
+}
+class LiveStudioPage {
+  - roomId: number
+  - publishing: bool
+  + loadMonitor()
+  + connectMonitor()
+  + startPublishing()
+  + stopPublishing()
+}
+class LiveRoomPage {
+  - roomId: number
+  - connected: bool
+  + loadRoom()
+  + connectDanmaku()
+  + toggleLike()
+  + sendGift()
+}
+class DanmakuWebSocket {
+  - ws: WebSocket
+  - reconnectTimer: Timer
+  + connect()
+  + send(content, color, fontSize, type): bool
+  + disconnect()
+}
+class DanmakuHandler {
+  + ListHandler()
+  + SendHandler()
+}
+class CommentHandler {
+  + ListHandler()
+  + CreateHandler()
+  + LikeHandler()
+}
+class VideoHandler {
+  + LikeHandler()
+  + CollectHandler()
+}
+class ScheduleHandler {
+  + CreateScheduleHandler()
+  + CancelScheduleHandler()
+  + ReserveScheduleHandler()
+  + processDueLiveSchedules()
+}
+class LiveHandler {
+  + CreateHandler()
+  + EndHandler()
+  + ManageDetailHandler()
+  + UpdateChatSettingsHandler()
+}
+class InteractionHandler {
+  + MonitorHandler()
+  + LikeHandler()
+  + GiftHandler()
+  + roomHeat()
+  + superChatDisplaySeconds()
+}
+class LiveWebSocketHandler {
+  + LiveWebSocketHandler(svcCtx): gin.HandlerFunc
+}
+class LivePublishWebSocketHandler {
+  + LivePublishWebSocketHandler(svcCtx): gin.HandlerFunc
+}
+class Hub {
+  - rooms: map
+  - lastChatAt: map
+  + Run()
+  + BroadcastEvent()
+  - broadcastViewerCount()
+  - canSendChat()
+}
+class Client {
+  + RoomID: uint
+  + UserID: uint
+  + Monitor: bool
+  + ReadPump()
+  + WritePump()
+}
+class Video {
+  + ID: uint
+  + AuthorID: uint
+  + Title: string
+  + Status: string
+  + LikeCount: int64
+  + CollectCount: int64
+}
+class Danmaku {
+  + ID: uint
+  + VideoID: uint
+  + UserID: uint
+  + Scene: string
+  + Content: string
+  + Time: int
+  + Blocked: bool
+}
+class Comment {
+  + ID: uint
+  + VideoID: uint
+  + UserID: uint
+  + ParentID: uint?
+  + Content: string
+  + LikeCount: int64
+}
+class Like {
+  + UserID: uint
+  + VideoID: uint
+}
+class Collect {
+  + UserID: uint
+  + VideoID: uint
+}
+class LiveSchedule {
+  + ID: uint
+  + OwnerID: uint
+  + ScheduledAt: time.Time
+  + Status: string
+  + ReminderCount: int64
+}
+class LiveReservation {
+  + ScheduleID: uint
+  + UserID: uint
+}
+class LiveRoom {
+  + ID: uint
+  + OwnerID: uint
+  + StreamKey: string
+  + Status: string
+  + ViewerCount: int64
+  + LikeCount: int64
+  + GiftValue: int64
+  + ChatMode: string
+}
+class LiveLike {
+  + RoomID: uint
+  + UserID: uint
+}
+class LiveGift {
+  + RoomID: uint
+  + UserID: uint
+  + GiftKey: string
+  + Count: int
+  + Value: int64
+  + Message: string
+  + DisplaySeconds: int
+}
+class Notification {
+  + ID: uint
+  + UserID: uint
+  + Type: string
+  + Title: string
+  + Read: bool
+}
+
+VideoDetailPage --> VideoPlayer
+VideoDetailPage --> Video
+VideoDetailPage --> DanmakuHandler
+VideoDetailPage --> CommentHandler
+VideoDetailPage --> VideoHandler
+LiveListPage --> ScheduleHandler
+LiveStudioPage --> LiveHandler
+LiveStudioPage --> LivePublishWebSocketHandler
+LiveStudioPage --> DanmakuWebSocket
+LiveRoomPage --> InteractionHandler
+LiveRoomPage --> DanmakuWebSocket
+DanmakuWebSocket --> LiveWebSocketHandler
+LiveWebSocketHandler --> Client
+Client --> Hub
+DanmakuHandler --> Danmaku
+DanmakuHandler --> Video
+CommentHandler --> Comment
+CommentHandler --> Video
+VideoHandler --> Like
+VideoHandler --> Collect
+VideoHandler --> Video
+ScheduleHandler --> LiveSchedule
+ScheduleHandler --> LiveReservation
+ScheduleHandler --> Notification
+LiveHandler --> LiveRoom
+InteractionHandler --> LiveLike
+InteractionHandler --> LiveGift
+Hub --> LiveRoom
+Hub --> Danmaku
+Danmaku "*" --> "1" Video
+Comment "*" --> "1" Video
+Like "*" --> "1" Video
+Collect "*" --> "1" Video
+LiveReservation "*" --> "1" LiveSchedule
+LiveLike "*" --> "1" LiveRoom
+LiveGift "*" --> "1" LiveRoom
+@enduml

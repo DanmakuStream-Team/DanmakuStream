@@ -1,0 +1,20 @@
+@startuml SYS-SEQ05
+!include ../_theme.puml
+title SYS-SEQ05 UC05 视频观看互动（系统级）
+actor "普通用户" as U
+participant "DanmakuStream 系统" as S
+
+U -> S: 打开可播放视频
+S --> U: 视频详情、弹幕、评论和互动状态
+U -> S: 发送弹幕（时间点、内容、样式）
+alt 输入合法
+  S --> U: 保存并返回弹幕
+else 输入非法或视频不可用
+  S --> U: 拒绝并说明原因
+end
+U -> S: 发表评论
+S --> U: 返回新增评论
+U -> S: 点赞/收藏视频
+S --> U: 返回切换后的状态和计数
+@enduml
+
