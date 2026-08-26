@@ -9,6 +9,7 @@ participant "videoApi" as Api
 participant "router: gin.Engine" as Router
 participant "handler: DetailHandler" as Handler
 participant "logic: DetailVideoLogic" as Logic
+participant "analyticslogic" as Analytics
 participant "db: *gorm.DB" as DB
 participant "video: Video" as Video
 participant "creatorStat: CreatorDailyStat" as CreatorStat
@@ -23,9 +24,11 @@ Logic -> DB: First(target, id AND approved)
 DB --> Logic: id、author_id / ErrRecordNotFound
 alt 视频公开可见
   Logic -> DB: Transaction(callback)
-  DB -> Video: UpdateColumn(view_count + 1)
-  DB -> CreatorStat: AddCreatorDailyStat(authorId, 1, 0, 0)
-  DB -> VideoStat: AddVideoDailyStat(authorId, videoId, 1, 0)
+  DB -> Video: Model(Video).UpdateColumn(view_count + 1)
+  Logic -> Analytics: AddCreatorDailyStat(tx, authorId, 1, 0, 0)
+  Analytics -> CreatorStat: UPSERT creator_daily_stats
+  Logic -> Analytics: AddVideoDailyStat(tx, authorId, videoId, 1, 0)
+  Analytics -> VideoStat: UPSERT video_daily_stats
   Logic -> DB: Preload(Author).First(video)
   Logic -> DB: Count(Comment WHERE video_id)
   Logic --> Handler: VideoDetailInfo

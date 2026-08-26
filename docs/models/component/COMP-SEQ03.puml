@@ -7,6 +7,7 @@ participant "VideoUploadPage" as Page
 participant "videoApi / Axios" as Api
 participant "Gin Router / AuthMiddleware" as Router
 participant "UploadHandler" as Handler
+participant "MeVideosHandler" as MeVideos
 database "MySQL" as DB
 participant "本地文件系统" as FS
 participant "FFmpeg / FFprobe" as FFmpeg
@@ -34,6 +35,9 @@ FFmpeg -> DB: 更新 video_url、duration、cover_url
 Creator -> Dashboard: 查看或筛选投稿状态
 Dashboard -> Api: videoApi.myVideos(params)
 Api -> Router: GET /api/v1/users/me/videos
-Router -> DB: MeVideosHandler 查询当前用户作品
-DB --> Dashboard: 投稿分页列表与状态
+Router -> MeVideos: MeVideosHandler(svcCtx)(context)
+MeVideos -> DB: 查询 author_id=currentUser 并按状态分页
+DB --> MeVideos: 投稿列表与总数
+MeVideos --> Api: HTTP 200 + PageResult
+Api --> Dashboard: 渲染投稿分页列表与状态
 @enduml
