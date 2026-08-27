@@ -14,8 +14,8 @@ export default defineConfig({
     ['list'],
     ['html', {
       outputFolder: isDEngagementRun
-        ? '../docs/tests/reports/D-engagement-e2e-report'
-        : '../docs/tests/reports/UC13-e2e-report',
+        ? '../docs/testing/reports/engagement-e2e'
+        : '../docs/testing/reports/uc13-e2e',
       open: 'never',
     }],
   ],
