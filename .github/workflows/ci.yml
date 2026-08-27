@@ -36,7 +36,10 @@ jobs:
         run: go build ./...
       - name: Unit tests (all use cases)
         working-directory: backend
-        run: go test ./... -v | tee unit-test-output.txt
+        # 显式启用 pipefail，避免 go test 失败被 tee 的成功退出码掩盖。
+        run: |
+          set -o pipefail
+          go test ./... -v | tee unit-test-output.txt
       - name: Upload test output
         if: always()
         uses: actions/upload-artifact@v4
@@ -90,12 +93,13 @@ jobs:
         working-directory: backend
         env:
           DANMAKU_TEST_ADMIN_DSN: "root:password@tcp(127.0.0.1:3306)/danmakustream?charset=utf8mb4&parseTime=True&loc=Local"
-        run: >-
-          go test -count=1 -tags=integration
-          ./internal/handler/v1/live
-          ./internal/logic/danmaku
-          ./integration -v
-          | tee d-engagement-integration-output.txt
+        run: |
+          set -o pipefail
+          go test -count=1 -tags=integration \
+            ./internal/handler/v1/live \
+            ./internal/logic/danmaku \
+            ./integration -v \
+            | tee d-engagement-integration-output.txt
       - name: Build backend
         working-directory: backend
         run: go build -o /tmp/dms-api ./api/main.go
@@ -128,7 +132,9 @@ jobs:
       - name: Run API test suite
         env:
           MYSQL_CMD: "mysql -h127.0.0.1 -P3306 -uroot -ppassword danmakustream"
-        run: tests/api/uc13-admin-test.sh | tee api-test-output.txt
+        run: |
+          set -o pipefail
+          tests/api/uc13-admin-test.sh | tee api-test-output.txt
       - name: Upload test output
         if: always()
         uses: actions/upload-artifact@v4
