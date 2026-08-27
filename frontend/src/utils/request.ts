@@ -10,8 +10,11 @@ declare module 'axios' {
   }
 }
 
+const GATEWAY_PREFIX: string =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '/api/v1'
+
 const request: AxiosInstance = axios.create({
-  baseURL: '/api/v1',
+  baseURL: GATEWAY_PREFIX,
   timeout: 20000,
 })
 

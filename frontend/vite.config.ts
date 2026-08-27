@@ -29,15 +29,15 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: process.env.VITE_DEV_GATEWAY_TARGET ?? 'http://localhost:8888',
         changeOrigin: true,
       },
       '/media': {
-        target: 'http://localhost:8080',
+        target: process.env.VITE_DEV_GATEWAY_TARGET ?? 'http://localhost:8888',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:8080',
+        target: process.env.VITE_DEV_GATEWAY_WS_TARGET ?? 'ws://localhost:8888',
         ws: true,
       },
     },
