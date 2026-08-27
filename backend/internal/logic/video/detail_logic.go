@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	analyticslogic "danmakustream/backend/internal/logic/analytics"
 	model "danmakustream/backend/internal/model/mysql"
 	"danmakustream/backend/internal/svc"
 
@@ -33,9 +34,24 @@ func (l *DetailVideoLogic) Detail(req *VideoDetailReq) (*VideoDetailInfo, error)
 		return nil, errors.New("invalid video id")
 	}
 
-	if err := l.svcCtx.DB.Model(&model.Video{}).
+	var target model.Video
+	if err := l.svcCtx.DB.Select("id", "author_id").
 		Where("id = ? AND status = ?", req.ID, "approved").
-		UpdateColumn("view_count", gorm.Expr("view_count + ?", 1)).Error; err != nil {
+		First(&target).Error; err != nil {
+		return nil, err
+	}
+
+	if err := l.svcCtx.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.Video{}).
+			Where("id = ?", req.ID).
+			UpdateColumn("view_count", gorm.Expr("view_count + ?", 1)).Error; err != nil {
+			return err
+		}
+		if err := analyticslogic.AddCreatorDailyStat(tx, target.AuthorID, 1, 0, 0); err != nil {
+			return err
+		}
+		return analyticslogic.AddVideoDailyStat(tx, target.AuthorID, target.ID, 1, 0)
+	}); err != nil {
 		return nil, err
 	}
 

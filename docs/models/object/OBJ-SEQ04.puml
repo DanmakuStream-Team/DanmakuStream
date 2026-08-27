@@ -1,0 +1,41 @@
+@startuml OBJ-SEQ04
+!include ../_theme.puml
+title OBJ-SEQ04 UC04 视频审核与发布（对象级）
+
+actor "审核员 / 管理员" as Reviewer
+participant "page: AdminVideosPage" as Page
+participant "videoApi" as Api
+participant "axios: AxiosInstance" as Axios
+participant "auth: AuthMiddleware" as Auth
+participant "staff: StaffMiddleware" as Staff
+participant "handler: AdminUpdateStatusHandler" as Handler
+participant "db: *gorm.DB" as DB
+participant "video: Video" as Video
+participant "fs: filepath / os" as FS
+
+Reviewer -> Page: updateStatus(video, status)
+Page -> Api: adminUpdateStatus(id, status)
+Api -> Axios: put('/admin/videos/:id/status', {status})
+Axios -> Auth: Bearer Token
+Auth -> Staff: 校验 role=moderator/admin
+Staff -> Handler: AdminUpdateStatusHandler(svcCtx)(c)
+Handler -> Handler: ParseUint(id) / ShouldBindJSON(req)
+Handler -> Handler: isValidVideoStatus(status)
+alt status == approved
+  Handler -> DB: Select(id, video_url).First(video)
+  DB --> Handler: Video / ErrRecordNotFound
+  alt video.video_url 为空
+    Handler -> FS: hasUploadedVideoSource(videoId)
+    FS --> Handler: upload.* 是否存在
+    Handler --> Page: HTTP 403 未上传或仍在转码
+  else video.video_url 非空
+    Handler -> DB: Model(Video).Where(id).Update(status)
+    DB --> Handler: RowsAffected / Error
+    Handler --> Page: {id, status} / 404 / 500
+  end
+else pending 或 rejected
+  Handler -> DB: Model(Video).Where(id).Update(status)
+  DB --> Handler: RowsAffected / Error
+  Handler --> Page: {id, status} / 404 / 500
+end
+@enduml

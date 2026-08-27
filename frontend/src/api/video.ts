@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import type { PageResult, VideoInfo, VideoStatus } from '@/types'
+import type { CreatorAnalytics, PageResult, VideoInfo, VideoStatus } from '@/types'
 
 export const videoApi = {
   list(params: { page: number; pageSize: number; keyword?: string; tag?: string; category?: string; sort?: 'hot' | 'date' | 'like' | 'collect' }) {
@@ -43,6 +43,9 @@ export const videoApi = {
   },
   myVideos(params: { page: number; pageSize: number; status?: VideoStatus | '' }) {
     return request.get<PageResult<VideoInfo>>('/users/me/videos', { params })
+  },
+  creatorAnalytics(days: 7 | 30 | 90, videoId?: number) {
+    return request.get<CreatorAnalytics>('/creator/analytics', { params: { days, videoId } })
   },
   userVideos(userId: number, params: { page: number; pageSize: number }) {
     return request.get<PageResult<VideoInfo>>(`/users/${userId}/videos`, { params })

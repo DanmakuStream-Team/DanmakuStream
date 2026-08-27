@@ -1,0 +1,26 @@
+@startuml SYS-SEQ12
+!include ../_theme.puml
+title SYS-SEQ12 UC12 创作者数据分析（系统级）
+
+actor "创作者" as Creator
+participant "DanmakuStream 系统" as System
+
+Creator -> System: 登录后进入创作中心数据分析区域
+Creator -> System: 选择 7 / 30 / 90 天和全部或单个作品
+alt 参数合法且作品属于当前创作者
+  System --> Creator: 返回累计指标、范围指标、每日趋势和作品排行
+  alt 指定范围没有统计记录
+    System --> Creator: 返回零值汇总和补零后的每日数据
+  else 存在统计记录
+    System --> Creator: 展示指标卡、趋势图和前五作品
+  end
+else 未登录
+  System --> Creator: 返回 401 并引导登录
+else 时间范围非法
+  System --> Creator: 返回 400 参数错误
+else 作品不存在或不属于当前创作者
+  System --> Creator: 返回 404，不泄露他人作品信息
+else 统计查询失败
+  System --> Creator: 返回服务失败
+end
+@enduml

@@ -1,0 +1,22 @@
+@startuml UC05-UC09-UC10-overview
+!include ../_theme.puml
+title 互动与直播域用例图
+left to right direction
+
+actor "普通用户/观众" as Viewer
+actor "主播" as Anchor
+actor "SRS 直播服务" as SRS
+
+rectangle "DanmakuStream" {
+  usecase "UC05\n视频观看互动" as UC05
+  usecase "UC09\n直播预约与用户预约" as UC09
+  usecase "UC10\n直播发布、观看与实时互动" as UC10
+}
+
+Viewer -- UC05
+Viewer -- UC09
+Anchor -- UC09
+Viewer -- UC10
+Anchor -- UC10
+SRS -- UC10
+@enduml

@@ -1,0 +1,46 @@
+@startuml OBJ-SEQ12
+!include ../_theme.puml
+title OBJ-SEQ12 UC12 创作者数据分析（对象级）
+
+actor "创作者" as Creator
+participant "page: CreatorDashboardPage" as Page
+participant "chart: MetricLineChart" as Chart
+participant "videoApi" as Api
+participant "axios: AxiosInstance" as Axios
+participant "auth: AuthMiddleware" as Auth
+participant "handler: AnalyticsHandler" as Handler
+participant "db: *gorm.DB" as DB
+participant "creatorStat: CreatorDailyStat" as CreatorStat
+participant "videoStat: VideoDailyStat" as VideoStat
+participant "video: Video" as Video
+
+Creator -> Page: loadAnalytics() / selectAnalyticsVideo(videoId?)
+Page -> Api: creatorAnalytics(analyticsDays, selectedVideoId)
+Api -> Axios: get('/creator/analytics', {days, videoId})
+Axios -> Auth: Bearer Token
+Auth -> Handler: AnalyticsHandler(svcCtx)(c)
+Handler -> Handler: GetUint(userId) / Atoi(days)
+opt videoId 已指定
+  Handler -> DB: Count(Video WHERE id AND author_id)
+  DB --> Handler: count
+end
+Handler -> CreatorStat: Find(creatorId, date range)
+CreatorStat -> DB: SELECT creator_daily_stats
+DB --> Handler: creatorStats
+opt videoId 已指定
+  Handler -> VideoStat: Find(creatorId, videoId, date range)
+  VideoStat -> DB: SELECT video_daily_stats
+  DB --> Handler: videoStats
+end
+Handler -> Handler: 构造 days 个 analyticsPoint 并补零
+Handler -> Video: SUM(view_count, collect_count) / top 5
+Video -> DB: SELECT videos WHERE author_id
+DB --> Handler: totals、topVideos
+Handler -> CreatorStat: SUM(stream_count)
+CreatorStat -> DB: SELECT creator_daily_stats
+DB --> Handler: streamTotal
+Handler --> Axios: days、summary、points、topVideos
+Axios --> Page: CreatorAnalytics
+Page -> Chart: points 与指标字段
+Chart --> Creator: 渲染 7 / 30 / 90 天趋势
+@enduml

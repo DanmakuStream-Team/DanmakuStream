@@ -1,0 +1,39 @@
+@startuml OBJ-SEQ09
+!include ../_theme.puml
+title OBJ-SEQ09 UC09 直播预约与用户预约（对象级）
+actor "主播" as anchor
+actor "用户" as viewer
+participant "liveListPage: LiveListPage" as page
+participant "liveApi" as api
+participant "scheduleHandler" as handler
+participant "tx: *gorm.DB" as tx
+participant "schedule: LiveSchedule" as schedule
+participant "reservation: LiveReservation" as reservation
+participant "scheduleWorker" as worker
+participant "room: LiveRoom" as room
+
+anchor -> page: 提交标题/封面/时间
+page -> api: createSchedule(dto)
+api -> handler: CreateScheduleHandler
+handler -> schedule: new(status=pending, ownerId)
+handler -> tx: Create(schedule) + Create(notifications)
+tx --> handler: 事务提交
+handler --> api: scheduleInfo
+api --> page: 展示计划
+viewer -> page: 点击预约
+page -> api: reserveSchedule(id)
+api -> handler: ReserveScheduleHandler
+handler -> tx: First(schedule)
+tx -> reservation: Find(scheduleId, userId)
+alt 关系不存在
+  handler -> tx: Create(reservation), reminder_count + 1
+else 关系存在
+  handler -> tx: Unscoped Delete(reservation), reminder_count - 1
+end
+tx --> handler: 事务提交结果
+handler --> api: reserved + reminderCount
+api --> page: 更新预约状态
+worker -> tx: 查找到期 pending schedule
+worker -> schedule: status = live
+worker -> room: 创建/复用并设置 live
+@enduml
