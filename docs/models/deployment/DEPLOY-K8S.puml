@@ -21,8 +21,6 @@ node "Kubernetes Cluster" as K8S {
     node "user-service Deployment" as UserSvc
     node "content-service Deployment" as ContentSvc
     node "engagement-service Deployment" as EngagementSvc
-    node "live-service Deployment" as LiveSvc
-    node "notification-service Deployment" as NotifySvc
     node "worker Deployment" as WorkerNode {
       component "Schedule Worker\nleader/幂等任务" as Worker
     }
@@ -30,7 +28,9 @@ node "Kubernetes Cluster" as K8S {
       component "RTMP / HLS" as Media
     }
     node "MySQL StatefulSet / 托管数据库" as MySQL {
-      database "danmakustream" as DB
+      database "user schema" as UserDB
+      database "content schema" as ContentDB
+      database "engagement schema" as EngagementDB
     }
     database "Redis" as Redis
     storage "PersistentVolume\nmedia-data" as PV
@@ -48,29 +48,28 @@ Routes --> API : /api /ws
 Routes --> Media : /live /rtmp
 API --> UserSvc : auth/profile
 API --> ContentSvc : video/media
-API --> EngagementSvc : danmaku/comment/like
-API --> LiveSvc : live/schedule
-API --> NotifySvc : notification/message
-Worker --> DB : scheduled jobs
-UserSvc --> DB
-ContentSvc --> DB
-EngagementSvc --> DB
-LiveSvc --> DB
-NotifySvc --> DB
+API --> EngagementSvc : danmaku/comment/like/message/membership
+Worker --> EngagementSvc : internal scheduled-job API
+UserSvc --> UserDB : owns
+ContentSvc --> ContentDB : owns
+EngagementSvc --> EngagementDB : owns
+ContentSvc --> UserSvc : internal API: author summary
+EngagementSvc --> UserSvc : internal API: user/member check
+EngagementSvc --> ContentSvc : internal API: video metadata
 EngagementSvc --> Redis : hub/cache/rate limit
-LiveSvc --> SRS : stream metadata
-API --> PV : video/cover
+EngagementSvc --> SRS : stream metadata via internal adapter
+ContentSvc --> PV : owns video/cover
 Media --> PV : HLS segments
 Config --> Web
 Config --> API
 Config --> Media
 Secret --> API
-Secret --> DB
+Secret --> MySQL
 HPA ..> Web : CPU/traffic scaling
 HPA ..> API : CPU/connection scaling
 
 note right of K8S
-改造后按领域拆分部署；服务通过内部 API 访问
-用户、内容、互动、直播和通知边界，数据层集中持久化
+改造后仅保留 user / content / engagement 三个业务服务；
+每个服务只写入所属 Schema，跨域数据通过内部 API 获取。
 end note
 @enduml

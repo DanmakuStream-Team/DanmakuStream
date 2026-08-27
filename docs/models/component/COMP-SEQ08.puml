@@ -1,4 +1,5 @@
 @startuml
+!include ../_theme.puml
 title COMP-SEQ08 UC08 会员订阅组件顺序图
 autonumber
 actor 用户 as U

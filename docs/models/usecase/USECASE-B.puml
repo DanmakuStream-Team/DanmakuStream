@@ -1,5 +1,6 @@
 @startuml
-title DanmakuStream 四个用例总览图
+!include ../_theme.puml
+title DanmakuStream 成员 B 用例范围图（UC01/07/08/11）
 left to right direction
 skinparam packageStyle rectangle
 skinparam shadowing false

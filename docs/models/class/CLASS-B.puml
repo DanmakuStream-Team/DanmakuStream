@@ -1,5 +1,6 @@
 @startuml
-title DanmakuStream 四个用例领域类图
+!include ../_theme.puml
+title DanmakuStream 成员 B 领域类图（UC01/07/08/11）
 skinparam classAttributeIconSize 0
 skinparam shadowing false
 
@@ -98,29 +99,30 @@ Conversation "1" -- "0..*" Message
 User "1" -- "0..*" Message : sends
 Message "0..1" *-- "1" MediaReference : shares
 
-class AuthService <<control>> {
-  +register()
-  +login()
-  +validateToken()
+class RegisterLogic <<control>> {
+  +Register(req)
 }
-class RelationshipService <<control>> {
-  +changeRelationship()
+class LoginLogic <<control>> {
+  +Login(req)
 }
-class MembershipService <<control>> {
-  +createSubscriptionOrder()
-  +activateOrRenew()
+class MeLogic <<control>> {
+  +Me(userID)
 }
-class MessageService <<control>> {
-  +sendMessage()
-  +validateMember()
+class UserHandler <<boundary>>
+class RelationshipHandler <<boundary>>
+class MembershipHandler <<boundary>>
+class MessageHandler <<boundary>>
+class GormDB <<database>> {
+  +First()
+  +Where()
+  +Create()
+  +Transaction()
 }
-AuthService ..> User
-RelationshipService ..> Relationship
-RelationshipService ..> Notification
-MembershipService ..> MembershipPlan
-MembershipService ..> Order
-MembershipService ..> Subscription
-MessageService ..> Conversation
-MessageService ..> Message
-MessageService ..> MediaReference
+RegisterLogic ..> User
+LoginLogic ..> User
+MeLogic ..> User
+UserHandler ..> GormDB
+RelationshipHandler ..> GormDB
+MembershipHandler ..> GormDB
+MessageHandler ..> GormDB
 @enduml

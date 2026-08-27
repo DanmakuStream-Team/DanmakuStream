@@ -1,4 +1,5 @@
 @startuml
+!include ../_theme.puml
 title SYS-SEQ08 UC08 创作者会员订阅
 autonumber
 actor 用户 as U

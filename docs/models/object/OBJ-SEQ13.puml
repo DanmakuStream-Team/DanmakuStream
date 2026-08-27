@@ -1,4 +1,5 @@
 @startuml
+!include ../_theme.puml
 title OBJ-SEQ13 UC13 对象级顺序图（代表流程：管理员修改用户角色）
 
 autonumber

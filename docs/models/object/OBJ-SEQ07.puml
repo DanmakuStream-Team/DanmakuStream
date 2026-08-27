@@ -1,28 +1,46 @@
 @startuml
-title OBJ-SEQ07 UC07 关注关系对象顺序图
+!include ../_theme.puml
+title OBJ-SEQ07 UC07 关注关系对象顺序图（代码追溯）
 autonumber
 actor 用户 as U
-boundary RelationshipHandler as H
-control RelationshipService as S
-database UserRepository as UR
-database RelationshipRepository as RR
-control NotificationService as NS
-U -> H: changeRelationship(targetId, type, groupId)
-H -> S: execute(currentId, command)
-S -> UR: exists(targetId)
-UR --> S: exists
-alt 目标不存在或目标是自己
-  S --> H: ruleViolation
-else 请求合法
-  S -> RR: find(currentId, targetId, type)
-  RR --> S: relation/none
-  S -> RR: upsertOrDelete(command)
-  RR --> S: relationState
-  opt 需要内容通知
-    S -> NS: createSubscription(relationState)
-    NS --> S: created
-  end
-  S --> H: relationshipDTO
+boundary relationship_handler as H
+database "*gorm.DB" as DB
+entity "model.User" as User
+entity "model.Follow" as Follow
+entity "model.UserBlock" as Block
+entity "model.CreatorSubscription" as Sub
+U -> H: FollowHandler(targetID)
+H -> DB: Select("id").First(&model.User{}, targetID)
+H -> DB: Model(&model.UserBlock{}).Count()
+alt 已存在关注
+  H -> DB: Where(follower_id, followee_id).First(&model.Follow{})
+  H -> DB: Model(&model.CreatorSubscription{}).Count()
+  H -> DB: Unscoped().Delete(&follow)
+  H -> DB: UpdateColumn("follow_count", -1)
+  H -> DB: UpdateColumn("fan_count", -1)
+else 尚未关注
+  H -> DB: Create(&model.Follow{FollowerID, FolloweeID})
+  H -> DB: UpdateColumn("follow_count", +1)
+  H -> DB: UpdateColumn("fan_count", +1)
 end
-H --> U: 最新关系状态/失败原因
+H --> U: {followed: bool}
+U -> H: CreateFollowGroupHandler(name)
+H -> DB: Create(&model.FollowGroup{OwnerID, Name})
+DB --> H: group / error
+H --> U: followGroupInfo
+U -> H: UpdateFollowSettingsHandler(targetID, groupID)
+H -> DB: Model(&model.FollowGroup{}).Count()
+H -> DB: Model(&model.Follow{}).Updates(group_id)
+DB --> H: RowsAffected
+H --> U: response.Ok / 请先关注
+U -> H: BlockHandler(targetID)
+H -> DB: Transaction(func(tx *gorm.DB))
+alt 尚未屏蔽
+  H -> DB: Create(&model.UserBlock{BlockerID, BlockedID})
+  H -> H: removeFollow(tx, userID, targetID)
+  H -> H: removeFollow(tx, targetID, userID)
+else 已屏蔽
+  H -> DB: Unscoped().Delete(&relation)
+end
+H --> U: {blocked: bool}
 @enduml

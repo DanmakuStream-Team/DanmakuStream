@@ -1,31 +1,32 @@
 @startuml
-title OBJ-SEQ11 UC11 私信与媒体分享对象顺序图
+!include ../_theme.puml
+title OBJ-SEQ11 UC11 私信与媒体分享对象顺序图（代码追溯）
 autonumber
 actor 发送者 as U
 actor 接收者 as V
-boundary MessageHandler as H
-control MessageService as S
-database ConversationRepository as CR
-database MessageRepository as MR
-control MediaReferenceService as MS
-control NotificationService as NS
-U -> H: send(conversationId, payload, clientMessageId)
-H -> S: execute(currentUserId, command)
-S -> CR: assertMember(currentUserId, conversationId)
-CR --> S: member/notMember
-alt 无权限或会话不存在
-  S --> H: accessError
-else 权限通过
-  opt 媒体分享
-    S -> MS: validate(payload.mediaRef)
-    MS --> S: mediaDTO/invalid
-  end
-  S -> MR: createOnce(message, clientMessageId)
-  MR --> S: savedMessage/duplicate
-  S -> NS: createMessageNotification(savedMessage)
-  NS --> S: created
-  S --> H: messageDTO
+boundary message_handler as H
+control "chat.Hub" as Hub
+database "*gorm.DB" as DB
+entity "model.ChatMessage" as Msg
+entity "model.User" as User
+entity "model.Video" as Video
+U -> H: SendHandler()
+H -> Hub: GetHub(svcCtx).CreateAndBroadcast(userID, req)
+Hub -> Hub: validateMessageInput(senderID, &input)
+Hub -> DB: Model(&model.User{}).Count()
+Hub -> DB: Model(&model.UserBlock{}).Count()
+opt 分享视频
+  Hub -> DB: Where(id, approved).First(&model.Video{})
 end
-H --> U: 发送结果
-H --> V: 新消息
+Hub -> DB: Create(&model.ChatMessage{})
+Hub -> DB: Preload(Sender/Receiver/SharedVideo).First(&message)
+Hub -> Hub: publish(senderID, receiverID, envelope)
+Hub --> V: WebSocket message event
+Hub --> H: chat.MessageInfo / error
+H --> U: messageDTO / writeSendError
+U -> H: HistoryHandler() / ReadHandler()
+H -> DB: Where(sender_id/receiver_id).Find(&[]model.ChatMessage{})
+H -> H: markConversationRead(svcCtx, userID, otherID)
+H -> DB: Model(&model.ChatMessage{}).Update("read", true)
+H --> U: message list
 @enduml

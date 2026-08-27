@@ -2,8 +2,9 @@
 
 本文件只作为索引。正式图统一使用 PlantUML，源文件位于 `docs/models/`，不再在 Markdown 中嵌入 Mermaid 图。
 
-- [四个用例总览图](docs/models/usecase/USECASE-ALL.puml)
-- [四个用例领域类图](docs/models/class/CLASS-ALL.puml)
+- [成员 B 用例范围图](docs/models/usecase/USECASE-B.puml)
+- [成员 B 领域类图](docs/models/class/CLASS-B.puml)
+- [成员 B 当前单体组件图](docs/models/component/COMPONENT-B.puml)
 
 ## UC01 用户注册、登录与资料维护
 

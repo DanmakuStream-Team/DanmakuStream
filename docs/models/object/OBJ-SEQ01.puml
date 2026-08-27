@@ -1,39 +1,49 @@
 @startuml
-title OBJ-SEQ01 UC01 用户服务对象顺序图
+!include ../_theme.puml
+title OBJ-SEQ01 UC01 用户服务对象顺序图（代码追溯）
 autonumber
 actor 用户 as U
-boundary UserHandler as H
-control AuthService as A
-control ProfileService as P
-database UserRepository as R
-control TokenService as T
-U -> H: submit(action, data)
+boundary auth_handler as AH
+boundary user_handler as UH
+control RegisterLogic as R
+control LoginLogic as L
+control MeLogic as M
+database "*gorm.DB" as DB
+entity "model.User" as User
+collections "avatar filesystem" as FS
+
 alt 注册
-  H -> A: register(data)
-  A -> R: existsByNickname(nickname)
-  R --> A: exists
-  alt 数据合法且昵称可用
-    A -> R: create(hashedUser)
-    R --> A: savedUser
-    A -> T: issue(savedUser)
-    T --> A: JWT
-    A --> H: session
-  else 数据非法或昵称重复
-    A --> H: validationError
-  end
+  U -> AH: RegisterHandler(req)
+  AH -> R: Register(req)
+  R -> DB: Model(&model.User{}).Where(...).Count()
+  R -> DB: Create(&model.User{})
+  R -> DB: Model(&user).Update("username", ...)
+  R --> AH: LoginResp / error
+  AH --> U: response.Ok / response.Fail
 else 登录
-  H -> A: login(data)
-  A -> R: findByNickname(nickname)
-  R --> A: user/notFound
-  A -> A: comparePassword()
-  A -> T: issue(user)
-  T --> A: JWT
-  A --> H: session/invalidCredentials
+  U -> AH: LoginHandler(req)
+  AH -> L: Login(req)
+  L -> DB: Where("nickname = ?").First(&model.User{})
+  L -> L: bcrypt.CompareHashAndPassword()
+  L --> AH: LoginResp / error
+  AH --> U: response.Ok / response.Fail
+else 查看资料
+  U -> AH: MeHandler()
+  AH -> M: Me(userID)
+  M -> DB: First(&model.User{}, userID)
+  M --> AH: MeInfo / error
+  AH --> U: response.Ok / response.Fail
 else 修改资料
-  H -> P: updateMe(userId, patch)
-  P -> R: updateProfile(userId, patch)
-  R --> P: updatedUser/error
-  P --> H: profileDTO/validationError
+  U -> UH: UpdateMeHandler(updateMeReq)
+  UH -> DB: Model(&model.User{}).Where("id = ?").Updates(updates)
+  DB --> UH: result
+  UH --> U: response.Ok / response.Fail
+else 上传头像
+  U -> UH: UploadAvatarHandler(multipart avatar)
+  UH -> FS: os.MkdirAll / os.Create / io.Copy
+  FS --> UH: avatarPath / error
+  UH -> DB: Model(&model.User{}).Update("avatar", avatarURL)
+  DB --> UH: result
+  UH --> U: {avatar: avatarURL} / error
 end
-H --> U: 操作结果
 @enduml
