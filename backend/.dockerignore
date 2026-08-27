@@ -1,0 +1,11 @@
+# 排除本地数据、日志与编译产物，加速构建并避免敏感内容进入镜像
+data/
+*.log
+*.out
+server
+danmakustream-api
+tmp/
+.git
+.gitignore
+Dockerfile
+.dockerignore

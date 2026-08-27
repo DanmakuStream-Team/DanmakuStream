@@ -1,0 +1,45 @@
+@startuml OBJ-SEQ03
+!include ../_theme.puml
+title OBJ-SEQ03 UC03 创作者投稿与状态跟踪（对象级）
+
+actor "创作者" as Creator
+participant "page: VideoUploadPage" as Page
+participant "videoApi" as Api
+participant "axios: AxiosInstance" as Axios
+participant "auth: AuthMiddleware" as Auth
+participant "handler: UploadHandler" as Handler
+participant "file: multipart.FileHeader" as Upload
+participant "fs: os / filepath" as FS
+participant "db: *gorm.DB" as DB
+participant "video: Video" as Video
+participant "cmd: exec.Cmd" as Cmd
+
+Creator -> Page: submit()
+Page -> Api: upload(formData, onProgress, signal)
+Api -> Axios: post('/videos/upload', formData)
+Axios -> Auth: POST /api/v1/videos/upload
+Auth -> Handler: UploadHandler(svcCtx)(c)
+Handler -> Upload: c.FormFile("video")
+Handler -> FS: MkdirAll(tmpDir) / Create(tmpPath) / Copy
+Handler -> Video: new Video(title, authorId, pending)
+Handler -> DB: Create(video)
+DB --> Handler: video.id
+Handler -> FS: MkdirAll(videoDir) / Rename(upload)
+opt 提供封面
+  Handler -> FS: 保存 coverFile
+  Handler -> DB: Update("cover_url", coverURL)
+end
+Handler -> Handler: go transcodeVideoAsync(...)
+Handler --> Axios: response.Ok(video)
+Axios --> Page: 上传完成
+
+Handler -> Cmd: exec.Command("ffmpeg", HLS 参数)
+Cmd -> FS: 生成 playlist.m3u8 与 segment_*.ts
+alt 转码成功
+  Handler -> Cmd: ffmpeg 截取缩略图 / ffprobe 获取时长
+  Handler -> FS: Remove(tmpPath)
+  Handler -> DB: Updates(video_url, duration, cover_url?)
+else 转码失败
+  Handler -> Handler: 输出带 videoId 的错误日志
+end
+@enduml

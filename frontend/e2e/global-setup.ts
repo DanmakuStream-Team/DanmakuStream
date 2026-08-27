@@ -1,31 +1,49 @@
 import { execSync } from 'node:child_process'
+import { request as playwrightRequest } from '@playwright/test'
 import { API, USERS } from './test-data'
 
-/**
- * E2E 测试数据初始化：
- * 1. 注册四个测试账号（已存在则忽略）并固化角色；
- * 2. 重置 tuser 角色（E2E-TC13-02 会修改它）；
- * 3. 造一条“待审 + 媒体就绪”视频和一条未屏蔽弹幕（E2E-TC13-01 消费）。
- * MySQL 连接可用 MYSQL_CMD 环境变量覆盖（默认本地用户态实例）。
- */
-const MYSQL = process.env.MYSQL_CMD ?? 'mysql -S /home/haoyue/dms-mysql.sock -uroot -ppassword danmakustream'
-const BACKEND = process.env.API_BASE ?? 'http://localhost:8080'
+type ApiContext = Awaited<ReturnType<typeof playwrightRequest.newContext>>
 
-async function register(nickname: string, password: string) {
-  const res = await fetch(`${BACKEND}${API}/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nickname, password }),
-  })
-  // 已存在（400）视为成功
-  if (!res.ok && res.status !== 400) throw new Error(`register ${nickname} failed: HTTP ${res.status}`)
+async function ensureUser(api: ApiContext, nickname: string, password: string) {
+  await api.post(`${API}/auth/register`, { data: { nickname, password } })
+  const response = await api.post(`${API}/auth/login`, { data: { nickname, password } })
+  if (!response.ok()) throw new Error(`cannot prepare ${nickname}: ${await response.text()}`)
+  return (await response.json()).data as { token: string; userInfo: { id: number } }
 }
 
-export default async function globalSetup() {
-  for (const u of Object.values(USERS)) await register(u.nickname, u.password)
+async function prepareEngagementData(api: ApiContext) {
+  const owner = await ensureUser(api, USERS.owner.nickname, USERS.owner.password)
+  await ensureUser(api, USERS.viewer.nickname, USERS.viewer.password)
+  const headers = { Authorization: `Bearer ${owner.token}` }
+
+  const roomsResponse = await api.get(`${API}/live?page=1&pageSize=100`)
+  if (roomsResponse.ok()) {
+    const rooms = (await roomsResponse.json()).data?.list || []
+    for (const room of rooms) {
+      if (room.ownerId === owner.userInfo.id) await api.put(`${API}/live/${room.id}/end`, { headers })
+    }
+  }
+
+  const schedulesResponse = await api.get(`${API}/live-schedules?status=pending&page=1&pageSize=100`, { headers })
+  if (schedulesResponse.ok()) {
+    const schedules = (await schedulesResponse.json()).data?.list || []
+    for (const schedule of schedules) {
+      if (schedule.ownerId === owner.userInfo.id) await api.delete(`${API}/live-schedules/${schedule.id}`, { headers })
+    }
+  }
+}
+
+async function prepareUC13Data(api: ApiContext) {
+  for (const user of [USERS.target, USERS.moderator, USERS.admin, USERS.plain]) {
+    await ensureUser(api, user.nickname, user.password)
+  }
+
+  const mysqlCommand = process.env.MYSQL_CMD
+    ?? (process.platform === 'linux' ? 'mysql -S /home/haoyue/dms-mysql.sock -uroot -ppassword danmakustream' : '')
+  if (!mysqlCommand) throw new Error('UC13 E2E setup requires MYSQL_CMD on this platform')
 
   execSync(
-    `${MYSQL} -e "
+    `${mysqlCommand} -e "
     UPDATE users SET role='user'      WHERE nickname='${USERS.target.nickname}';
     UPDATE users SET role='moderator' WHERE nickname='${USERS.moderator.nickname}';
     UPDATE users SET role='admin'     WHERE nickname='${USERS.admin.nickname}';
@@ -41,5 +59,14 @@ export default async function globalSetup() {
        (SELECT id FROM users WHERE nickname='${USERS.target.nickname}'),'E2E-UC13-待屏蔽弹幕',5);"`,
     { stdio: 'pipe' },
   )
-  console.log('[globalSetup] UC13 E2E 数据就绪')
+}
+
+export default async function globalSetup() {
+  const api = await playwrightRequest.newContext()
+  try {
+    await prepareEngagementData(api)
+    if (process.env.E2E_SKIP_UC13_SETUP !== '1') await prepareUC13Data(api)
+  } finally {
+    await api.dispose()
+  }
 }
