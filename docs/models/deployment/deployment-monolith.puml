@@ -1,0 +1,39 @@
+@startuml deployment-monolith
+!include ../_theme.puml
+title 改造前：Docker Compose 单体部署图（Monolith）
+left to right direction
+
+actor "用户浏览器" as User
+actor "主播推流端" as Anchor
+
+node "单台 Docker 主机" as Host {
+  node "frontend 容器" as Frontend {
+    artifact "Vue 静态资源" as Vue
+    component "Nginx 反向代理" as Nginx
+  }
+  node "backend 容器（单实例）" as Backend {
+    component "Gin API / WebSocket" as Gin
+    component "Schedule Worker" as Worker
+  }
+  node "srs 容器（单实例）" as SRS {
+    component "RTMP / HLS" as Media
+  }
+  node "mysql 容器（单实例）" as MySQL {
+    database "danmakustream" as DB
+  }
+  folder "宿主机卷" as Volume
+}
+
+User --> Nginx : HTTP / WebSocket / HLS
+Anchor --> Media : RTMP
+Nginx --> Gin : /api /ws /media
+Nginx --> Media : /live/*.m3u8
+Gin --> DB : GORM / MySQL
+Worker --> DB
+Gin --> Volume : 视频、封面、HLS 文件
+Media --> Volume : HLS 分片
+
+note bottom of Host
+单机、单实例；应用、媒体和数据服务共享主机故障域。
+end note
+@enduml

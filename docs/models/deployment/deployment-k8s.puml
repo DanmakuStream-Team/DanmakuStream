@@ -1,0 +1,53 @@
+@startuml deployment-k8s
+!include ../_theme.puml
+title 改造后：Kubernetes 部署图
+left to right direction
+
+actor "用户浏览器" as User
+actor "主播推流端" as Anchor
+cloud "Internet" as Internet
+
+node "Kubernetes Cluster" as K8S {
+  node "Ingress / LoadBalancer" as Ingress {
+    component "HTTP / WebSocket / HLS 路由" as Routes
+  }
+  node "frontend Deployment" as Frontend {
+    component "Nginx + Vue\nreplicas >= 2" as Web
+  }
+  node "backend Deployment" as Backend {
+    component "Gin API / WebSocket\nreplicas >= 2" as API
+  }
+  node "worker Deployment" as WorkerNode {
+    component "Schedule Worker\nleader/幂等任务" as Worker
+  }
+  node "SRS Deployment / StatefulSet" as SRS {
+    component "RTMP / HLS" as Media
+  }
+  node "MySQL StatefulSet / 托管数据库" as MySQL {
+    database "danmakustream" as DB
+  }
+  storage "PersistentVolume" as PV
+  component "ConfigMap" as Config
+  component "Secret" as Secret
+  component "HPA" as HPA
+}
+
+User --> Internet
+Anchor --> Internet
+Internet --> Routes
+Routes --> Web : /
+Routes --> API : /api /ws
+Routes --> Media : /live /rtmp
+API --> DB
+Worker --> DB
+API --> PV : 视频、封面
+Media --> PV : HLS 分片
+Config --> Web
+Config --> API
+Config --> Media
+Secret --> API
+Secret --> DB
+HPA ..> Web : CPU/流量扩缩容
+HPA ..> API : CPU/连接数扩缩容
+
+@enduml

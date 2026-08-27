@@ -1,0 +1,77 @@
+@startuml COMP-SEQ06
+!include ../_theme.puml
+title COMP-SEQ06 UC06 个人视频资料库管理（组件级）
+actor "用户" as U
+participant "UserLibraryPage / VideoPlayer" as P
+participant "libraryApi / videoApi" as A
+participant "Gin Router + AuthMiddleware" as R
+participant "libraryHandler (History/WatchLater)" as H
+participant "videoHandler (Like/Collect)" as VH
+database "MySQL: WatchHistory / WatchLater / Like / Collect" as DB
+participant "localStorage (liked/collections/downloads)" as LS
+
+== 历史记录：保存进度 ==
+U -> P: 在 VideoPlayer 中播放视频并触发 timeupdate
+P -> A: libraryApi.saveHistory(videoId, position) 节流调用
+A -> R: PUT /api/v1/users/me/history/:videoId + Bearer Token
+R -> H: SaveHistoryHandler(ctx)
+H -> DB: SELECT Video (id, duration, status=approved)
+alt 视频不存在或未审核
+  DB --> H: 空结果
+  H --> R: HTTP 404 "视频不存在"
+  R --> A: 404
+  A --> P: 静默忽略
+else 视频存在
+  H -> DB: UPSERT WatchHistory(user_id,video_id,position,updated_at)
+  DB --> H: 持久化成功
+  H --> R: 200 { videoId, position }
+  R --> A: 200
+  A --> P: 进度已保存
+end
+
+== 历史记录：列表查询与继续观看 ==
+U -> P: 进入 /me/history
+P -> A: libraryApi.history({ page:1, pageSize:100 })
+A -> R: GET /api/v1/users/me/history
+R -> H: HistoryListHandler(ctx)
+H -> DB: JOIN videos + 分页查询 WatchHistory ORDER BY updated_at DESC
+DB --> H: 列表 + Author 预加载
+H -> H: toLibraryRecord(progress = position*100/duration)
+H --> R: 200 { list, total, page, pageSize }
+R --> A: 200
+A --> P: 渲染列表卡片与进度条
+U -> P: 点击某条「继续观看」
+P -> P: 跳转 /video/:id?t=position
+
+== 稍后再看：切换 ==
+U -> P: 点击「稍后再看」按钮
+P -> A: libraryApi.toggleWatchLater(videoId)
+A -> R: POST /api/v1/users/me/watch-later/:videoId
+R -> H: ToggleWatchLaterHandler(ctx)
+H -> DB: SELECT Video (id WHERE status=approved)
+H -> DB: SELECT WatchLater(user,video)
+alt 已存在
+  H -> DB: DELETE WatchLater
+  H --> R: 200 { saved:false }
+else 不存在
+  H -> DB: INSERT WatchLater(user,video)
+  H --> R: 200 { saved:true }
+end
+R --> A: 200
+A --> P: 按钮状态更新
+
+== 清空记录 ==
+U -> P: 点击「清空」按钮 → ElMessageBox 二次确认
+alt history/watchlater
+  P -> A: libraryApi.clearHistory() / clearWatchLater()
+  A -> R: DELETE /users/me/history or /watch-later
+  R -> H: ClearHistoryHandler / ClearWatchLaterHandler
+  H -> DB: Unscoped DELETE WHERE user_id = ?
+  DB --> H: 影响行数
+  H --> R: 200 { cleared:true }
+else liked/collections/downloads
+  P -> LS: clearUserLibraryRecords(kind)
+  LS --> P: 已清空
+end
+P -> P: loadRecords() 重新拉取或读取本地
+@enduml

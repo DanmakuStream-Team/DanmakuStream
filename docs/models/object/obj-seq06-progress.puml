@@ -1,0 +1,77 @@
+@startuml obj-seq06-progress
+!include ../_theme.puml
+title OBJ-SEQ06 UC06 个人视频资料库·播放进度（对象级·Progress）
+actor "用户" as user
+participant "videoDetailPage: VideoDetailPage" as page
+participant "videoPlayer: VideoPlayer" as player
+participant "libraryApi: LibraryApi" as api
+participant "authMiddleware" as auth
+participant "saveHistoryHandler: SaveHistoryHandler" as saveH
+participant "historyListHandler: HistoryListHandler" as listH
+participant "db: *gorm.DB" as db
+participant "video: Video" as video
+participant "history: WatchHistory" as history
+participant "userLibrary (localStorage)" as local
+
+== SaveHistory 保存播放进度 ==
+user -> player: 开始播放，暂停/跳转/触发 timeupdate 节流
+player -> page: emit("timeupdate", currentTime)
+page -> api: saveHistory(videoId, position)
+api -> auth: PUT /api/v1/users/me/history/:videoId  Authorization: Bearer <JWT>
+auth -> saveH: SaveHistoryHandler(svcCtx) + c.Set(CtxKeyUserID, uid)
+saveH -> db: Select("id","duration").Where("id=? AND status=?", videoId, "approved").First(&video)
+alt 视频不存在或未审核
+  db --> saveH: gorm.ErrRecordNotFound
+  saveH --> api: 404 { code, message: "视频不存在" }
+  api --> page: skipErrorMessage，静默忽略
+else 视频存在
+  saveH -> saveH: position = min(position, video.Duration)
+  saveH -> history: new WatchHistory{UserID: uid, VideoID: videoId, Position: position}
+  saveH -> db: Clauses(OnConflict{Columns:[user_id,video_id], DoUpdates:{position,updated_at:time.Now()}}).Create(&history)
+  db --> saveH: RowsAffected = 1
+  saveH --> api: 200 { videoId, position }
+  api --> page: 本地缓存最新 position，用于下次 continue-watch
+end
+
+== HistoryListHandler 查询历史列表 + 进度百分比 ==
+user -> page: 路由守卫重定向后，进入 /me/history
+page -> api: history({ page:1, pageSize:100 })
+api -> auth: GET /api/v1/users/me/history
+auth -> listH: HistoryListHandler(svcCtx)
+listH -> db: Model(&WatchHistory{}).
+            Joins("JOIN videos ON videos.id=watch_histories.video_id AND videos.deleted_at IS NULL AND videos.status=?", "approved").
+            Where("watch_histories.user_id=?", uid).Count(&total)
+listH -> db: Preload("Video.Author").
+            Order("watch_histories.updated_at DESC").
+            Offset(0).Limit(100).Find(&histories)
+db --> listH: []WatchHistory{ video *Video, Position, UpdatedAt }
+listH -> listH: for h := range histories: toLibraryRecord(h.Video, h.UpdatedAt, h.Position)
+  note right
+    progress = 0
+    if video.Duration > 0
+      progress = h.Position * 100 / video.Duration
+      if progress > 100 then progress = 100
+    end
+  end note
+listH --> api: 200 { list: []libraryRecord, total, page:1, pageSize:100 }
+api --> page: records.value = res.data.list
+page -> page: 渲染卡片 + el-progress :percentage="record.progress"
+
+== 继续观看：恢复到 saved position ==
+user -> page: 点击 UserLibraryPage 条目按钮「继续观看」
+page -> page: router.push({path:`/video/:id`, query:{t:String(record.position)}})
+player -> player: onMounted 读取 route.query.t → video.currentTime = Number(query.t)
+player -> db: 触发 timeupdate → 回到上面的 SaveHistory 流程（递归保证最新）
+== 本地 liked/collections/downloads 对象写入兜底（不写 DB） ==
+user -> page: 点击下载按钮（downloads）或点赞/收藏（本机）
+page -> local: upsertUserLibraryRecord(kind, video)
+  note right
+    records = JSON.parse(localStorage.getItem("danmaku:user-library:<kind>"))
+    records = records.filter(x => x.video.id != video.id)
+    records.unshift({video, savedAt: new Date().toISOString()})
+    localStorage.setItem(key, JSON.stringify(records.slice(0, 80)))
+  end note
+local --> page: 写回成功
+user -> page: 切换到 /me/liked 或 /me/downloads
+page -> local: getUserLibraryRecords(kind) → 渲染列表
+@enduml
