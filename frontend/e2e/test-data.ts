@@ -2,6 +2,7 @@
 export const PASSWORD = 'Test1234!'
 
 export const API = process.env.E2E_API_BASE ?? 'http://127.0.0.1:8080/api/v1'
+export const ENGAGEMENT_VIDEO_TITLE = 'E2E-UC05-互动测试视频'
 
 export const USERS = {
   owner: { nickname: 'e2e-d-owner', password: PASSWORD },
