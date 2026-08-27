@@ -1,0 +1,28 @@
+@startuml SYS-SEQ02
+!include ../_theme.puml
+title SYS-SEQ02 UC02 视频发现、搜索与播放（系统级）
+
+actor "游客 / 普通用户" as User
+participant "DanmakuStream 系统" as System
+
+User -> System: 浏览首页或提交关键词、分类、标签与排序条件
+alt 查询成功且存在匹配视频
+  System --> User: 返回审核通过的视频分页列表
+  User -> System: 选择视频并打开详情
+  alt 视频存在且已审核通过
+    System --> User: 返回详情、作者、互动计数和播放地址
+    User -> System: 请求并播放媒体资源
+    alt 媒体资源可用
+      System --> User: 返回媒体清单与分片，开始播放
+    else 媒体资源不可用
+      System --> User: 返回播放失败状态
+    end
+  else 视频不存在或不可公开
+    System --> User: 返回视频不存在
+  end
+else 查询成功但没有匹配结果
+  System --> User: 返回空列表
+else 查询参数或服务异常
+  System --> User: 返回参数错误或服务失败
+end
+@enduml

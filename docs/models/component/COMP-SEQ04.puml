@@ -1,0 +1,49 @@
+@startuml COMP-SEQ04
+!include ../_theme.puml
+title COMP-SEQ04 UC04 视频审核与发布（组件级）
+
+actor "审核员 / 管理员" as Reviewer
+participant "AdminVideosPage" as Page
+participant "videoApi / Axios" as Api
+participant "Gin Router" as Router
+participant "AuthMiddleware / StaffMiddleware" as Middleware
+participant "AdminListHandler / AdminUpdateStatusHandler" as Handler
+database "MySQL" as DB
+participant "本地文件系统" as FS
+
+Reviewer -> Page: 打开审核页并筛选投稿
+Page -> Api: videoApi.adminList(params)
+Api -> Router: GET /api/v1/admin/videos
+Router -> Middleware: 校验令牌与 staff 角色
+alt 权限有效
+  Middleware -> Handler: AdminListHandler(context)
+  Handler -> DB: 查询视频、作者、状态和分页
+  DB --> Handler: 投稿列表
+  Handler --> Page: 返回审核列表
+else 无权限
+  Middleware --> Page: HTTP 401 / 403
+end
+
+Reviewer -> Page: 选择 approved 或 rejected
+Page -> Api: videoApi.adminUpdateStatus(id, status)
+Api -> Router: PUT /api/v1/admin/videos/:id/status
+Router -> Middleware: 再次校验令牌与 staff 角色
+Middleware -> Handler: AdminUpdateStatusHandler(context)
+Handler -> Handler: 校验视频 ID 与状态
+alt 状态为 approved
+  Handler -> DB: 查询 video_url
+  alt video_url 为空
+    Handler -> FS: 检查 videos/:id/upload.*
+    FS --> Handler: 未上传 / 仍在转码
+    Handler --> Page: HTTP 403 和具体原因
+  else 已存在播放地址
+    Handler -> DB: Update status=approved
+    DB --> Handler: 更新结果
+    Handler --> Page: 返回最新状态
+  end
+else 状态为 pending 或 rejected
+  Handler -> DB: Update status
+  DB --> Handler: 更新结果 / 未找到
+  Handler --> Page: HTTP 200 / 404 / 500
+end
+@enduml

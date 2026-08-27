@@ -1,0 +1,34 @@
+@startuml SYS-SEQ04
+!include ../_theme.puml
+title SYS-SEQ04 UC04 视频审核与发布（系统级）
+
+actor "审核员 / 管理员" as Reviewer
+actor "创作者" as Creator
+actor "游客 / 普通用户" as User
+participant "DanmakuStream 系统" as System
+
+Reviewer -> System: 登录并查看、筛选投稿列表
+alt 具备审核权限
+  System --> Reviewer: 返回投稿及当前状态
+  Reviewer -> System: 提交通过或拒绝决定
+  alt 状态合法且目标视频存在
+    alt 选择通过且媒体已完成处理
+      System --> Reviewer: 更新为 approved
+      Creator -> System: 查看投稿状态
+      System --> Creator: 返回已通过
+      User -> System: 浏览或打开该视频
+      System --> User: 返回公开列表或视频详情
+    else 选择拒绝
+      System --> Reviewer: 更新为 rejected
+      Creator -> System: 查看投稿状态
+      System --> Creator: 返回已拒绝
+    else 选择通过但媒体尚未就绪
+      System --> Reviewer: 拒绝通过并说明原因
+    end
+  else 状态非法或视频不存在
+    System --> Reviewer: 返回参数错误或视频不存在
+  end
+else 不具备审核权限
+  System --> Reviewer: 拒绝访问
+end
+@enduml

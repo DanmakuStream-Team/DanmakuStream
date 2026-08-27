@@ -1,0 +1,24 @@
+@startuml SYS-SEQ03
+!include ../_theme.puml
+title SYS-SEQ03 UC03 创作者投稿与状态跟踪（系统级）
+
+actor "创作者" as Creator
+participant "DanmakuStream 系统" as System
+
+Creator -> System: 登录后提交视频、封面和作品信息
+alt 身份、表单和文件可接受
+  System --> Creator: 返回待审核投稿和上传完成状态
+  System -> System: 异步处理媒体
+  alt 媒体处理成功
+    System -> System: 保存播放地址、时长和封面
+  else 媒体处理失败
+    System -> System: 保留待处理状态并记录错误日志
+  end
+  Creator -> System: 打开创作中心并筛选投稿状态
+  System --> Creator: 返回仅属于当前创作者的投稿列表
+else 未登录或输入不合法
+  System --> Creator: 拒绝投稿并说明原因
+else 文件或投稿记录保存失败
+  System --> Creator: 清理已产生的临时资源并返回失败
+end
+@enduml
