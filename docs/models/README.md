@@ -7,9 +7,10 @@
 | 成员 B 范围 | UC01、UC07、UC08、UC11 | `usecase/USECASE-B`、`class/CLASS-B`、`component/COMPONENT-B` |
 | 互动与直播域 | UC05、UC09、UC10 | `usecase/UC05-UC09-UC10-overview`、`object/DOMAIN-CLASS-D`、`component/COMPONENT-D`、`object/IMPLEMENTATION-CLASS-D` |
 | 用例说明 | UC13 | `usecase/UC13.md` |
-| 系统级 | UC01、02、03、04、05、07、08、09、10、11、12、13 | `system/SYS-SEQxx` |
-| 组件级 | UC01、02、03、04、05、07、08、09、10、11、12、13 | `component/COMP-SEQxx` |
-| 对象级 | UC01、02、03、04、05、07、08、09、10、11、12、13 | `object/OBJ-SEQxx` |
+| 总用例图 | UC01～UC13 全部参与者与用例 | `usecase/USECASE-OVERVIEW` |
+| 系统级 | UC01～UC13 全部（UC06 于 PR #68 补齐） | `system/SYS-SEQxx` |
+| 组件级 | UC01～UC13 全部 | `component/COMP-SEQxx` |
+| 对象级 | UC01～UC13 全部 | `object/OBJ-SEQxx` |
 | 部署 | 单体、单体详图、Kubernetes | `deployment/DEPLOY-MONO`、`DEPLOY-MONO-DETAILED`、`DEPLOY-K8S` |
 
 目前共有 46 个 PlantUML 正式源文件（不含 `_theme.puml`），全部应保留同名 SVG 和 PNG。当前尚未提交三层模型的用例为 UC06。

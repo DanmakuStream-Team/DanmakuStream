@@ -5,6 +5,7 @@
 | 用例 | 测试设计 |
 |---|---|
 | UC01 | [uc01-user-service.md](./test-cases/uc01-user-service.md) |
+| UC06 | [uc06-personal-library.md](./test-cases/uc06-personal-library.md) |
 | UC07 | [uc07-relationships.md](./test-cases/uc07-relationships.md) |
 | UC08 | [uc08-membership.md](./test-cases/uc08-membership.md) |
 | UC11 | [uc11-messaging.md](./test-cases/uc11-messaging.md) |
