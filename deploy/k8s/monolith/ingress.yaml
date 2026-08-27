@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: danmakustream
+  namespace: danmakustream
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 2g        # 视频上传
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: danmakustream.local     # 本地验证：/etc/hosts 映射到 ingress 控制器 IP
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port: { number: 80 }

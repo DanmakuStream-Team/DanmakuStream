@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: video-data
+  namespace: danmakustream
+spec:
+  # 单体基线为单副本；大多数本地集群默认支持 RWO，不保证支持 RWX。
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi

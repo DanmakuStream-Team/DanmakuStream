@@ -39,17 +39,49 @@ DanmakuStream/
 ### Docker Compose 启动
 
 ```bash
+# 空环境一键启动（首次会构建镜像，MySQL 数据卷不存在时自动建库）
 docker compose up -d --build
+
+# 播放固定测试数据（幂等）：test_user / test_moderator / test_admin
+scripts/seed-test-data.sh
 ```
+
+容器内后端使用 [backend/etc/config.docker.yaml](backend/etc/config.docker.yaml)（以服务名 `mysql`/`srs` 访问依赖，本地开发用的 `config.yaml` 仍是 `localhost`）。所有服务配置了健康检查与 `restart: unless-stopped`；前端会等后端健康后才启动。
 
 默认访问地址：
 
 | 服务 | 地址 |
 |---|---|
 | 前端 | `http://localhost` |
-| 后端 API | 前端 Nginx 代理到 `/api/v1/*` |
+| 后端 API | `http://localhost:8080/api/v1/*`，同时可由前端 Nginx 代理到 `/api/v1/*` |
+| 健康检查 | `http://localhost/api/v1/health`（`data.status=ok`、`data.db=up`） |
 | SRS RTMP | `rtmp://localhost:1935/live/<streamKey>` |
 | SRS HLS | `http://localhost:8081/live/<streamKey>.m3u8` |
+
+#### 测试账号（仅本地测试）
+
+| 昵称（登录用） | 角色 | 用途 |
+|---|---|---|
+| `test_user` | user | 普通用户/越权测试 |
+| `test_moderator` | moderator | 内容审核 |
+| `test_admin` | admin | 权限与运营管理 |
+
+密码均为 `Test1234!`。账号经真实注册接口创建（bcrypt 由后端生成），示例视频/弹幕/横幅/公告以 `SEED-` 前缀标识，可重复执行种子脚本重建。
+
+#### 验证与清理
+
+```bash
+docker compose ps                          # 四个服务均应为 healthy/up
+curl -f http://localhost/api/v1/health     # 健康检查
+docker compose logs backend | tail -20     # 后端日志
+
+# 测试（从仓库根目录执行；E2E 见 frontend/e2e）
+(cd backend && go test ./...)
+tests/api/uc13-admin-test.sh               # 需先合入 UC13 测试分支，且后端在 8080 运行
+
+# 彻底清理（删除数据库与视频数据卷）
+docker compose down -v
+```
 
 公网部署时需要把 [backend/etc/config.yaml](backend/etc/config.yaml) 里的直播地址改成公网可访问地址：
 

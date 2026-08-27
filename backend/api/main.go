@@ -38,7 +38,18 @@ func loadConfig(path string, c *config.Config) error {
 	if err != nil {
 		return err
 	}
-	return yaml.Unmarshal(data, c)
+	if err := yaml.Unmarshal(data, c); err != nil {
+		return err
+	}
+	// 容器和 Kubernetes 通过环境变量注入敏感配置，避免把密钥写入
+	// ConfigMap 或镜像。未设置时仍兼容本地 YAML 配置。
+	if value := os.Getenv("DMS_JWT_SECRET"); value != "" {
+		c.Auth.AccessSecret = value
+	}
+	if value := os.Getenv("DMS_DATABASE_DSN"); value != "" {
+		c.Database.DataSource = value
+	}
+	return nil
 }
 
 func main() {
@@ -80,6 +91,20 @@ func main() {
 
 	v1 := r.Group("/api/v1")
 	{
+		// 仅验证进程存活，不依赖数据库，供 Kubernetes livenessProbe 使用。
+		v1.GET("/livez", func(ctx *gin.Context) {
+			ctx.JSON(http.StatusOK, gin.H{"code": 0, "data": gin.H{"status": "ok"}})
+		})
+		// 无鉴权健康检查：供 Docker/K8s 探针与 CI 使用，顺带验证数据库连通性
+		v1.GET("/health", func(ctx *gin.Context) {
+			if sqlDB, err := svcCtx.DB.DB(); err == nil {
+				if err := sqlDB.PingContext(ctx.Request.Context()); err == nil {
+					ctx.JSON(http.StatusOK, gin.H{"code": 0, "data": gin.H{"status": "ok", "db": "up"}})
+					return
+				}
+			}
+			ctx.JSON(http.StatusServiceUnavailable, gin.H{"code": 503, "data": gin.H{"status": "degraded", "db": "down"}})
+		})
 		v1.POST("/auth/login", authhandler.LoginHandler(svcCtx))
 		v1.POST("/auth/register", authhandler.RegisterHandler(svcCtx))
 
