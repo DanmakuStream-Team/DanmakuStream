@@ -15,7 +15,7 @@ name: ci
 
 on:
   push:
-    branches: [dev, main]
+    branches: [dev, main, 'whh用户b-test']
   pull_request:
     branches: [dev, main]
 
@@ -127,10 +127,44 @@ jobs:
         if: always()
         run: pkill -f dms-api || true
 
+  member-b-integration:
+    name: 成员 B 用例集成测试（INT-TC01/07/08/11）
+    runs-on: ubuntu-latest
+    needs: backend-test
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -ppassword"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Run UC01/07/08/11 MySQL integration tests
+        working-directory: backend
+        env:
+          DANMAKU_TEST_ADMIN_DSN: "root:password@tcp(127.0.0.1:3306)/?charset=utf8mb4&parseTime=True&loc=Local"
+        run: go test -tags=integration ./integration -run '^TestMemberBUseCasesWithMySQL$' -count=1 -v | tee member-b-integration-output.txt
+      - name: Upload member B test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: member-b-integration-output
+          path: backend/member-b-integration-output.txt
+
   docker-build:
     name: 构建前后端镜像（版本号 = commit sha）
     runs-on: ubuntu-latest
-    needs: [backend-test, frontend-build, api-test]
+    needs: [backend-test, frontend-build, api-test, member-b-integration]
     steps:
       - uses: actions/checkout@v4
       - name: Build backend image
