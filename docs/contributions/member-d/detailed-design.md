@@ -2,17 +2,17 @@
 
 ## 1. 实现类图
 
-![互动与直播域实现类图](../models/object/IMPLEMENTATION-CLASS-D.svg)
+![互动与直播域实现类图](../../models/object/IMPLEMENTATION-CLASS-D.svg)
 
-源文件：[IMPLEMENTATION-CLASS-D.puml](../models/object/IMPLEMENTATION-CLASS-D.puml)；PNG：[IMPLEMENTATION-CLASS-D.png](../models/object/IMPLEMENTATION-CLASS-D.png)。
+源文件：[IMPLEMENTATION-CLASS-D.puml](../../models/object/IMPLEMENTATION-CLASS-D.puml)；PNG：[IMPLEMENTATION-CLASS-D.png](../../models/object/IMPLEMENTATION-CLASS-D.png)。
 
 ## 2. UC05 对象级设计
 
 ### 2.1 对象级顺序图
 
-![OBJ-SEQ05 UC05 对象级顺序图](../models/object/OBJ-SEQ05.svg)
+![OBJ-SEQ05 UC05 对象级顺序图](../../models/object/OBJ-SEQ05.svg)
 
-源文件：[OBJ-SEQ05.puml](../models/object/OBJ-SEQ05.puml)；PNG：[OBJ-SEQ05.png](../models/object/OBJ-SEQ05.png)。
+源文件：[OBJ-SEQ05.puml](../../models/object/OBJ-SEQ05.puml)；PNG：[OBJ-SEQ05.png](../../models/object/OBJ-SEQ05.png)。
 
 ### 2.2 事务与约束
 
@@ -24,9 +24,9 @@
 
 ### 3.1 对象级顺序图
 
-![OBJ-SEQ09 UC09 对象级顺序图](../models/object/OBJ-SEQ09.svg)
+![OBJ-SEQ09 UC09 对象级顺序图](../../models/object/OBJ-SEQ09.svg)
 
-源文件：[OBJ-SEQ09.puml](../models/object/OBJ-SEQ09.puml)；PNG：[OBJ-SEQ09.png](../models/object/OBJ-SEQ09.png)。
+源文件：[OBJ-SEQ09.puml](../../models/object/OBJ-SEQ09.puml)；PNG：[OBJ-SEQ09.png](../../models/object/OBJ-SEQ09.png)。
 
 ### 3.2 事务与并发
 
@@ -39,9 +39,9 @@
 
 ### 4.1 对象级顺序图
 
-![OBJ-SEQ10 UC10 对象级顺序图](../models/object/OBJ-SEQ10.svg)
+![OBJ-SEQ10 UC10 对象级顺序图](../../models/object/OBJ-SEQ10.svg)
 
-源文件：[OBJ-SEQ10.puml](../models/object/OBJ-SEQ10.puml)；PNG：[OBJ-SEQ10.png](../models/object/OBJ-SEQ10.png)。
+源文件：[OBJ-SEQ10.puml](../../models/object/OBJ-SEQ10.puml)；PNG：[OBJ-SEQ10.png](../../models/object/OBJ-SEQ10.png)。
 
 ### 4.2 关键算法
 

@@ -4,14 +4,14 @@
 
 当前运行基线由单台 Docker 主机承载前端 Nginx、Gin 单体后端、SRS 和 MySQL。应用实例、媒体处理和数据库处于同一主机故障域。
 
-![改造前 Docker Compose 单体部署图](models/deployment/DEPLOY-MONO.svg)
+![改造前 Docker Compose 单体部署图](../models/deployment/DEPLOY-MONO.svg)
 
-源文件：[DEPLOY-MONO.puml](models/deployment/DEPLOY-MONO.puml)；PNG：[DEPLOY-MONO.png](models/deployment/DEPLOY-MONO.png)。
+源文件：[DEPLOY-MONO.puml](../models/deployment/DEPLOY-MONO.puml)；PNG：[DEPLOY-MONO.png](../models/deployment/DEPLOY-MONO.png)。另有包含角色、中间件与存储细节的 [DEPLOY-MONO-DETAILED.puml](../models/deployment/DEPLOY-MONO-DETAILED.puml)。
 
 ## 2. 改造后：Kubernetes 部署
 
 改造后通过 Ingress/LoadBalancer 统一接入，前端和后端使用 Deployment 多副本，计划任务独立运行，持久化数据使用 StatefulSet、托管数据库或 PersistentVolume，并通过 ConfigMap、Secret 和 HPA 管理配置、凭据和扩缩容。
 
-![改造后 Kubernetes 部署图](models/deployment/DEPLOY-K8S.svg)
+![改造后 Kubernetes 部署图](../models/deployment/DEPLOY-K8S.svg)
 
-源文件：[DEPLOY-K8S.puml](models/deployment/DEPLOY-K8S.puml)；PNG：[DEPLOY-K8S.png](models/deployment/DEPLOY-K8S.png)。
+源文件：[DEPLOY-K8S.puml](../models/deployment/DEPLOY-K8S.puml)；PNG：[DEPLOY-K8S.png](../models/deployment/DEPLOY-K8S.png)。

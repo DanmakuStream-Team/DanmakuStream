@@ -4,7 +4,7 @@
 
 - 最近执行日期：2026-08-27。
 - 覆盖范围：UC05、UC09、UC10（开发计划旧编号 UC04、UC07、UC06 分别对应当前三个业务场景）。
-- 代码分支：`codex/d-engagement-tests-20260826`；开发基线为 `origin/dev` 的 `ebf4e51`。
+- 代码分支：`codex/d-engagement-tests-20260826`；已同步 `origin/dev` 的文档重组基线 `fdc44ad`。
 - 运行环境：Windows 11 `10.0.26100`、Go `1.26.2 windows/amd64`、Node.js `24.13.0`、npm `11.6.2`、Gin Handler、GORM、本机 MySQL（TCP 3306）。
 - 数据隔离：测试运行时创建名称为 `danmakustream_d_sxh_<时间戳>` 的临时数据库，完成后自动删除，不使用开发业务库。
 
@@ -82,7 +82,7 @@ Remove-Item Env:DANMAKU_TEST_ADMIN_DSN
 
 ## 7. E2E 状态与现场检查项
 
-自动化集成测试已经从 HTTP Handler 入口覆盖三个用例的业务写入、权限、异常分支和数据库结果；真实 RTMP 推流与 SRS/HLS 输出也已通过。Playwright 已自动完成 UC05 的弹幕、评论、点赞、收藏与刷新持久化，UC09 的创建、预约、取消与刷新持久化，以及 UC10 的直播创建、点赞、赠礼和结束流程。HTML 报告位于 `docs/tests/reports/D-engagement-e2e-report/index.html`。
+自动化集成测试已经从 HTTP Handler 入口覆盖三个用例的业务写入、权限、异常分支和数据库结果；真实 RTMP 推流与 SRS/HLS 输出也已通过。Playwright 已自动完成 UC05 的弹幕、评论、点赞、收藏与刷新持久化，UC09 的创建、预约、取消与刷新持久化，以及 UC10 的直播创建、点赞、赠礼和结束流程。HTML 报告位于 `docs/testing/reports/engagement-e2e/index.html`。
 
 最终现场仍建议补充两项视觉证据：
 

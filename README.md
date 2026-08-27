@@ -22,10 +22,13 @@ DanmakuStream 是一个前后端分离的视频社区系统，支持视频点播
 DanmakuStream/
 ├── frontend/          # Vue 3 前端应用和 Nginx 配置
 ├── backend/           # Gin API 服务
+├── docs/              # 项目、架构、模型、测试与追溯文档
 ├── scripts/           # 数据库初始化和测试脚本
 ├── docker-compose.yml
 └── README.md
 ```
+
+项目计划、架构、模型、测试与追溯材料见 [文档中心](docs/README.md)。
 
 ## 快速启动
 
@@ -279,7 +282,7 @@ npm run build
 - 接口、权限或部署方式变化后，需要同步更新 README 或相关文档
 - 重要后端变更至少运行 `GOCACHE=/tmp/go-build go test ./...`
 - 重要前端变更至少运行 `npm run build`
-- 每个 Issue 必须记录负责人、分支、用例编号、验收条件、PR、测试和文档证据；证据齐全后才能关闭并进入 Done。详细规则见 [Issue、PR 与 Done 验收规则](docs/协作与验收规则.md)。
+- 每个 Issue 必须记录负责人、分支、用例编号、验收条件、PR、测试和文档证据；证据齐全后才能关闭并进入 Done。详细规则见 [Issue、PR 与 Done 验收规则](docs/project/collaboration-and-acceptance.md)。
 - 所有正式图统一使用 PlantUML，源文件及 SVG/PNG 导出图集中存放在 [docs/models](docs/models/README.md)；项目看板统一使用 `Backlog → Ready → In Progress → Review → Done`，另设 `Blocked`。
 
 ## 项目进度

@@ -227,7 +227,7 @@ jobs:
         with:
           name: d-engagement-e2e-report
           path: |
-            docs/tests/reports/D-engagement-e2e-report/
+            docs/testing/reports/engagement-e2e/
             frontend/test-results/
           if-no-files-found: ignore
       - name: Stop backend
