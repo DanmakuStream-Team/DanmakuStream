@@ -1,0 +1,29 @@
+@startuml
+!include ../_theme.puml
+title COMP-SEQ11 UC11 私信与媒体分享组件顺序图
+autonumber
+actor "发送者" as U
+actor "接收者" as V
+participant "ChatPage" as UI
+participant "API Gateway" as GW
+participant "消息管理" as MSG
+participant "媒体服务" as MEDIA
+participant "通知管理" as NOTIFY
+U -> UI: 打开会话
+UI -> GW: GET /messages/conversations/{id}
+GW -> MSG: listMessages(userId, conversationId)
+MSG --> GW: 消息列表/权限错误
+GW --> UI: 会话消息
+U -> UI: 发送文本或媒体分享
+UI -> GW: POST /messages
+GW -> MSG: sendMessage(command)
+opt 媒体分享
+  MSG -> MEDIA: validateReference(video/live)
+  MEDIA --> MSG: 媒体摘要/无效
+end
+MSG -> NOTIFY: notifyRecipient(message)
+NOTIFY --> MSG: notificationCreated
+MSG --> GW: messageDTO
+GW --> UI: 发送结果
+UI --> V: 实时/站内新消息提醒
+@enduml

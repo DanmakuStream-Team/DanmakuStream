@@ -1,0 +1,23 @@
+@startuml
+!include ../_theme.puml
+title SYS-SEQ11 UC11 用户私信与媒体分享
+autonumber
+actor 发送者 as U
+actor 接收者 as V
+participant "DanmakuStream 系统" as S
+U -> S: 创建会话或选择已有会话
+S -> S: 校验登录身份与会话成员
+alt 会话无效
+  S --> U: 拒绝并说明原因
+else 会话有效
+  U -> S: 发送文本或视频/直播分享卡片
+  S -> S: 校验内容、媒体引用和幂等消息 ID
+  alt 内容合法
+    S -> S: 持久化消息并创建通知
+    S --> V: 推送新消息通知
+    S --> U: 返回发送成功
+  else 内容非法或写入失败
+    S --> U: 返回失败原因
+  end
+end
+@enduml
