@@ -20,8 +20,10 @@ test.describe.serial('成员 C 内容域', () => {
     await expect(page).toHaveURL(/keyword=/)
     const result = page.locator('.search-item', { hasText: 'E2E-MC-公开视频' })
     await expect(result).toBeVisible()
-    await result.getByRole('heading', { name: 'E2E-MC-公开视频' }).click()
-    await expect(page).toHaveURL(/\/video\/\d+/)
+    await Promise.all([
+      page.waitForURL(/\/video\/\d+/, { timeout: 15_000 }),
+      result.click(),
+    ])
     await expect(page.getByRole('heading', { name: 'E2E-MC-公开视频' })).toBeVisible()
     await expect(page.locator('video')).toBeVisible()
 
