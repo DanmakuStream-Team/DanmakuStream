@@ -34,7 +34,11 @@ jobs:
         run: go build ./...
       - name: Unit tests (UNIT-TC13)
         working-directory: backend
-        run: go test ./... -v | tee unit-test-output.txt
+        # set -o pipefail 确保管道中 go test 的非零退出码不被 tee 吞掉：
+        # 红灯演练（run 33032768023）发现默认行为下测试失败仍返回 0，已修复
+        run: |
+          set -o pipefail
+          go test ./... -v | tee unit-test-output.txt
       - name: Upload test output
         if: always()
         uses: actions/upload-artifact@v4
@@ -116,7 +120,9 @@ jobs:
       - name: Run API test suite
         env:
           MYSQL_CMD: "mysql -h127.0.0.1 -P3306 -uroot -ppassword danmakustream"
-        run: tests/api/uc13-admin-test.sh | tee api-test-output.txt
+        run: |
+          set -o pipefail
+          tests/api/uc13-admin-test.sh | tee api-test-output.txt
       - name: Upload test output
         if: always()
         uses: actions/upload-artifact@v4
