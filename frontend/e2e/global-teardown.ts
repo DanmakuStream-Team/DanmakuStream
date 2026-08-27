@@ -25,6 +25,6 @@ export default async function globalTeardown() {
       rmSync(path.resolve('../backend/data/videos', id), { recursive: true, force: true })
     }
   }
-  rmSync(path.resolve('.e2e-fixtures'), { recursive: true, force: true })
+  rmSync('/tmp/danmakustream-member-c-fixtures', { recursive: true, force: true })
   rmSync(path.resolve('../backend/data/videos/e2e-member-c'), { recursive: true, force: true })
 }

@@ -102,7 +102,7 @@ async function prepareMemberCData(api: ApiContext) {
     ?? (process.platform === 'linux' ? 'mysql -S /home/haoyue/dms-mysql.sock -uroot -ppassword danmakustream' : '')
   if (!mysqlCommand) throw new Error('member C E2E setup requires MYSQL_CMD')
 
-  const fixtureDir = path.resolve('.e2e-fixtures')
+  const fixtureDir = '/tmp/danmakustream-member-c-fixtures'
   const backendMediaDir = path.resolve('../backend/data/videos/e2e-member-c')
   mkdirSync(fixtureDir, { recursive: true })
   mkdirSync(backendMediaDir, { recursive: true })

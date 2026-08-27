@@ -1,4 +1,3 @@
-import path from 'node:path'
 import { expect, test, type Locator } from '@playwright/test'
 import { loginViaApi, openAs } from './fixtures/auth'
 import { API, USERS } from './test-data'
@@ -36,7 +35,7 @@ test.describe.serial('成员 C 内容域', () => {
   test('UC03 创作者取消上传后重新投稿并看到待审状态', async ({ page, request }) => {
     const creator = await loginViaApi(request, USERS.memberCCreator.nickname, USERS.memberCCreator.password)
     await openAs(page, creator, '/creator/upload')
-    const file = path.resolve('.e2e-fixtures/member-c.mp4')
+    const file = '/tmp/danmakustream-member-c-fixtures/member-c.mp4'
     await page.locator('input[type=file]').first().setInputFiles(file)
     await page.getByPlaceholder('请输入视频标题').fill('E2E-MC-取消上传')
 
