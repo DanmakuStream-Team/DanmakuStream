@@ -40,20 +40,20 @@
 - [`hub_chat_integration_test.go`](../../backend/internal/logic/danmaku/hub_chat_integration_test.go)：覆盖聊天身份模式、会员有效期、慢速模式及主播绕过。
 - [`hub_websocket_integration_test.go`](../../backend/internal/logic/danmaku/hub_websocket_integration_test.go)：覆盖真实 WebSocket 连接、事件往返、在线人数和持久化失败错误事件。
 - [`engagement_integration_test.go`](../../backend/integration/engagement_integration_test.go)：使用自动创建并删除的临时 MySQL 数据库，覆盖 UC05、UC09、UC10 的查询与写入、权限、参数边界、事务、通知、状态回读及结束后重启。
-- [`d-engagement.spec.ts`](../../frontend/e2e/d-engagement.spec.ts)：Playwright 覆盖 UC09 预约闭环和 UC10 直播创建、互动、结束闭环；HTML 报告见 [`index.html`](../tests/reports/D-engagement-e2e-report/index.html)。
+- [`d-engagement.spec.ts`](../../frontend/e2e/d-engagement.spec.ts)：Playwright 覆盖 UC05 视频互动持久化、UC09 预约闭环和 UC10 直播创建、互动、结束闭环；HTML 报告见 [`index.html`](../tests/reports/D-engagement-e2e-report/index.html)。
+- [CI 工作流](../../.github/workflows/ci.yml)：PR/推送时自动执行三个用例的 MySQL 集成测试与 Playwright E2E，失败会阻止后续 Docker 镜像构建。
 - 后端全量验证：`go test ./...` 已通过。
 - 三用例及直播机制集成验证：`go test -tags=integration ./internal/handler/v1/live ./internal/logic/danmaku ./integration -v` 已通过。
-- 浏览器 E2E：`npm run test:e2e:d`，Chromium 2/2 通过。
+- 浏览器 E2E：`npm run test:e2e:d`，Chromium 3/3 通过。
 - 前端生产验证：`npm run build` 已通过；仅有既有的包体积提示，无编译错误。
 - 真实媒体链路：FFmpeg 推送 30 秒测试流至 SRS，HLS 主清单、媒体清单和 TS 分片均返回 HTTP 200。
 - 覆盖率：成员 D 用例函数口径 90.3%（924/1023），相关文件保守口径 58.1%（940/1618）。
 
 ## 5. 当前基线与状态
 
-- 工作分支：`feature/floatingsoul423-live-features-20260825`。
-- 开发基线：已合并 `dev` 的 `ea9a5ee`。
-- 基线合并提交：`81359ed`。
-- 文档、单元测试、三个用例的 MySQL/API 集成测试、真实 WebSocket 测试和两条 Playwright E2E：已完成。
+- 工作分支：`codex/d-engagement-tests-20260826`。
+- 开发基线：已同步 `origin/dev` 的 `ebf4e51`。
+- 文档、单元测试、三个用例的 MySQL/API 集成测试、真实 WebSocket 测试和三条 Playwright E2E：已完成。
 - 已处理：同主播相同开播时间冲突、登录观众多连接去重、直播弹幕写入失败不广播并返回错误、UC05/UC09/UC10 集成测试证据。
-- 后续增强：UC05 浏览器视觉演示、WebSocket 断网重连现场测试，以及异常推流状态恢复测试。
+- 后续增强：保存 UC05 代表性页面截图、WebSocket 断网重连现场测试，以及异常推流状态恢复测试。
 - `engagement-service` 仍是计划中的拆分目标；当前设计和代码追溯以可运行的单体实现为准。
