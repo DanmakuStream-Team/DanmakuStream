@@ -296,7 +296,7 @@ jobs:
           if-no-files-found: warn
           path: |
             /tmp/e2e-member-c-output.txt
-            frontend/test-results/
+            /tmp/danmakustream-member-c-test-results/
             docs/testing/reports/UC02-03-04-12-e2e-report/
 
   member-b-integration:

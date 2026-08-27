@@ -8,6 +8,7 @@ const backendConfig = process.env.E2E_BACKEND_CONFIG ?? 'etc/config.yaml'
 
 export default defineConfig({
   testDir: './e2e',
+  outputDir: isMemberCRun ? '/tmp/danmakustream-member-c-test-results' : 'test-results',
   globalSetup: './e2e/global-setup.ts',
   globalTeardown: './e2e/global-teardown.ts',
   fullyParallel: false,
