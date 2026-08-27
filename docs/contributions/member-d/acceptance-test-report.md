@@ -82,7 +82,7 @@ Remove-Item Env:DANMAKU_TEST_ADMIN_DSN
 
 ## 7. E2E 状态与现场检查项
 
-自动化集成测试已经从 HTTP Handler 入口覆盖三个用例的业务写入、权限、异常分支和数据库结果；真实 RTMP 推流与 SRS/HLS 输出也已通过。Playwright 已自动完成 UC05 的弹幕、评论、点赞、收藏与刷新持久化，UC09 的创建、预约、取消与刷新持久化，以及 UC10 的直播创建、点赞、赠礼和结束流程。HTML 报告位于 `docs/tests/reports/D-engagement-e2e-report/index.html`。
+自动化集成测试已经从 HTTP Handler 入口覆盖三个用例的业务写入、权限、异常分支和数据库结果；真实 RTMP 推流与 SRS/HLS 输出也已通过。Playwright 已自动完成 UC05 的弹幕、评论、点赞、收藏与刷新持久化，UC09 的创建、预约、取消与刷新持久化，以及 UC10 的直播创建、点赞、赠礼和结束流程。HTML 报告位于 `docs/testing/reports/engagement-e2e/index.html`。
 
 最终现场仍建议补充两项视觉证据：
 

@@ -24,15 +24,15 @@
 
 ## 3. 用例图
 
-![互动与直播域用例图](../models/usecase/UC05-UC09-UC10-overview.svg)
+![互动与直播域用例图](../../models/usecase/UC05-UC09-UC10-overview.svg)
 
-源文件：[UC05-UC09-UC10-overview.puml](../models/usecase/UC05-UC09-UC10-overview.puml)；PNG：[UC05-UC09-UC10-overview.png](../models/usecase/UC05-UC09-UC10-overview.png)。
+源文件：[UC05-UC09-UC10-overview.puml](../../models/usecase/UC05-UC09-UC10-overview.puml)；PNG：[UC05-UC09-UC10-overview.png](../../models/usecase/UC05-UC09-UC10-overview.png)。
 
 ## 4. 概念类图
 
-![互动与直播域概念类图](../models/object/DOMAIN-CLASS-D.svg)
+![互动与直播域概念类图](../../models/object/DOMAIN-CLASS-D.svg)
 
-源文件：[DOMAIN-CLASS-D.puml](../models/object/DOMAIN-CLASS-D.puml)；PNG：[DOMAIN-CLASS-D.png](../models/object/DOMAIN-CLASS-D.png)。
+源文件：[DOMAIN-CLASS-D.puml](../../models/object/DOMAIN-CLASS-D.puml)；PNG：[DOMAIN-CLASS-D.png](../../models/object/DOMAIN-CLASS-D.png)。
 
 图中的属性是业务层面的核心信息，不表示数据库字段必须与其逐字对应；概念类图不包含接口方法、Handler 或表索引等实现细节。
 
@@ -54,9 +54,9 @@
 
 ### 5.2 系统级顺序图
 
-![SYS-SEQ05 UC05 系统级顺序图](../models/system/SYS-SEQ05.svg)
+![SYS-SEQ05 UC05 系统级顺序图](../../models/system/SYS-SEQ05.svg)
 
-源文件：[SYS-SEQ05.puml](../models/system/SYS-SEQ05.puml)；PNG：[SYS-SEQ05.png](../models/system/SYS-SEQ05.png)。
+源文件：[SYS-SEQ05.puml](../../models/system/SYS-SEQ05.puml)；PNG：[SYS-SEQ05.png](../../models/system/SYS-SEQ05.png)。
 
 ## 6. UC09 直播预约与用户预约
 
@@ -79,9 +79,9 @@
 
 ### 6.2 系统级顺序图
 
-![SYS-SEQ09 UC09 系统级顺序图](../models/system/SYS-SEQ09.svg)
+![SYS-SEQ09 UC09 系统级顺序图](../../models/system/SYS-SEQ09.svg)
 
-源文件：[SYS-SEQ09.puml](../models/system/SYS-SEQ09.puml)；PNG：[SYS-SEQ09.png](../models/system/SYS-SEQ09.png)。
+源文件：[SYS-SEQ09.puml](../../models/system/SYS-SEQ09.puml)；PNG：[SYS-SEQ09.png](../../models/system/SYS-SEQ09.png)。
 
 ## 7. UC10 直播发布、观看与实时互动
 
@@ -114,9 +114,9 @@
 
 ### 7.3 系统级顺序图
 
-![SYS-SEQ10 UC10 系统级顺序图](../models/system/SYS-SEQ10.svg)
+![SYS-SEQ10 UC10 系统级顺序图](../../models/system/SYS-SEQ10.svg)
 
-源文件：[SYS-SEQ10.puml](../models/system/SYS-SEQ10.puml)；PNG：[SYS-SEQ10.png](../models/system/SYS-SEQ10.png)。
+源文件：[SYS-SEQ10.puml](../../models/system/SYS-SEQ10.puml)；PNG：[SYS-SEQ10.png](../../models/system/SYS-SEQ10.png)。
 
 ## 8. 非功能需求与边界
 

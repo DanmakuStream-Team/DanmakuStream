@@ -96,7 +96,7 @@ cd backend
 GOCACHE=/tmp/go-build go test ./...
 ```
 
-6 个测试函数（13 个子测试）全部通过，全后端无编译/回归问题。原始报告：`docs/tests/reports/UC13-unit-test-report-20260826.txt`（总数 6、通过 6、失败 0）。
+6 个测试函数（13 个子测试）全部通过，全后端无编译/回归问题。原始报告：`docs/testing/reports/uc13-unit-2026-08-26.txt`（总数 6、通过 6、失败 0）。
 
 **结论**：单元测试未发现新的业务缺陷；此前 API 层发现的 D1（JSON 字段命名不一致）不属单元层断言范围，仍待修。
 
@@ -107,7 +107,7 @@ GOCACHE=/tmp/go-build go test ./...
 - 覆盖 INT-TC13-01～10，共 33 条断言（HTTP 状态码 + 响应字段 + 数据库实际值 + 公开接口同步 + 软删除后列表排除）。
 - 自带幂等测试数据准备（注册/重置三个测试账号角色、按时间戳清理并重建视频与弹幕），可用 `API_BASE`、`MYSQL_CMD` 环境变量适配不同环境（本地用户态实例或 Docker）。
 - 任一断言失败即以非零状态退出，可直接接入 CI 作为阻断步骤。
-- 本次运行 33/33 通过，exit 0。原始报告：`docs/tests/reports/UC13-api-test-report-20260826.txt`。
+- 本次运行 33/33 通过，exit 0。原始报告：`docs/testing/reports/uc13-api-2026-08-26.txt`。
 
 **前端就绪情况**：UC13 六个管理页面（Dashboard/Videos/Danmaku/Users/Operations/Infrastructure）均已实现并注册路由，带 `requiresStaff`/`requiresAdmin` 守卫，可直接进入 Playwright E2E 编写阶段。
 
@@ -121,7 +121,7 @@ GOCACHE=/tmp/go-build go test ./...
 - `global-setup.ts` — 每次运行前注册账号、固化角色、按 `E2E-UC13-` 前缀清理并重建待审视频/弹幕
 - `frontend/playwright.config.ts` — 单 worker 串行、失败自动截图/录屏/trace、自动拉起 Vite dev server（代理到后端 8080）
 
-**运行命令**：`cd frontend && npx playwright test`（HTML 报告输出到 `docs/tests/reports/UC13-e2e-report/`，用 `npx playwright show-report <该目录>` 查看）
+**运行命令**：`cd frontend && npx playwright test`（HTML 报告输出到 `docs/testing/reports/uc13-e2e/`，用 `npx playwright show-report <该目录>` 查看）
 
 **结果**：5/5 通过。要点：
 
@@ -133,4 +133,4 @@ GOCACHE=/tmp/go-build go test ./...
 
 **触发并修复的缺陷（D1 关闭）**：E2E-TC13-03 首次运行时发现横幅/公告在页面上不显示标题和图片——后端 `SiteBanner`/`SiteAnnouncement` 模型缺 json tag，接口返回 Go 默认字段名（`ID`/`Title`/`ImageURL`），前端模板读 `item.title` 为 undefined。修复：两个模型改为显式字段并补 camelCase json tag（`backend/internal/model/mysql/models.go`），gorm 行为不变。修复后 E2E、API（33/33）、单元（全过）三层回归均绿。
 
-**回归汇总（2026-08-26）**：单元 6/6、API 33/33、E2E 5/5，全部通过；原始报告见 `docs/tests/reports/`（UC13-unit-test-report-20260826.txt、UC13-api-test-report-20260826.txt、UC13-e2e-report/）。
+**回归汇总（2026-08-26）**：单元 6/6、API 33/33、E2E 5/5，全部通过；原始报告见 `docs/testing/reports/`（`uc13-unit-2026-08-26.txt`、`uc13-api-2026-08-26.txt`、`uc13-e2e/`）。
