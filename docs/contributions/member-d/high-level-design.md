@@ -6,33 +6,33 @@
 
 ## 2. 组件图
 
-![当前单体实现组件图](../models/component/COMPONENT-D.svg)
+![当前单体实现组件图](../../models/component/COMPONENT-D.svg)
 
-源文件：[COMPONENT-D.puml](../models/component/COMPONENT-D.puml)；PNG：[COMPONENT-D.png](../models/component/COMPONENT-D.png)。
+源文件：[COMPONENT-D.puml](../../models/component/COMPONENT-D.puml)；PNG：[COMPONENT-D.png](../../models/component/COMPONENT-D.png)。
 
 ## 3. UC05 组件级设计
 
 ### 3.1 组件级顺序图
 
-![COMP-SEQ05 UC05 组件级顺序图](../models/component/COMP-SEQ05.svg)
+![COMP-SEQ05 UC05 组件级顺序图](../../models/component/COMP-SEQ05.svg)
 
-源文件：[COMP-SEQ05.puml](../models/component/COMP-SEQ05.puml)；PNG：[COMP-SEQ05.png](../models/component/COMP-SEQ05.png)。
+源文件：[COMP-SEQ05.puml](../../models/component/COMP-SEQ05.puml)；PNG：[COMP-SEQ05.png](../../models/component/COMP-SEQ05.png)。
 
 ## 4. UC09 组件级设计
 
 ### 4.1 组件级顺序图
 
-![COMP-SEQ09 UC09 组件级顺序图](../models/component/COMP-SEQ09.svg)
+![COMP-SEQ09 UC09 组件级顺序图](../../models/component/COMP-SEQ09.svg)
 
-源文件：[COMP-SEQ09.puml](../models/component/COMP-SEQ09.puml)；PNG：[COMP-SEQ09.png](../models/component/COMP-SEQ09.png)。
+源文件：[COMP-SEQ09.puml](../../models/component/COMP-SEQ09.puml)；PNG：[COMP-SEQ09.png](../../models/component/COMP-SEQ09.png)。
 
 ## 5. UC10 组件级设计
 
 ### 5.1 组件级顺序图
 
-![COMP-SEQ10 UC10 组件级顺序图](../models/component/COMP-SEQ10.svg)
+![COMP-SEQ10 UC10 组件级顺序图](../../models/component/COMP-SEQ10.svg)
 
-源文件：[COMP-SEQ10.puml](../models/component/COMP-SEQ10.puml)；PNG：[COMP-SEQ10.png](../models/component/COMP-SEQ10.png)。
+源文件：[COMP-SEQ10.puml](../../models/component/COMP-SEQ10.puml)；PNG：[COMP-SEQ10.png](../../models/component/COMP-SEQ10.png)。
 
 ## 6. 接口与数据边界
 
