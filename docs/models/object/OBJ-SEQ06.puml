@@ -1,4 +1,4 @@
-@startuml obj-seq06-progress
+@startuml
 !include ../_theme.puml
 title OBJ-SEQ06 UC06 个人视频资料库·播放进度（对象级·Progress）
 actor "用户" as user

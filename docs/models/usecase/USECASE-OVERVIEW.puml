@@ -1,4 +1,4 @@
-@startuml usecase-overview
+@startuml
 !include ../_theme.puml
 title DanmakuStream 总用例图（UC01～UC13，经教师确认的全部业务场景）
 left to right direction

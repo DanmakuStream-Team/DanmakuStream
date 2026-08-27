@@ -1,4 +1,4 @@
-@startuml comp-seq06-library
+@startuml
 !include ../_theme.puml
 title COMP-SEQ06 UC06 个人视频资料库管理（组件级·Library）
 actor "用户" as U
