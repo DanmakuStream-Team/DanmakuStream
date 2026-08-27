@@ -8,6 +8,7 @@
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.ts,.tsx --fix",
     "test:e2e:d": "playwright test e2e/d-engagement.spec.ts",
+    "test:e2e:user-domain": "playwright test e2e/user-domain.spec.ts",
     "test:e2e:uc13": "playwright test e2e/uc13-admin.spec.ts"
   },
   "dependencies": {

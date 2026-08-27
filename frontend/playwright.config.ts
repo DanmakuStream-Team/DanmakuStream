@@ -1,7 +1,9 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const isDEngagementRun = process.argv.some((argument) => argument.includes('d-engagement'))
-if (isDEngagementRun) process.env.E2E_SKIP_UC13_SETUP = '1'
+const isUserDomainRun = process.argv.some((argument) => argument.includes('user-domain'))
+if (isDEngagementRun || isUserDomainRun) process.env.E2E_SKIP_UC13_SETUP = '1'
+if (isUserDomainRun) process.env.E2E_RUN_USER_DOMAIN = '1'
 const backendConfig = process.env.E2E_BACKEND_CONFIG ?? 'etc/config.yaml'
 
 export default defineConfig({
@@ -15,6 +17,8 @@ export default defineConfig({
     ['html', {
       outputFolder: isDEngagementRun
         ? '../docs/testing/reports/engagement-e2e'
+        : isUserDomainRun
+          ? '../docs/testing/reports/user-domain-e2e'
         : '../docs/testing/reports/uc13-e2e',
       open: 'never',
     }],

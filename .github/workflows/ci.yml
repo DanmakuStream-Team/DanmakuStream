@@ -117,6 +117,18 @@ jobs:
         env:
           MYSQL_CMD: "mysql -h127.0.0.1 -P3306 -uroot -ppassword danmakustream"
         run: tests/api/uc13-admin-test.sh | tee api-test-output.txt
+      - name: UC01/07/08/11 integration, WebSocket and coverage tests
+        working-directory: backend
+        env:
+          DANMAKU_TEST_ADMIN_DSN: "root:password@tcp(127.0.0.1:3306)/danmakustream?charset=utf8mb4&parseTime=True&loc=Local"
+        run: |
+          go test -tags=integration ./integration ./internal/handler/v1/membership ./internal/logic/chat \
+            -run 'TestUserDomain|TestSubscriptionExpiration|TestValidateMessageInput|TestNormalizedMessageType|TestHubBackpressure|TestChatHubWebSocketRoundTripPersistenceAndError' \
+            -count=1 \
+            -coverpkg=danmakustream/backend/internal/handler/v1/auth,danmakustream/backend/internal/logic/auth,danmakustream/backend/internal/handler/v1/user,danmakustream/backend/internal/handler/v1/notification,danmakustream/backend/internal/handler/v1/membership,danmakustream/backend/internal/handler/v1/message,danmakustream/backend/internal/logic/chat \
+            -coverprofile=user-domain.cover.out
+          go run ./cmd/userdomaincoverage -profile user-domain.cover.out -root . | tee user-domain-coverage.txt
+          grep -Eq 'coverage: (9[0-9]|100)\.' user-domain-coverage.txt
       - name: Upload test output
         if: always()
         uses: actions/upload-artifact@v4
@@ -127,10 +139,58 @@ jobs:
         if: always()
         run: pkill -f dms-api || true
 
+  user-domain-e2e:
+    name: 端到端测试（E2E-TC01/07/08/11）
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-build]
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: danmakustream
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -ppassword"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend and Chromium
+        working-directory: frontend
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mysql-client
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Run user-domain browser tests
+        working-directory: frontend
+        env:
+          DMS_DATABASE_DSN: "root:password@tcp(127.0.0.1:3306)/danmakustream?charset=utf8mb4&parseTime=True&loc=Local"
+          MYSQL_CMD: "mysql -h127.0.0.1 -P3306 -uroot -ppassword danmakustream"
+        run: npm run test:e2e:user-domain
+      - name: Upload E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: user-domain-e2e-report
+          path: docs/testing/reports/user-domain-e2e
+
   docker-build:
     name: 构建前后端镜像（版本号 = commit sha）
     runs-on: ubuntu-latest
-    needs: [backend-test, frontend-build, api-test]
+    needs: [backend-test, frontend-build, api-test, user-domain-e2e]
     steps:
       - uses: actions/checkout@v4
       - name: Build backend image

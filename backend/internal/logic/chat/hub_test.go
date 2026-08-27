@@ -44,3 +44,36 @@ func TestNormalizedMessageType(t *testing.T) {
 		t.Fatalf("normalizedMessageType(image) = %q", got)
 	}
 }
+
+func TestHubBackpressureDuplicateRecipientsAndUnknownRemoval(t *testing.T) {
+	hub := &Hub{
+		clients:    make(map[uint]map[*Client]struct{}),
+		register:   make(chan *Client),
+		unregister: make(chan *Client),
+		broadcast:  make(chan broadcastRequest, 1),
+	}
+
+	// Invalid payloads return before enqueueing. A full broadcast queue drops
+	// the next publication without blocking the caller.
+	hub.publish([]uint{1}, envelope{Type: "invalid", Payload: func() {}})
+	hub.publish([]uint{1}, envelope{Type: "first"})
+	hub.publish([]uint{1}, envelope{Type: "dropped"})
+	<-hub.broadcast
+
+	fullClient := &Client{Hub: hub, UserID: 7, Send: make(chan []byte, 1)}
+	witnessClient := &Client{Hub: hub, UserID: 8, Send: make(chan []byte, 1)}
+	fullClient.Send <- []byte("already full")
+	go hub.run()
+	hub.Register(fullClient)
+	hub.Register(witnessClient)
+	hub.broadcast <- broadcastRequest{userIDs: []uint{7, 7, 8}, data: []byte("backpressure")}
+	<-witnessClient.Send
+	<-fullClient.Send
+	if _, open := <-fullClient.Send; open {
+		t.Fatal("backpressured client channel should be closed")
+	}
+
+	// Removing a client that was never registered is a safe no-op.
+	unknown := &Client{Hub: hub, UserID: 999, Send: make(chan []byte)}
+	hub.removeClient(unknown)
+}

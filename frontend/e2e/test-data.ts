@@ -1,4 +1,4 @@
-/** Shared E2E data for UC05/09/10 and UC13. */
+/** Shared E2E data for the acceptance-test suites. */
 export const PASSWORD = 'Test1234!'
 
 export const API = process.env.E2E_API_BASE ?? 'http://127.0.0.1:8080/api/v1'
@@ -6,6 +6,9 @@ export const API = process.env.E2E_API_BASE ?? 'http://127.0.0.1:8080/api/v1'
 export const USERS = {
   owner: { nickname: 'e2e-d-owner', password: PASSWORD },
   viewer: { nickname: 'e2e-d-viewer', password: PASSWORD },
+  domainViewer: { nickname: 'e2e-domain-viewer', password: PASSWORD },
+  domainCreator: { nickname: 'e2e-domain-creator', password: PASSWORD },
+  domainOther: { nickname: 'e2e-domain-other', password: PASSWORD },
   /** 普通用户（角色可能被 E2E-TC13-02 修改，勿用于权限断言） */
   target: { nickname: 'tuser', password: PASSWORD },
   /** 审核员 */

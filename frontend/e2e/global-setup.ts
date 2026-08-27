@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process'
+import { execFileSync, execSync } from 'node:child_process'
 import { request as playwrightRequest } from '@playwright/test'
 import { API, USERS } from './test-data'
 
@@ -61,10 +61,46 @@ async function prepareUC13Data(api: ApiContext) {
   )
 }
 
+async function prepareUserDomainData(api: ApiContext) {
+  for (const user of [USERS.domainViewer, USERS.domainCreator, USERS.domainOther]) {
+    await ensureUser(api, user.nickname, user.password)
+  }
+
+  const mysqlCommand = process.env.MYSQL_CMD
+    ?? (process.platform === 'linux' ? 'mysql -S /home/haoyue/dms-mysql.sock -uroot -ppassword danmakustream' : '')
+  if (!mysqlCommand && !process.env.MYSQL_TEST_CLIENT) {
+    throw new Error('UC01/07/08/11 E2E setup requires MYSQL_CMD or MYSQL_TEST_CLIENT on this platform')
+  }
+
+  const sql = `
+    SET @viewer=(SELECT id FROM users WHERE nickname='${USERS.domainViewer.nickname}');
+    SET @creator=(SELECT id FROM users WHERE nickname='${USERS.domainCreator.nickname}');
+    SET @other=(SELECT id FROM users WHERE nickname='${USERS.domainOther.nickname}');
+    UPDATE users SET role='user' WHERE id IN (@viewer,@other);
+    UPDATE users SET role='creator' WHERE id=@creator;
+    DELETE FROM chat_messages WHERE sender_id IN (@viewer,@creator,@other) OR receiver_id IN (@viewer,@creator,@other);
+    DELETE FROM subscription_orders WHERE subscriber_id IN (@viewer,@other) OR creator_id=@creator;
+    DELETE FROM creator_subscriptions WHERE subscriber_id IN (@viewer,@other) OR creator_id=@creator;
+    DELETE FROM creator_membership_plans WHERE creator_id=@creator;
+    DELETE FROM notifications WHERE user_id IN (@viewer,@creator,@other) OR actor_id IN (@viewer,@creator,@other);
+    DELETE FROM user_blocks WHERE blocker_id IN (@viewer,@creator,@other) OR blocked_id IN (@viewer,@creator,@other);
+    DELETE FROM follows WHERE follower_id IN (@viewer,@creator,@other) OR followee_id IN (@viewer,@creator,@other);
+    DELETE FROM follow_groups WHERE owner_id IN (@viewer,@creator,@other);
+    INSERT INTO creator_membership_plans
+      (created_at,updated_at,creator_id,price_cents,benefits,enabled)
+      VALUES (NOW(),NOW(),@creator,600,'E2E 会员权益',TRUE);`
+  if (process.env.MYSQL_TEST_CLIENT) {
+    execFileSync(process.env.MYSQL_TEST_CLIENT, ['-e', sql], { stdio: 'pipe' })
+  } else {
+    execSync(`${mysqlCommand} -e "${sql}"`, { stdio: 'pipe' })
+  }
+}
+
 export default async function globalSetup() {
   const api = await playwrightRequest.newContext()
   try {
     await prepareEngagementData(api)
+    if (process.env.E2E_RUN_USER_DOMAIN === '1') await prepareUserDomainData(api)
     if (process.env.E2E_SKIP_UC13_SETUP !== '1') await prepareUC13Data(api)
   } finally {
     await api.dispose()

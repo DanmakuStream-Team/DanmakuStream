@@ -735,7 +735,9 @@ func openTemporaryMySQL(t *testing.T) *gorm.DB {
 	models := []any{
 		&model.User{}, &model.Video{}, &model.Danmaku{}, &model.Comment{}, &model.CommentLike{},
 		&model.Like{}, &model.Collect{}, &model.CreatorDailyStat{}, &model.VideoDailyStat{},
-		&model.Follow{}, &model.LiveSchedule{}, &model.LiveReservation{}, &model.Notification{},
+		&model.Follow{}, &model.FollowGroup{}, &model.UserBlock{}, &model.Notification{},
+		&model.ChatMessage{}, &model.CreatorMembershipPlan{}, &model.CreatorSubscription{}, &model.SubscriptionOrder{},
+		&model.LiveSchedule{}, &model.LiveReservation{},
 		&model.LiveRoom{}, &model.LiveLike{}, &model.LiveGift{}, &model.LiveReplay{},
 	}
 	if err := db.AutoMigrate(models...); err != nil {
