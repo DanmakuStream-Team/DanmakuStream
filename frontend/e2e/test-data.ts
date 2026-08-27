@@ -15,4 +15,10 @@ export const USERS = {
   admin: { nickname: 'tadmin', password: PASSWORD },
   /** 专用普通用户，用于 UC13 越权断言。 */
   plain: { nickname: 'e2eplain', password: PASSWORD },
+  /** 成员 C 内容域专用创作者。 */
+  memberCCreator: { nickname: 'e2e-mc-creator', password: PASSWORD },
+  /** 成员 C 内容域专用审核员。 */
+  memberCModerator: { nickname: 'e2e-mc-moderator', password: PASSWORD },
+  /** 成员 C 内容域专用普通用户。 */
+  memberCPlain: { nickname: 'e2e-mc-plain', password: PASSWORD },
 } as const
