@@ -1,5 +1,4 @@
 @startuml obj-seq06-progress
-!include ../_theme.puml
 title OBJ-SEQ06 UC06 个人视频资料库·播放进度（对象级·Progress）
 actor "用户" as user
 participant "videoDetailPage: VideoDetailPage" as page
@@ -38,12 +37,20 @@ user -> page: 路由守卫重定向后，进入 /me/history
 page -> api: history({ page:1, pageSize:100 })
 api -> auth: GET /api/v1/users/me/history
 auth -> listH: HistoryListHandler(svcCtx)
-listH -> db: Model(&WatchHistory{}).
-            Joins("JOIN videos ON videos.id=watch_histories.video_id AND videos.deleted_at IS NULL AND videos.status=?", "approved").
-            Where("watch_histories.user_id=?", uid).Count(&total)
-listH -> db: Preload("Video.Author").
-            Order("watch_histories.updated_at DESC").
-            Offset(0).Limit(100).Find(&histories)
+listH -> db: "Model(&WatchHistory{}).Joins(Count)"
+note right
+  Model(&WatchHistory{}).
+    Joins("JOIN videos ON videos.id=watch_histories.video_id
+      AND videos.deleted_at IS NULL
+      AND videos.status=?", "approved").
+    Where("watch_histories.user_id=?", uid).Count(&total)
+end note
+listH -> db: "Preload(\"Video.Author\") + Find(&histories)"
+note right
+  Preload("Video.Author").
+    Order("watch_histories.updated_at DESC").
+    Offset(0).Limit(100).Find(&histories)
+end note
 db --> listH: []WatchHistory{ video *Video, Position, UpdatedAt }
 listH -> listH: for h := range histories: toLibraryRecord(h.Video, h.UpdatedAt, h.Position)
   note right

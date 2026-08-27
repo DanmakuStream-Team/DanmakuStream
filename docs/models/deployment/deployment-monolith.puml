@@ -1,5 +1,4 @@
 @startuml deployment-monolith
-!include ../_theme.puml
 title 改造前：Docker Compose 单体部署图（Monolith）
 left to right direction
 

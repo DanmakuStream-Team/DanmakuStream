@@ -1,5 +1,4 @@
 @startuml comp-seq06-library
-!include ../_theme.puml
 title COMP-SEQ06 UC06 个人视频资料库管理（组件级·Library）
 actor "用户" as U
 participant "UserLibraryPage / VideoPlayer" as P
