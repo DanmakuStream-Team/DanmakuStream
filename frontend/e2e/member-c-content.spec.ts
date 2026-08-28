@@ -9,7 +9,10 @@ function dropdownOption(page: import('@playwright/test').Page, text: string): Lo
 test.describe.serial('成员 C 内容域', () => {
   // E2E-TC02-01 搜索 → 详情 → 播放器，并验证空搜索结果。
   test('UC02 用户搜索公开视频并进入播放页', async ({ page }) => {
+    const initialVideosResponse = page.waitForResponse((response) =>
+      response.url().includes('/api/v1/videos') && !response.url().includes('keyword='))
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 30_000 })
+    expect((await initialVideosResponse).status()).toBe(200)
     const search = page.getByLabel('搜索视频或创作者')
     await search.fill('E2E-MC-公开视频')
     const searchResponse = page.waitForResponse((response) =>
