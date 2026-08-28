@@ -1,6 +1,6 @@
 # CD 流水线设计与运维手册
 
-> 对应工作流：`.github/workflows/deploy.yml`（由 `ci.yml` 的 `deploy` job 在 **push 合并到 dev 且全部测试通过** 时调用）；服务器端脚本：`scripts/k3s-deploy.sh`。
+> 对应工作流：`.github/workflows/deploy.yml`（独立监听 `ci` 的 `workflow_run` 完成事件，仅在 **push 合并到 dev 且全部测试通过** 时部署）；服务器端脚本：`scripts/k3s-deploy.sh`。
 
 ## 1. 流程与触发规则
 
@@ -19,8 +19,11 @@ main                          暂不自动部署（留给最终稳定版/人工�
 ```
 
 - `concurrency: production-deploy`（排队不取消）保证**同一时间只有一次部署**。
+- Actions 中 `ci` 与 `cd-deploy` 分开显示：CI 失败时 CD 记录为 skipped；CI 成功后可直接在 `cd-deploy` 页面查看部署绿灯/红灯和日志。
 - 数据库与视频 PVC 不随部署删除；**数据库不做自动回滚**（结构变更遵循向前兼容迁移）。
 - 镜像规则：不使用裸 `latest` 部署；前后端同一 SHA 版本；旧 SHA 镜像保留在 GHCR 供回滚。
+
+> GitHub 要求 `workflow_run` 工作流文件存在于仓库默认分支。仓库默认分支为 `main`，因此启用本方案时须先将 `.github/workflows/deploy.yml` 合入 `main`，再合入 `dev`；否则 `dev` 的 CI 完成事件不会创建独立 CD 运行。
 
 ## 2. 服务器准备（一次性，需要一台公网服务器）
 
@@ -75,8 +78,8 @@ Settings → Environments → 新建 **`production`**，添加 Secrets：
 
 ## 6. 验收演示（对应任务书两条流水线记录）
 
-1. **成功记录**：合并一个全绿 PR 到 dev → Actions 里 `ci` 工作流的 `CD 部署到公网 k3s` job 绿 → 下载 `cd-evidence-<sha>` artifact → 访问 `$PUBLIC_URL` 现场演示。
-2. **失败阻断记录**：已有 `docs/testing/reports/ci-red-green-evidence-2026-08-27.md`（红灯时 api-test/docker-build 全部 skipped）——CD 位于 docker-build 之后，同样被阻断；如需 CD 专属记录，可临时推送一个会让集成测试失败的提交到 dev（取证后 revert，注意 dev 部署会停在旧版本）。
+1. **成功记录**：合并一个全绿 PR 到 dev → Actions 里 `ci` 全绿 → 独立的 `cd-deploy` 工作流变绿 → 下载 `cd-evidence-<sha>` artifact → 访问 `$PUBLIC_URL` 现场演示。
+2. **失败阻断记录**：已有 `docs/testing/reports/ci-red-green-evidence-2026-08-27.md`（红灯时 api-test/docker-build 全部 skipped）；独立 CD 收到该 CI 的完成事件后显示为 skipped，不构建镜像、不连接生产环境，dev 继续运行旧版本。
 
 ## 7. 尚未自动化 / 后续增强
 

@@ -354,16 +354,5 @@ jobs:
           docker tag danmakustream/frontend:${GITHUB_SHA::12} danmakustream/frontend:monolith
       - name: Show images
         run: docker images "danmakustream/*"
-      # docker-build 验证镜像可构建；推送 GHCR 与 k3s 部署由下方 deploy（CD）完成。
-
-  deploy:
-    # CD：仅在 push 合并到 dev 且以上全部测试（含 docker-build）通过后执行。
-    # 普通 PR 检查与功能分支推送 event_name 不是 push，本 job 直接跳过。
-    name: CD 部署到公网 k3s（仅 dev 合并）
-    needs: [docker-build]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
-    uses: ./.github/workflows/deploy.yml
-    secrets: inherit
-    permissions:
-      contents: read
-      packages: write
+      # docker-build 验证镜像可构建；独立 cd-deploy 工作流监听本次 CI 的完成事件，
+      # 仅在 dev push 且 CI 全绿时推送 GHCR 并部署到 k3s。
