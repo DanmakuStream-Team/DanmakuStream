@@ -10,6 +10,7 @@ push 合并到 dev               CI 全绿 → CD：
                                 构建前后端镜像（tag = commit SHA 前 12 位）
                                 → 推送 GHCR（另推 dev 滚动标签）
                                 → SSH 连接公网 k3s
+                                → 应用并等待 nginx-gateway Ready
                                 → 预检（节点/NS/Secret/PVC/基础服务/旧版本记录）
                                 → kubectl set image 滚动更新
                                 → rollout 等待 + Pod 状态 + 集群内三链路健康检查
@@ -20,6 +21,7 @@ main                          暂不自动部署（留给最终稳定版/人工�
 
 - `concurrency: production-deploy`（排队不取消）保证**同一时间只有一次部署**。
 - 数据库与视频 PVC 不随部署删除；**数据库不做自动回滚**（结构变更遵循向前兼容迁移）。
+- CD 会在应用前自动创建/更新 `nginx-gateway` ConfigMap、Deployment 与 Service，避免 frontend 因网关 DNS 不存在而启动失败。
 - 镜像规则：不使用裸 `latest` 部署；前后端同一 SHA 版本；旧 SHA 镜像保留在 GHCR 供回滚。
 
 ## 2. 服务器准备（一次性，需要一台公网服务器）

@@ -83,6 +83,19 @@ jobs:
           printf '%s\n' "$HOST_KEY" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
+      - name: Apply and verify API gateway
+        env:
+          K3S_HOST: ${{ secrets.K3S_HOST }}
+          K3S_SSH_USER: ${{ secrets.K3S_SSH_USER }}
+        run: |
+          set -o pipefail
+          ssh "${K3S_SSH_USER}@${K3S_HOST}" \
+            'sudo k3s kubectl apply -f -' \
+            < deploy/k8s/monolith/nginx-gateway.yaml
+          ssh "${K3S_SSH_USER}@${K3S_HOST}" \
+            'sudo k3s kubectl -n danmakustream rollout restart deploy/nginx-gateway &&
+             sudo k3s kubectl -n danmakustream rollout status deploy/nginx-gateway --timeout=180s'
+
       - name: Precheck cluster（任一失败不更新生产）
         env:
           K3S_HOST: ${{ secrets.K3S_HOST }}

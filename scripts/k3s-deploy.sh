@@ -36,7 +36,7 @@ precheck() {
     phase=$($KUBECTL -n "$NS" get pvc "$pvc" -o jsonpath='{.status.phase}' 2>/dev/null) || die "PVC $pvc 不存在"
     [ "$phase" = "Bound" ] || die "PVC $pvc 状态为 $phase，非 Bound"
   done
-  for dep in mysql srs; do
+  for dep in mysql srs nginx-gateway; do
     ready=$($KUBECTL -n "$NS" get deploy "$dep" -o jsonpath='{.status.readyReplicas}')
     [ "${ready:-0}" -ge 1 ] || die "基础服务 $dep 未就绪（readyReplicas=${ready:-0}）"
   done
@@ -48,8 +48,17 @@ precheck() {
 
 current_image() { $KUBECTL -n "$NS" get deploy "$1" -o jsonpath='{.spec.template.spec.containers[0].image}'; }
 
+capture_diagnostics() {
+  log "== 失败现场诊断（回滚前） =="
+  $KUBECTL -n "$NS" get pods -o wide || true
+  $KUBECTL -n "$NS" describe pods -l app=frontend || true
+  $KUBECTL -n "$NS" logs -l app=frontend --all-containers=true --tail=100 --prefix=true || true
+  $KUBECTL -n "$NS" get events --sort-by=.lastTimestamp | tail -50 || true
+}
+
 rollback() {
   log "!! 部署失败，回滚到上一版本：$*"
+  capture_diagnostics
   $KUBECTL -n "$NS" rollout undo deploy/backend   || true
   $KUBECTL -n "$NS" rollout undo deploy/frontend  || true
   $KUBECTL -n "$NS" rollout status deploy/backend   --timeout="$ROLLOUT_TIMEOUT" || true
