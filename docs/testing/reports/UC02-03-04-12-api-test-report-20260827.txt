@@ -1,0 +1,20 @@
+DanmakuStream 成员 C API/集成测试报告
+日期: 2026-08-27
+基线: ebf4e51796541ded6be08dfed16ef12c9d4b261c
+环境: linux/amd64, MariaDB 11.8.6（MySQL 协议兼容）, FFmpeg 7.0.2
+命令: tests/api/member-c-content-test.sh
+
+RESULT: TOTAL=51 PASS=46 FAIL=0 GAP=5
+
+UC02: 搜索、公开过滤、详情、播放量和每日统计断言通过。
+UC03: 鉴权、缺字段、转码失败安全状态、上传取消和状态跟踪断言通过。
+UC04: 审核权限、列表、通过、拒绝和异常请求断言通过。
+UC12: 鉴权、7 天趋势、汇总、作品过滤、越权与空数据断言通过。
+
+GAP 1: INT-TC02-04 非法排序当前返回 500，期望 400。
+GAP 2: UC02 详情接口未校验 videoUrl 对应媒体文件是否真实存在。
+GAP 3: UC03 转码失败只有服务日志，没有 failed 状态或失败原因。
+GAP 4: UC04 重复审核可覆盖终态，且通过时未检查实际 HLS 文件。
+GAP 5: UC12 单作品模式的 topVideos 仍返回创作者全部作品。
+
+退出码: 0（阻断断言无失败；GAP 单独报告）
