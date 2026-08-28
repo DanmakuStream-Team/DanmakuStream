@@ -1,13 +1,16 @@
 # DanmakuStream 单体版 CI（第一阶段）
 #
 # 流水线顺序（任一步失败即终止，后续步骤不执行）：
-#   backend-test ─┬─> api-test ─────────┐
-#                 ├─> e2e-test ─────────┼─> docker-build（仅构建，不推送）
-#                 └─> e2e-member-c ─────┤
-#   frontend-build ─> 两个 E2E Job ─────┘
+#   backend-test ─┬─> api-test ──────────────────┐
+#                 ├─> e2e-test ──────────────────┤
+#                 ├─> e2e-member-c ──────────────┼─> docker-build（仅构建，不推送）
+#                 ├─> member-b-integration ──────┤
+#                 └─> test-uc06 ─────────────────┘
+#   frontend-build ─> 两个 E2E Job ──────────────┘
 #
 # 阻断规则（对齐课程任务书）：
 #   - 单元测试失败 → 停止，不构建镜像
+#   - UC06 资料库单元测试失败 → 停止，不构建镜像
 #   - API/集成测试失败 → 停止，不构建镜像
 #   - E2E 测试失败 → 停止，不构建镜像
 #   - 前端构建失败 → 停止，不构建镜像
@@ -338,10 +341,54 @@ jobs:
           path: backend/member-b-integration-output.txt
           if-no-files-found: ignore
 
+  test-uc06:
+    name: UC06 个人资料库单元测试（user + collection 包）
+    runs-on: ubuntu-latest
+    needs: backend-test
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: danmakustream
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -ppassword"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Run UC06 unit tests (user + collection)
+        working-directory: backend
+        env:
+          DANMAKU_TEST_ADMIN_DSN: "root:password@tcp(127.0.0.1:3306)/danmakustream?charset=utf8mb4&parseTime=True&loc=Local"
+        run: |
+          set -o pipefail
+          {
+            echo "===== ./internal/handler/v1/user/... ====="
+            go test -count=1 -v ./internal/handler/v1/user/...
+            echo ""
+            echo "===== ./internal/handler/v1/collection/... ====="
+            go test -count=1 -v ./internal/handler/v1/collection/...
+          } | tee uc06-unit-output.txt
+      - name: Upload UC06 unit output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uc06-unit-output
+          path: backend/uc06-unit-output.txt
+          if-no-files-found: warn
+
   docker-build:
     name: 构建前后端镜像（版本号 = commit sha）
     runs-on: ubuntu-latest
-    needs: [backend-test, frontend-build, api-test, e2e-test, e2e-member-c, member-b-integration]
+    needs: [backend-test, frontend-build, api-test, e2e-test, e2e-member-c, member-b-integration, test-uc06]
     steps:
       - uses: actions/checkout@v4
       - name: Build backend image
