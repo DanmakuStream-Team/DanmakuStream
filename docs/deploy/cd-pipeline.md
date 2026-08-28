@@ -1,12 +1,13 @@
 # CD 流水线设计与运维手册
 
-> 对应工作流：`.github/workflows/deploy.yml`（由 `ci.yml` 的 `deploy` job 在 **push 合并到 dev 且全部测试通过** 时调用）；服务器端脚本：`scripts/k3s-deploy.sh`。
+> 对应工作流：`.github/workflows/deploy.yml`（由 `ci.yml` 的 `deploy` job 在 **PR 合并到 dev 且全部测试通过** 时调用）；服务器端脚本：`scripts/k3s-deploy.sh`。
 
 ## 1. 流程与触发规则
 
 ```text
-功能分支 / PR → dev          只跑 CI（deploy job 直接跳过）
-push 合并到 dev               CI 全绿 → CD：
+功能分支 / 普通 PR            只跑 CI（deploy job 跳过）
+直接 push 到 dev              跑完整 CI，合并来源校验不通过，CD 跳过
+PR 合并到 dev                 CI 全绿 → 校验 merge commit 与 PR → CD：
                                 构建前后端镜像（tag = commit SHA 前 12 位）
                                 → 推送 GHCR（另推 dev 滚动标签）
                                 → SSH 连接公网 k3s

@@ -403,12 +403,52 @@ jobs:
         run: docker images "danmakustream/*"
       # docker-build 验证镜像可构建；推送 GHCR 与 k3s 部署由下方 deploy（CD）完成。
 
-  deploy:
-    # CD：仅在 push 合并到 dev 且以上全部测试（含 docker-build）通过后执行。
-    # 普通 PR 检查与功能分支推送 event_name 不是 push，本 job 直接跳过。
-    name: CD 部署到公网 k3s（仅 dev 合并）
+  verify-pr-merge:
+    name: 验证提交来自合并到 dev 的 PR
     needs: [docker-build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      is_merged_pr: ${{ steps.verify.outputs.is_merged_pr }}
+      pr_number: ${{ steps.verify.outputs.pr_number }}
+    steps:
+      - id: verify
+        name: 查找与当前提交关联且已合并到 dev 的 PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pulls = await github.paginate(
+              github.rest.repos.listPullRequestsAssociatedWithCommit,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: context.sha,
+                per_page: 100,
+              },
+            )
+            const mergedPull = pulls.find((pull) =>
+              pull.merged_at &&
+              pull.base.ref === 'dev' &&
+              pull.merge_commit_sha === context.sha
+            )
+            if (!mergedPull) {
+              core.notice(`提交 ${context.sha} 不是合并到 dev 的 PR，跳过 CD`)
+              core.setOutput('is_merged_pr', 'false')
+              core.setOutput('pr_number', '')
+              return
+            }
+            core.notice(`允许部署：PR #${mergedPull.number} 已合并到 dev`)
+            core.setOutput('is_merged_pr', 'true')
+            core.setOutput('pr_number', String(mergedPull.number))
+
+  deploy:
+    # 只有合并到 dev 的 PR 提交才允许进入 CD；直接 push 到 dev 只跑 CI。
+    name: CD 部署到公网 k3s（仅 PR 合并）
+    needs: [docker-build, verify-pr-merge]
+    if: needs.verify-pr-merge.outputs.is_merged_pr == 'true'
     uses: ./.github/workflows/deploy.yml
     secrets: inherit
     permissions:
