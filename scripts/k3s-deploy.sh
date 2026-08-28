@@ -99,9 +99,12 @@ deploy() {
   if ! $KUBECTL -n "$NS" exec deploy/backend -- wget -qO- http://localhost:8080/api/v1/livez > /dev/null 2>&1; then
     rollback "集群内 /api/v1/livez 检查失败"; exit 1
   fi
-  # frontend -> backend 通路（经 nginx 代理）
-  if ! $KUBECTL -n "$NS" exec deploy/frontend -- wget -qO- http://localhost/api/v1/health 2>/dev/null | grep -q '"status":"ok"'; then
-    rollback "frontend 容器内代理 /api/v1/health 失败"; exit 1
+  # backend -> frontend Service -> nginx -> backend Service 完整代理通路。
+  # 不在 frontend 容器内请求 localhost：Alpine 会优先解析到 ::1，
+  # 而当前 nginx 仅监听 IPv4，容易产生 connection refused 的假失败；
+  # 通过 Service 访问也可避免 rollout 后 exec 误选正在终止的旧 frontend Pod。
+  if ! $KUBECTL -n "$NS" exec deploy/backend -- wget -qO- http://frontend/api/v1/health 2>/dev/null | grep -q '"status":"ok"'; then
+    rollback "frontend Service/nginx 代理 /api/v1/health 失败"; exit 1
   fi
 
   log "== 部署成功并验证通过：Backend=$backend_image Frontend=$frontend_image =="
