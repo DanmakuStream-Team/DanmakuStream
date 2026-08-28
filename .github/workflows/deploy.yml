@@ -77,9 +77,11 @@ jobs:
           SSH_KEY: ${{ secrets.K3S_SSH_KEY }}
           HOST_KEY: ${{ secrets.K3S_HOST_KEY }}
         run: |
+          install -d -m 700 ~/.ssh
           install -m 600 /dev/null ~/.ssh/id_ed25519
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           printf '%s\n' "$HOST_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
 
       - name: Precheck cluster（任一失败不更新生产）
         env:
@@ -99,9 +101,11 @@ jobs:
         run: |
           set -o pipefail
           ssh "${K3S_SSH_USER}@${K3S_HOST}" bash -s -- \
-            danmakustream deploy "$BACKEND_IMAGE" "$FRONTEND_IMAGE" 2>&1 | tee deploy-output.txt
+            danmakustream deploy "$BACKEND_IMAGE" "$FRONTEND_IMAGE" \
+            < scripts/k3s-deploy.sh 2>&1 | tee deploy-output.txt
 
       - name: Public health check（公网冒烟）
+        id: public_health
         env:
           PUBLIC_URL: ${{ secrets.PUBLIC_URL }}
         run: |
@@ -113,6 +117,16 @@ jobs:
             sleep 6
           done
           echo "public health check failed"; cat /tmp/pub.json 2>/dev/null; exit 1
+
+      - name: Roll back when public health check fails
+        if: failure() && steps.public_health.outcome == 'failure'
+        env:
+          K3S_HOST: ${{ secrets.K3S_HOST }}
+          K3S_SSH_USER: ${{ secrets.K3S_SSH_USER }}
+        run: |
+          ssh "${K3S_SSH_USER}@${K3S_HOST}" bash -s -- \
+            danmakustream rollback \
+            < scripts/k3s-deploy.sh
 
       - name: Collect evidence（成功与失败都保留证据）
         if: always()
@@ -138,6 +152,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cd-evidence-${{ github.sha::12 }}
+          name: cd-evidence-${{ github.sha }}
           path: cd-evidence.txt
           if-no-files-found: warn
