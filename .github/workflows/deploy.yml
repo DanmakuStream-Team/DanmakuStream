@@ -138,6 +138,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cd-evidence-${{ github.sha::12 }}
+          name: cd-evidence-${{ github.sha }}
           path: cd-evidence.txt
           if-no-files-found: warn
