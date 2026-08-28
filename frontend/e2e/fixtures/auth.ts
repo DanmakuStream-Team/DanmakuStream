@@ -23,5 +23,5 @@ export async function openAs(page: Page, session: Session, path: string) {
     },
     { token: session.token, userInfo: session.userInfo },
   )
-  await page.goto(path)
+  await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 30_000 })
 }

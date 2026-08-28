@@ -1,0 +1,25 @@
+@startuml
+!include ../_theme.puml
+title COMP-SEQ07 UC07 关注关系组件顺序图
+autonumber
+actor 用户 as U
+participant "用户主页" as UI
+participant "API Gateway" as GW
+participant "用户管理" as USER
+participant "关注关系管理" as REL
+participant "通知管理" as NOTIFY
+U -> UI: 选择关系操作
+UI -> GW: POST /users/{id}/relationship
+GW -> USER: validateUsers(currentId, targetId)
+USER --> GW: 有效/无效
+alt 用户有效且不是本人
+  GW -> REL: changeRelation(command)
+  REL --> GW: 最新关系状态/幂等结果
+  opt 新关注或特别关注
+    REL -> NOTIFY: subscribeContent(currentId, targetId)
+    NOTIFY --> REL: subscriptionCreated
+  end
+end
+GW --> UI: 操作结果
+UI --> U: 刷新关系状态
+@enduml

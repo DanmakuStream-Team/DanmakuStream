@@ -1,0 +1,128 @@
+@startuml
+!include ../_theme.puml
+title DanmakuStream 成员 B 领域类图（UC01/07/08/11）
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+
+package "用户与关系" {
+  class User {
+    +id: uint
+    +nickname: string
+    +role: string
+    +bio: string
+    +avatar: string
+  }
+  class Relationship {
+    +id: uint
+    +type: RelationshipType
+    +groupId: uint
+    +special: bool
+    +blocked: bool
+  }
+  class Notification {
+    +id: uint
+    +type: string
+    +read: bool
+    +createdAt: time
+  }
+  enum RelationshipType {
+    follow
+    mute
+    block
+  }
+}
+
+package "会员订阅" {
+  class MembershipPlan {
+    +id: uint
+    +creatorId: uint
+    +name: string
+    +price: decimal
+    +active: bool
+  }
+  class Order {
+    +orderNo: string
+    +amount: decimal
+    +status: OrderStatus
+    +idempotencyKey: string
+  }
+  class Subscription {
+    +id: uint
+    +userId: uint
+    +expiresAt: time
+    +autoRenew: bool
+    +status: string
+  }
+  enum OrderStatus {
+    pending
+    paid
+    failed
+    expired
+  }
+}
+
+package "私信与媒体分享" {
+  class Conversation {
+    +id: uint
+    +createdAt: time
+  }
+  class ConversationMember {
+    +conversationId: uint
+    +userId: uint
+  }
+  class Message {
+    +id: uint
+    +senderId: uint
+    +content: string
+    +clientMessageId: string
+    +createdAt: time
+  }
+  class MediaReference {
+    +scene: string
+    +targetId: uint
+    +title: string
+    +url: string
+  }
+}
+
+User "1" -- "0..*" Relationship : initiator
+User "1" -- "0..*" Relationship : target
+Relationship "0..1" --> "0..1" Notification : subscribes
+User "1" -- "0..*" MembershipPlan : creator
+User "1" -- "0..*" Order : buyer
+MembershipPlan "1" -- "0..*" Order
+Order "1" --> "0..1" Subscription : activates
+User "1" -- "0..*" Subscription
+Conversation "1" *-- "2..*" ConversationMember
+User "1" -- "0..*" ConversationMember
+Conversation "1" -- "0..*" Message
+User "1" -- "0..*" Message : sends
+Message "0..1" *-- "1" MediaReference : shares
+
+class RegisterLogic <<control>> {
+  +Register(req)
+}
+class LoginLogic <<control>> {
+  +Login(req)
+}
+class MeLogic <<control>> {
+  +Me(userID)
+}
+class UserHandler <<boundary>>
+class RelationshipHandler <<boundary>>
+class MembershipHandler <<boundary>>
+class MessageHandler <<boundary>>
+class GormDB <<database>> {
+  +First()
+  +Where()
+  +Create()
+  +Transaction()
+}
+RegisterLogic ..> User
+LoginLogic ..> User
+MeLogic ..> User
+UserHandler ..> GormDB
+RelationshipHandler ..> GormDB
+MembershipHandler ..> GormDB
+MessageHandler ..> GormDB
+@enduml

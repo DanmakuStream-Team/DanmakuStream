@@ -1,0 +1,13 @@
+DanmakuStream 成员 C E2E 测试报告
+日期: 2026-08-27
+基线: ebf4e51796541ded6be08dfed16ef12c9d4b261c
+环境: Node.js v24.16.0, npm 11.13.0, Playwright Chromium 151
+命令: cd frontend && npm run test:e2e:member-c
+
+PASS E2E-TC02-01 UC02 用户搜索公开视频并进入播放页 (2.8s)
+PASS E2E-TC03-01 UC03 创作者取消上传后重新投稿并看到待审状态 (1.9s)
+PASS E2E-TC04-01 UC04 审核员发布与拒绝视频，普通用户不能越权 (2.2s)
+PASS E2E-TC12-01 UC12 创作者切换 7 天和单作品分析范围 (2.7s)
+
+RESULT: 4 passed, 0 failed, 0 skipped (12.7s)
+HTML: docs/testing/reports/UC02-03-04-12-e2e-report/index.html

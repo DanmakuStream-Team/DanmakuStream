@@ -1,0 +1,21 @@
+DanmakuStream 成员 C 单元测试报告
+日期: 2026-08-27
+基线: ebf4e51796541ded6be08dfed16ef12c9d4b261c
+环境: linux/amd64, go1.26.3
+命令: cd backend && go test ./... -v
+
+成员 C 新增/复用测试:
+PASS UNIT-TC02-01 TestVideoSortExpr
+PASS UNIT-TC02-02 TestDetailHandlerRejectsInvalidID
+PASS UNIT-TC03-01 TestUploadHandlerRequiredFields
+PASS UNIT-TC03-02 TestSafeDownloadName
+PASS UNIT-TC03-03 TestMediaPathToLocalPath
+PASS UNIT-TC04-01 TestHasUploadedVideoSource
+PASS UNIT-TC04-02 TestAdminUpdateStatusHandlerRejectsInvalidRequest
+PASS UNIT-TC04-03 TestStaffMiddleware / TestIsValidVideoStatus
+PASS UNIT-TC12-01 TestAnalyticsHandlerRejectsInvalidRequests
+PASS UNIT-TC12-02 TestBeginningOfDay
+
+全仓 Go 测试结果: PASS
+失败包: 0
+失败用例: 0

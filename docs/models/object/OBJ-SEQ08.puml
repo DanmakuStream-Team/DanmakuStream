@@ -1,0 +1,30 @@
+@startuml
+!include ../_theme.puml
+title OBJ-SEQ08 UC08 会员订阅对象顺序图（代码追溯）
+autonumber
+actor 用户 as U
+boundary membership_handler as H
+database "*gorm.DB" as DB
+entity "model.CreatorMembershipPlan" as Plan
+entity "model.SubscriptionOrder" as Order
+entity "model.CreatorSubscription" as Sub
+U -> H: CreateOrderHandler()
+H -> DB: Where(creator_id, enabled).First(&model.CreatorMembershipPlan{})
+H -> DB: Where(subscriber_id, creator_id).First(&model.CreatorSubscription{})
+H -> DB: Create(&model.SubscriptionOrder{OrderNo, AmountCents, ...})
+H --> U: orderInfo{orderNo, pending}
+U -> H: DemoPayHandler(orderNo)
+H -> DB: Where("order_no = ?").First(&model.SubscriptionOrder{})
+H -> DB: Transaction(func(tx *gorm.DB))
+alt 已支付（幂等重试）
+  H -> DB: Preload("Creator").First(&subscription)
+else 待支付
+  H -> DB: Create/Save(&model.CreatorSubscription{})
+  H -> H: ensureFollow(tx, subscriberID, creatorID)
+  H -> DB: Model(&model.Follow{}).Update("special", true)
+  H -> DB: Model(&order).Updates(status, paid_at)
+  H -> DB: Create(&model.Notification{})
+end
+DB --> H: model.CreatorSubscription / error
+H --> U: subscriptionInfo / 订单无法支付
+@enduml

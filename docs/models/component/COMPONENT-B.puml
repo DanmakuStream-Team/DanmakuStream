@@ -1,0 +1,54 @@
+@startuml COMPONENT-B
+!include ../_theme.puml
+title 成员 B 当前单体实现组件图（UC01/07/08/11）
+left to right direction
+
+package "Vue 前端" {
+  [LoginPage / RegisterPage] as AuthPage
+  [UserProfilePage] as ProfilePage
+  [SubscriptionPage] as SubscriptionPage
+  [ChatPage] as ChatPage
+  [HTTP API Client] as APIClient
+  [Chat WebSocket Client] as WSClient
+}
+
+package "Gin 单体后端" {
+  [路由与 AuthMiddleware] as Router
+  [auth_handler] as AuthHandler
+  [user_handler / relationship_handler] as UserHandler
+  [membership_handler] as MembershipHandler
+  [message_handler / media_handler] as MessageHandler
+  [auth LoginLogic / RegisterLogic / MeLogic] as AuthLogic
+  [chat.Hub] as ChatHub
+  [membership expiration worker] as MembershipWorker
+}
+
+database "MySQL\nusers / follows / user_blocks /\nfollow_groups / membership / chat_messages" as DB
+folder "VideoDir\navatars / messages" as MediaStore
+
+AuthPage --> APIClient
+ProfilePage --> APIClient
+SubscriptionPage --> APIClient
+ChatPage --> APIClient
+ChatPage --> WSClient
+APIClient --> Router : HTTP /api/v1
+WSClient --> Router : WebSocket /ws/chat
+Router --> AuthHandler
+Router --> UserHandler
+Router --> MembershipHandler
+Router --> MessageHandler
+AuthHandler --> AuthLogic
+AuthLogic --> DB : GORM
+UserHandler --> DB : GORM transaction
+UserHandler --> MediaStore : avatar
+MembershipHandler --> DB : GORM transaction
+MembershipWorker --> DB : expireAll
+MessageHandler --> ChatHub
+MessageHandler --> MediaStore : message attachment
+ChatHub --> DB : validate / persist / preload
+ChatHub --> WSClient : realtime event
+
+note bottom
+本图描述当前 Go 单体代码，不表示未来微服务已经落地。
+end note
+@enduml
