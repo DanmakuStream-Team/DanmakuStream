@@ -99,7 +99,8 @@ Live:
 ### 本地开发启动
 
 ```bash
-docker compose up mysql srs -d
+# 依赖服务 + nginx-gateway（API 统一入口，宿主端口默认 8888）
+docker compose up mysql srs nginx-gateway backend -d
 
 cd backend
 go mod tidy
@@ -111,6 +112,8 @@ npm run dev
 ```
 
 本地前端默认访问 `http://localhost:5173`。
+
+> **代理说明**：`npm run dev` 的 `/api`、`/media`、`/ws` 代理默认指向 `http://localhost:8888`（compose 里的 nginx-gateway；后端容器不再对宿主暴露 8080，为微服务拆分做准备）。改用其他网关地址：`VITE_DEV_GATEWAY_TARGET=http://x npm run dev`；构建期 API 前缀可用 `VITE_API_BASE_URL`（见 `frontend/.env.example`）。若只起了 `mysql srs` 而后端用 `go run` 本地跑，请把网关 upstream 指到宿主：`deploy/nginx-gateway.conf` 中 backend 地址默认解析容器名，本地场景用完整 compose 栈最省事。
 
 ## 核心功能
 
