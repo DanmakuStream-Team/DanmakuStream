@@ -5,19 +5,19 @@
 [WebServer] (node:320589) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 [WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
 [WebServer] node_modules/@vueuse/core/dist/index.js (3362:0): A comment
-[WebServer] 
+[WebServer]
 [WebServer] "/* #__PURE__ */"
-[WebServer] 
+[WebServer]
 [WebServer] in "node_modules/@vueuse/core/dist/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
 [WebServer] node_modules/@vueuse/core/dist/index.js (5780:22): A comment
-[WebServer] 
+[WebServer]
 [WebServer] "/* #__PURE__ */"
-[WebServer] 
+[WebServer]
 [WebServer] in "node_modules/@vueuse/core/dist/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
-[WebServer] [plugin vite:reporter] 
+[WebServer] [plugin vite:reporter]
 [WebServer] (!) /home/starsgazer/work/DanmakuStream/frontend/src/router/index.ts is dynamically imported by /home/starsgazer/work/DanmakuStream/frontend/src/utils/request.ts but also statically imported by /home/starsgazer/work/DanmakuStream/frontend/src/main.ts, dynamic import will not move module into another chunk.
-[WebServer] 
-[WebServer] 
+[WebServer]
+[WebServer]
 [WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
 [WebServer] - Using dynamic import() to code-split the application
 [WebServer] - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
