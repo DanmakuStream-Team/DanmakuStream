@@ -64,7 +64,7 @@ Settings → Environments → 新建 **`production`**，添加 Secrets：
 | 层 | 检查 |
 |---|---|
 | K8s | Node Ready、PVC Bound、rollout 完成、无 `ImagePullBackOff`/`CrashLoopBackOff` |
-| 集群内 | frontend→backend 代理 `/api/v1/health`；backend→MySQL（health 含 `db:up`）；`/api/v1/livez` 存活 |
+| 集群内 | backend→frontend Service→Nginx→backend Service 的代理 `/api/v1/health`；backend→MySQL（health 含 `db:up`）；`/api/v1/livez` 存活 |
 | 公网 | `$PUBLIC_URL/api/v1/health` 返回 200 且 `db:up`（10 次重试） |
 
 每次部署产出 **`cd-evidence-<sha>` artifact**：CI 记录、镜像地址、rollout 输出、Pod/Service/Ingress/事件快照、backend 日志（失败时）——对应任务书"部署证据"要求。
