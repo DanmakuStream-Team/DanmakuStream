@@ -20,20 +20,22 @@ type User struct {
 
 type Video struct {
 	gorm.Model
-	Title        string `gorm:"size:200;not null"`
-	Description  string `gorm:"type:text"`
-	CoverURL     string `gorm:"size:500"`
-	VideoURL     string `gorm:"size:500"`
-	Duration     int    `gorm:"default:0"` // seconds
-	ViewCount    int64  `gorm:"default:0"`
-	LikeCount    int64  `gorm:"default:0"`
-	CollectCount int64  `gorm:"default:0"`
-	DanmakuCount int64  `gorm:"default:0"`
-	Status       string `gorm:"size:20;default:pending"` // pending | approved | rejected
-	AuthorID     uint   `gorm:"not null;index"`
-	Author       User   `gorm:"foreignKey:AuthorID"`
-	Tags         string `gorm:"size:500"` // comma-separated
-	Category     string `gorm:"column:category;type:varchar(32)" json:"category"`
+	Title           string `gorm:"size:200;not null"`
+	Description     string `gorm:"type:text"`
+	CoverURL        string `gorm:"size:500"`
+	VideoURL        string `gorm:"size:500"`
+	Duration        int    `gorm:"default:0"` // seconds
+	ViewCount       int64  `gorm:"default:0"`
+	LikeCount       int64  `gorm:"default:0"`
+	CollectCount    int64  `gorm:"default:0"`
+	DanmakuCount    int64  `gorm:"default:0"`
+	Status          string `gorm:"size:20;default:pending"` // pending | approved | rejected
+	TranscodeStatus string `gorm:"size:20"`                 // processing | ready | failed
+	TranscodeError  string `gorm:"size:500"`
+	AuthorID        uint   `gorm:"not null;index"`
+	Author          User   `gorm:"foreignKey:AuthorID"`
+	Tags            string `gorm:"size:500"` // comma-separated
+	Category        string `gorm:"column:category;type:varchar(32)" json:"category"`
 }
 
 type VideoCollection struct {

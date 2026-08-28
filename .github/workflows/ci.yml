@@ -133,6 +133,7 @@ jobs:
       - name: Run UC13 API test suite
         env:
           MYSQL_CMD: "mysql -h127.0.0.1 -P3306 -uroot -ppassword danmakustream"
+          VIDEO_DIR: "/tmp/dms-data"
         run: |
           set -o pipefail
           tests/api/uc13-admin-test.sh | tee uc13-api-test-output.txt

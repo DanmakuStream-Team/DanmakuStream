@@ -1,6 +1,9 @@
 package videologic
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 // UNIT-TC02-01 视频发现排序：仅支持产品约定的四种排序方式。
 func TestVideoSortExpr(t *testing.T) {
@@ -35,5 +38,12 @@ func TestVideoSortExpr(t *testing.T) {
 				t.Errorf("videoSortExpr(%q) = %q, want %q", tc.sort, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestInvalidVideoSortUsesTypedError(t *testing.T) {
+	_, err := videoSortExpr("views", "hot")
+	if !errors.Is(err, ErrInvalidVideoSort) {
+		t.Fatalf("error = %v, want ErrInvalidVideoSort", err)
 	}
 }

@@ -11,7 +11,7 @@
       </div>
 
       <div v-if="videos.length" class="rows">
-        <div v-for="video in videos" :key="video.id" class="row">
+        <div v-for="video in videos" :key="video.id" class="row" :data-video-id="video.id">
           <button class="thumb-button" type="button" @click="previewVideo(video)">
             <img v-if="video.coverUrl" :src="mediaUrl(video.coverUrl)" :alt="video.title">
             <span v-else>D</span>
@@ -27,8 +27,12 @@
 
           <div class="row-actions">
             <el-button @click="previewVideo(video)">查看视频</el-button>
-            <el-select v-model="video.status" size="small" @change="updateStatus(video.id, video.status)">
-              <el-option label="待审核" value="pending" />
+            <el-select
+              :model-value="video.status"
+              :disabled="video.status !== 'pending'"
+              size="small"
+              @change="updateStatus(video.id, $event as VideoStatus)"
+            >
               <el-option label="通过" value="approved" />
               <el-option label="拒绝" value="rejected" />
             </el-select>
@@ -53,14 +57,14 @@
           </el-tag>
           <el-button @click="previewVisible = false">关闭</el-button>
           <el-button
-            v-if="previewVideoInfo"
+            v-if="previewVideoInfo?.status === 'pending'"
             type="success"
             @click="updateStatus(previewVideoInfo.id, 'approved')"
           >
             通过
           </el-button>
           <el-button
-            v-if="previewVideoInfo"
+            v-if="previewVideoInfo?.status === 'pending'"
             type="danger"
             @click="updateStatus(previewVideoInfo.id, 'rejected')"
           >

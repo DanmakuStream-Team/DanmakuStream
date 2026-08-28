@@ -41,7 +41,7 @@ test.describe.serial('成员 C 内容域', () => {
 
     await page.route('**/api/v1/videos/upload', async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 3000))
-      await route.abort('aborted')
+      await route.abort('aborted').catch(() => undefined)
     })
     await page.getByRole('button', { name: '提交上传' }).click()
     await page.getByRole('button', { name: '终止上传' }).click()
@@ -59,6 +59,27 @@ test.describe.serial('成员 C 内容域', () => {
       headers: { Authorization: `Bearer ${creator.token}` },
     })
     expect(await canceled.text()).not.toContain('E2E-MC-取消上传')
+
+    const failedTitle = `E2E-MC-转码失败-${Date.now()}`
+    const failedUpload = await request.post(`${API}/videos/upload`, {
+      headers: { Authorization: `Bearer ${creator.token}` },
+      multipart: {
+        title: failedTitle,
+        video: { name: 'invalid.mp4', mimeType: 'video/mp4', buffer: Buffer.from('not a media file') },
+      },
+    })
+    expect(failedUpload.status()).toBe(200)
+    await expect.poll(async () => {
+      const response = await request.get(`${API}/users/me/videos?page=1&pageSize=100`, {
+        headers: { Authorization: `Bearer ${creator.token}` },
+      })
+      const payload = await response.json()
+      return payload.data.list.find((item: { title: string }) => item.title === failedTitle)?.transcodeStatus
+    }, { timeout: 15_000 }).toBe('failed')
+    await page.reload()
+    const failedRow = page.locator('.el-table__row', { hasText: failedTitle })
+    await expect(failedRow).toContainText('转码失败')
+    await expect(failedRow).toContainText('请检查文件格式后重新上传')
   })
 
   // E2E-TC04-01 审核员通过/拒绝，普通用户同时受页面和 API 权限保护。
@@ -69,15 +90,27 @@ test.describe.serial('成员 C 内容域', () => {
     const approveRow = page.locator('.row', { hasText: 'E2E-MC-待审核通过' })
     await expect(approveRow).toBeVisible()
     await approveRow.locator('.el-select').click()
-    await page.keyboard.press('ArrowDown')
-    await page.keyboard.press('Enter')
+    await dropdownOption(page, '通过').click()
     await expect(approveRow.locator('.el-tag')).toContainText('已通过')
+    await expect(approveRow.locator('.el-select__wrapper')).toHaveClass(/is-disabled/)
+
+    const approvedID = Number(await approveRow.getAttribute('data-video-id'))
+    expect(approvedID).toBeGreaterThan(0)
+    const repeated = await request.put(`${API}/admin/videos/${approvedID}/status`, {
+      headers: { Authorization: `Bearer ${moderator.token}` },
+      data: { status: 'rejected' },
+    })
+    expect(repeated.status()).toBe(409)
 
     const rejectRow = page.locator('.row', { hasText: 'E2E-MC-待审核拒绝' })
-    await rejectRow.locator('.el-select').click()
-    await page.keyboard.press('ArrowDown')
-    await page.keyboard.press('ArrowDown')
-    await page.keyboard.press('Enter')
+    const rejectID = Number(await rejectRow.getAttribute('data-video-id'))
+    expect(rejectID).toBeGreaterThan(0)
+    const rejected = await request.put(`${API}/admin/videos/${rejectID}/status`, {
+      headers: { Authorization: `Bearer ${moderator.token}` },
+      data: { status: 'rejected' },
+    })
+    expect(rejected.status()).toBe(200)
+    await page.reload()
     await expect(rejectRow.locator('.el-tag')).toContainText('已拒绝')
 
     const plain = await loginViaApi(request, USERS.memberCPlain.nickname, USERS.memberCPlain.password)
@@ -107,6 +140,9 @@ test.describe.serial('成员 C 内容域', () => {
     await dropdownOption(page, 'E2E-MC-公开视频').click()
     const analyticsResponse = await singleWorkResponse
     expect(analyticsResponse.status()).toBe(200)
+    const singleWorkPayload = await analyticsResponse.json()
+    expect(singleWorkPayload.data.topVideos).toHaveLength(1)
+    expect(singleWorkPayload.data.topVideos[0].id).toBe(singleWorkPayload.data.selectedVideoId)
     await expect(page.getByText('E2E-MC-公开视频的观看、收藏增长和账号开播次数。')).toBeVisible()
 
     const other = await loginViaApi(request, USERS.memberCPlain.nickname, USERS.memberCPlain.password)
