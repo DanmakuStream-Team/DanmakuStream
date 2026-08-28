@@ -1,8 +1,41 @@
 import { expect, test } from '@playwright/test'
 import { loginViaApi, openAs } from './fixtures/auth'
-import { API, USERS } from './test-data'
+import { API, ENGAGEMENT_VIDEO_TITLE, USERS } from './test-data'
 
 const runTag = Date.now()
+
+test('E2E-TC05 发送弹幕和评论、点赞收藏，刷新后数据保持', async ({ page, request }) => {
+  const viewer = await loginViaApi(request, USERS.viewer.nickname, USERS.viewer.password)
+  const listResponse = await request.get(`${API}/videos?page=1&pageSize=20&keyword=${encodeURIComponent(ENGAGEMENT_VIDEO_TITLE)}`)
+  expect(listResponse.ok(), await listResponse.text()).toBeTruthy()
+  const list = await listResponse.json()
+  const video = list.data.list.find((item: { title: string }) => item.title === ENGAGEMENT_VIDEO_TITLE)
+  expect(video, 'global setup should seed the UC05 video when MYSQL_CMD is provided').toBeTruthy()
+
+  await openAs(page, viewer, `/video/${video.id}`)
+  await expect(page.getByRole('heading', { name: ENGAGEMENT_VIDEO_TITLE })).toBeVisible()
+
+  await page.getByRole('button', { name: /^点赞 0$/ }).click()
+  await expect(page.getByRole('button', { name: /^点赞 1$/ })).toBeVisible()
+  await page.getByRole('button', { name: /^收藏 0$/ }).click()
+  await expect(page.getByRole('button', { name: /^收藏 1$/ })).toBeVisible()
+
+  const danmakuText = `E2E弹幕-${runTag}`
+  await page.getByPlaceholder('此刻想说什么').fill(danmakuText)
+  await page.getByPlaceholder('此刻想说什么').press('Enter')
+  await expect(page.locator('.stats').getByText('1 弹幕', { exact: true })).toBeVisible()
+
+  const commentText = `E2E评论-${runTag}`
+  await page.getByPlaceholder('写下你的看法').fill(commentText)
+  await page.getByRole('button', { name: '发表评论', exact: true }).click()
+  await expect(page.getByText(commentText, { exact: true })).toBeVisible()
+
+  await page.reload()
+  await expect(page.getByRole('button', { name: /^点赞 1$/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^收藏 1$/ })).toBeVisible()
+  await expect(page.locator('.stats').getByText('1 弹幕', { exact: true })).toBeVisible()
+  await expect(page.getByText(commentText, { exact: true })).toBeVisible()
+})
 
 test('E2E-TC09 创建预约、另一用户预约与取消，刷新后状态保持', async ({ page, request }) => {
   const owner = await loginViaApi(request, USERS.owner.nickname, USERS.owner.password)

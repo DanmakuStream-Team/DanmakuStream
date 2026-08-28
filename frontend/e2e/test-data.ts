@@ -2,6 +2,7 @@
 export const PASSWORD = 'Test1234!'
 
 export const API = process.env.E2E_API_BASE ?? 'http://127.0.0.1:8080/api/v1'
+export const ENGAGEMENT_VIDEO_TITLE = 'E2E-UC05-互动测试视频'
 
 export const USERS = {
   owner: { nickname: 'e2e-d-owner', password: PASSWORD },
@@ -14,4 +15,10 @@ export const USERS = {
   admin: { nickname: 'tadmin', password: PASSWORD },
   /** 专用普通用户，用于 UC13 越权断言。 */
   plain: { nickname: 'e2eplain', password: PASSWORD },
+  /** 成员 C 内容域专用创作者。 */
+  memberCCreator: { nickname: 'e2e-mc-creator', password: PASSWORD },
+  /** 成员 C 内容域专用审核员。 */
+  memberCModerator: { nickname: 'e2e-mc-moderator', password: PASSWORD },
+  /** 成员 C 内容域专用普通用户。 */
+  memberCPlain: { nickname: 'e2e-mc-plain', password: PASSWORD },
 } as const

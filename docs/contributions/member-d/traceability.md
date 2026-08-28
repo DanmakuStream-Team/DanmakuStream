@@ -13,7 +13,7 @@
 
 | 需求 | 用例 | 系统级设计 | 组件级设计 | 对象级设计 | 代码模块 | 自动化测试 | 当前结果 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| REQ01 视频弹幕、评论、点赞与收藏 | UC05 | `SYS-SEQ05` | `COMP-SEQ05` | `OBJ-SEQ05` | `danmaku_handler.go`、`comment_handler.go`、`video_handler.go`、`VideoDetailPage.vue`、`VideoPlayer.vue` | `UNIT-TC01`、`INT-TC01`、`INT-TC02` | 弹幕、评论、点赞/取消和收藏/取消的 MySQL 集成测试已通过 |
+| REQ01 视频弹幕、评论、点赞与收藏 | UC05 | `SYS-SEQ05` | `COMP-SEQ05` | `OBJ-SEQ05` | `danmaku_handler.go`、`comment_handler.go`、`video_handler.go`、`VideoDetailPage.vue`、`VideoPlayer.vue` | `UNIT-TC01`、`INT-TC01`、`INT-TC02`、`E2E-TC05` | 弹幕、评论、点赞/取消和收藏/取消的 MySQL 集成及浏览器持久化测试已通过 |
 | REQ02 主播发布直播计划 | UC09 | `SYS-SEQ09` | `COMP-SEQ09` | `OBJ-SEQ09` | `schedule_handler.go`、`LiveListPage.vue`、`api/live.ts` | `UNIT-TC03`、`UNIT-TC04`、`INT-TC04`、`E2E-TC09` | 相同开播时间冲突校验与并发串行锁已实现，集成和浏览器测试通过 |
 | REQ03 用户预约/取消预约 | UC09 | `SYS-SEQ09` | `COMP-SEQ09` | `OBJ-SEQ09` | `ReserveScheduleHandler`、`LiveReservation` | `INT-TC03`、`E2E-TC09` | 预约切换、刷新持久化、唯一关系和提醒人数测试已通过 |
 | REQ04 主播创建、推流与结束直播 | UC10 | `SYS-SEQ10` | `COMP-SEQ10` | `OBJ-SEQ10` | `live_handler.go`、`live_publish_handler.go`、`LiveStudioPage.vue` | `INT-TC09`、`E2E-TC10`、`E2E-MEDIA` | 创建、重复创建、越权/正常下播和浏览器闭环通过；RTMP-SRS-HLS 媒体链路通过 |
@@ -40,6 +40,7 @@
 | INT-TC07 | 集成 | 星光礼物、SC 留言和数量上界非法值 | 价值、展示时长和参数错误正确 | 已通过 |
 | INT-TC08 | 集成 | everyone/followers/members 与慢速模式 | 仅符合权限者发言，主播可绕过 | 已通过 |
 | INT-TC09 | 集成 | 创建/重复创建直播、越权/正常下播 | 房间复用正确，越权拒绝，正常下播并生成记录 | 已通过 |
+| E2E-TC05 | E2E | 用户观看审核通过的视频，发送弹幕和评论并点赞收藏，随后刷新 | 计数、评论内容及互动状态刷新后保持一致 | 已通过；Chromium |
 | E2E-TC09 | E2E | 主播创建预约，另一用户预约/取消并刷新页面 | 页面状态和 API 数据保持一致 | 已通过；Chromium |
 | E2E-TC10 | E2E | 主播创建直播，观众点赞赠礼，主播结束直播 | 页面、互动 API 和结束状态保持一致 | 已通过；Chromium |
 | E2E-MEDIA | E2E | FFmpeg 推送测试流至 SRS，读取 HLS 主清单、媒体清单和 TS 分片 | RTMP 接收正常，HLS 各级资源可下载 | 已通过 |

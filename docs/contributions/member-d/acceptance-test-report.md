@@ -2,9 +2,9 @@
 
 ## 1. 执行信息
 
-- 最近执行日期：2026-08-26。
+- 最近执行日期：2026-08-27。
 - 覆盖范围：UC05、UC09、UC10（开发计划旧编号 UC04、UC07、UC06 分别对应当前三个业务场景）。
-- 代码基线：`a5606b9`，分支 `feature/floatingsoul423-live-features-20260825`。
+- 代码分支：`codex/d-engagement-tests-20260826`；已同步 `origin/dev` 的文档重组基线 `fdc44ad`。
 - 运行环境：Windows 11 `10.0.26100`、Go `1.26.2 windows/amd64`、Node.js `24.13.0`、npm `11.6.2`、Gin Handler、GORM、本机 MySQL（TCP 3306）。
 - 数据隔离：测试运行时创建名称为 `danmakustream_d_sxh_<时间戳>` 的临时数据库，完成后自动删除，不使用开发业务库。
 
@@ -16,8 +16,8 @@
 | 集成/API 场景组 | 10 | 10 | 0 | 0 | 通过 |
 | 前端类型检查与生产构建 | 1 | 1 | 0 | 0 | 通过，有既有构建警告 |
 | FFmpeg—RTMP—SRS—HLS 媒体 E2E | 1 | 1 | 0 | 0 | 通过 |
-| Playwright 浏览器 E2E | 2 | 2 | 0 | 0 | Chromium 通过 |
-| **已执行合计** | **25** | **25** | **0** | **0** | **有效测试全部通过** |
+| Playwright 浏览器 E2E | 3 | 3 | 0 | 0 | Chromium 通过 |
+| **已执行合计** | **26** | **26** | **0** | **0** | **有效测试全部通过** |
 
 单元测试按实际执行叶子场景统计：Super Chat 五个价值边界，加上热度、时间解析、计划状态、观众去重、Hub 事件和持久化失败六个场景。集成/API 按三个业务用例、三个数据库故障组，以及计划启动、计划通知、聊天权限和真实 WebSocket 往返四组统计。断网重连仍保留为现场增强检查，不计入上述自动化场景。
 
@@ -40,7 +40,7 @@
 | `TestCanSendChatModesAndSlowMode` | everyone/followers/members 身份校验、会员有效期与慢速模式，主播绕过限速 | 通过 |
 | `TestHubWebSocketRoundTripAndPersistenceFailure` | 真实 WebSocket 注册、在线人数、弹幕往返、默认样式和数据库错误事件 | 通过 |
 | `TestEngagementDatabaseFailureResponses` | UC05/UC09/UC10 依赖表不可用时返回 500，且不伪报成功 | 3/3 通过 |
-| `npm run test:e2e:d` | UC09 页面创建预约并由另一用户预约/取消；UC10 创建直播、点赞、赠礼与结束 | Chromium 2/2 通过 |
+| `npm run test:e2e:d` | UC05 弹幕、评论、点赞、收藏及刷新持久化；UC09 页面创建预约并由另一用户预约/取消；UC10 创建直播、点赞、赠礼与结束 | Chromium 3/3 通过 |
 | `npm run build` | Vue TypeScript 检查与生产构建 | 通过；存在既有包体积提示，无编译错误 |
 | FFmpeg → RTMP → SRS → HLS | 30 秒测试音视频推流；读取主清单、媒体清单和首个 TS 分片 | 通过；三级 HTTP 均为 200，分片 162620 字节 |
 
@@ -82,9 +82,9 @@ Remove-Item Env:DANMAKU_TEST_ADMIN_DSN
 
 ## 7. E2E 状态与现场检查项
 
-自动化集成测试已经从 HTTP Handler 入口覆盖三个用例的业务写入、权限、异常分支和数据库结果；真实 RTMP 推流与 SRS/HLS 输出也已通过。Playwright 已自动完成 UC09 的创建、预约、取消与刷新持久化，以及 UC10 的直播创建、点赞、赠礼和结束流程。HTML 报告位于 `docs/testing/reports/engagement-e2e/index.html`。
+自动化集成测试已经从 HTTP Handler 入口覆盖三个用例的业务写入、权限、异常分支和数据库结果；真实 RTMP 推流与 SRS/HLS 输出也已通过。Playwright 已自动完成 UC05 的弹幕、评论、点赞、收藏与刷新持久化，UC09 的创建、预约、取消与刷新持久化，以及 UC10 的直播创建、点赞、赠礼和结束流程。HTML 报告位于 `docs/testing/reports/engagement-e2e/index.html`。
 
 最终现场仍建议补充两项视觉证据：
 
-1. UC05：观看审核通过视频，完成弹幕、评论、点赞和收藏，刷新后确认状态一致。
+1. UC05：自动化流程已通过；最终汇报时保存一张代表性的成功页面截图。
 2. UC10：打开同一账号多个标签页确认在线人数不重复；断网恢复后确认自动重连。数据库写入失败门控、真实 WebSocket 往返、聊天权限和媒体链路已有自动化证据。
