@@ -4,6 +4,7 @@
 # 用法：
 #   k3s-deploy.sh <namespace> precheck
 #   k3s-deploy.sh <namespace> deploy <backend_image> <frontend_image>
+#   k3s-deploy.sh <namespace> rollback
 #
 # deploy 流程：预检 → 记录旧版本 → set image 滚动更新 → rollout 等待 →
 #              Pod 就绪检查 → 集群内健康检查；任一步失败自动 rollout undo 回滚
@@ -25,6 +26,11 @@ precheck() {
   $KUBECTL get namespace "$NS" > /dev/null || die "Namespace $NS 不存在（首次请按 docs/deploy/cd-pipeline.md 初始化）"
   for secret in danmakustream-secrets; do
     $KUBECTL -n "$NS" get secret "$secret" > /dev/null || die "Secret $secret 不存在（含数据库密码与 JWT，须在服务器手动创建，CD 不管理）"
+  done
+  for key in DB_PASSWORD JWT_SECRET DATABASE_DSN; do
+    value=$($KUBECTL -n "$NS" get secret danmakustream-secrets \
+      -o "jsonpath={.data.$key}" 2>/dev/null) || die "无法读取 Secret 键 $key"
+    [ -n "$value" ] || die "Secret danmakustream-secrets 缺少键 $key"
   done
   for pvc in mysql-data video-data; do
     phase=$($KUBECTL -n "$NS" get pvc "$pvc" -o jsonpath='{.status.phase}' 2>/dev/null) || die "PVC $pvc 不存在"
@@ -65,8 +71,8 @@ deploy() {
   log "目标版本：Backend=$backend_image Frontend=$frontend_image"
 
   # 滚动更新（失败即回滚）
-  if ! $KUBECTL -n "$NS" set image deploy/backend="backend=$backend_image" \
-     || ! $KUBECTL -n "$NS" set image deploy/frontend="frontend=$frontend_image"; then
+  if ! $KUBECTL -n "$NS" set image deployment/backend backend="$backend_image" \
+     || ! $KUBECTL -n "$NS" set image deployment/frontend frontend="$frontend_image"; then
     rollback "set image 失败"; exit 1
   fi
   if ! $KUBECTL -n "$NS" rollout status deploy/backend --timeout="$ROLLOUT_TIMEOUT" 2>&1; then
@@ -105,5 +111,6 @@ deploy() {
 case "$MODE" in
   precheck) precheck ;;
   deploy)   deploy "${3:?}" "${4:?}" ;;
+  rollback) rollback "公网健康检查失败" ;;
   *) die "未知模式: $MODE" ;;
 esac
