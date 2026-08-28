@@ -48,6 +48,11 @@ async function prepareEngagementData(api: ApiContext) {
 
   const mysqlCommand = process.env.MYSQL_CMD
   if (mysqlCommand) {
+    const videoDir = process.env.VIDEO_DIR ?? path.resolve('../backend/data')
+    const mediaFixture = path.join(videoDir, 'videos', 'e2e-uc05.mp4')
+    mkdirSync(path.dirname(mediaFixture), { recursive: true })
+    writeFileSync(mediaFixture, 'UC05 E2E media fixture', 'utf8')
+
     runSql(mysqlCommand, `
       UPDATE users SET role='creator' WHERE nickname='${USERS.owner.nickname}';
       SET FOREIGN_KEY_CHECKS=0;
@@ -61,7 +66,7 @@ async function prepareEngagementData(api: ApiContext) {
       DELETE FROM videos WHERE title='${ENGAGEMENT_VIDEO_TITLE}';
       SET FOREIGN_KEY_CHECKS=1;
       INSERT INTO videos (created_at,updated_at,title,description,video_url,status,author_id)
-      VALUES (NOW(),NOW(),'${ENGAGEMENT_VIDEO_TITLE}','UC05 自动化测试数据','/data/videos/e2e-uc05.mp4','approved',
+      VALUES (NOW(),NOW(),'${ENGAGEMENT_VIDEO_TITLE}','UC05 自动化测试数据','/media/videos/e2e-uc05.mp4','approved',
         (SELECT id FROM users WHERE nickname='${USERS.owner.nickname}'));
     `)
   }

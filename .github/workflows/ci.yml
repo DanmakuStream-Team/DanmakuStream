@@ -231,6 +231,7 @@ jobs:
         working-directory: frontend
         env:
           MYSQL_CMD: "mysql -h127.0.0.1 -P3306 -uroot -ppassword danmakustream"
+          VIDEO_DIR: "/tmp/dms-data"
         run: npm run test:e2e:d
       - name: Upload E2E report and failure evidence
         if: always()
