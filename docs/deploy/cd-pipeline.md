@@ -35,11 +35,12 @@ git clone https://github.com/DanmakuStream-Team/DanmakuStream.git && cd DanmakuS
 sudo k3s kubectl apply -f deploy/k8s/monolith/namespace.yaml
 sudo k3s kubectl -n danmakustream create secret generic danmakustream-secrets \
   --from-literal=DB_PASSWORD='<真实数据库密码>' \
-  --from-literal=JWT_SECRET='<真实JWT密钥>'          # CD 永不覆盖这两个值
+  --from-literal=JWT_SECRET='<真实JWT密钥>' \
+  --from-literal=DATABASE_DSN='root:<真实数据库密码>@tcp(mysql:3306)/danmakustream?charset=utf8mb4&parseTime=True&loc=Local'  # CD 永不覆盖这些值
 sudo k3s kubectl apply -f deploy/k8s/monolith/        # 其余资源（PVC/MySQL/SRS/前后端/Ingress）
 
 # 3) 首次部署后 CD 用 set image 接管版本；首次镜像可手动：
-#    sudo k3s kubectl -n danmakustream set image deploy/backend=backend=ghcr.io/.../backend:<sha> ...
+#    sudo k3s kubectl -n danmakustream set image deployment/backend backend=ghcr.io/.../backend:<sha>
 ```
 
 > GHCR 私有镜像需在服务器登录拉取：`sudo docker login ghcr.io`（用 PAT）或创建 `regcred` Secret 并在 Deployment 补 `imagePullSecrets`。若仓库公开则免配置。
