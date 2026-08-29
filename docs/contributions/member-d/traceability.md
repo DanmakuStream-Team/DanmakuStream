@@ -19,7 +19,7 @@
 | REQ04 主播创建、推流与结束直播 | UC10 | `SYS-SEQ10` | `COMP-SEQ10` | `OBJ-SEQ10` | `live_handler.go`、`live_publish_handler.go`、`LiveStudioPage.vue` | `INT-TC09`、`E2E-TC10`、`E2E-MEDIA` | 创建、重复创建、越权/正常下播和浏览器闭环通过；RTMP-SRS-HLS 媒体链路通过 |
 | REQ05 实时弹幕、点赞、礼物与 SC | UC10 | `SYS-SEQ10` | `COMP-SEQ10` | `OBJ-SEQ10` | `interaction_handler.go`、`ws_handler.go`、`logic/danmaku/hub.go`、`LiveRoomPage.vue` | `UNIT-TC01`、`INT-TC06`、`INT-TC07`、`E2E-TC10` | 点赞切换、礼物/SC、持久化失败门控、真实 WebSocket 和浏览器流程已通过 |
 | REQ06 在线人数、热度与主播监控 | UC10 | `SYS-SEQ10` | `COMP-SEQ10` | `OBJ-SEQ10` | `MonitorHandler`、`Hub.broadcastViewerCount`、`LiveStudioPage.vue` | `UNIT-TC02`、`UNIT-TC05` | 登录观众按用户去重、匿名按连接计数、监控连接排除，测试通过 |
-| REQ07 实时连接恢复 | UC10 | `SYS-SEQ10` | `COMP-SEQ10` | `OBJ-SEQ10` | `frontend/src/api/danmaku.ts`、`Client.ReadPump`、`Client.WritePump` | `UNIT-TC05`、`E2E-TC02` | 3 秒重连和 Ping/Pong 已实现；重连期间登录用户不会因多连接重复计数 |
+| REQ07 实时连接与异常推流恢复 | UC10 | `SYS-SEQ10` | `COMP-SEQ10` | `OBJ-SEQ10` | `frontend/src/api/danmaku.ts`、`live_publish_handler.go`、`srs_hook_handler.go`、`deploy/srs.conf` | `UNIT-TC05`、`INT-TC-SRS`、`E2E-TC10` | 3 秒观看端重连及人数去重已通过；浏览器和 SRS/OBS 推流断开进入 15 秒恢复窗口，快速重连不误结束，超时后房间置为 ended |
 
 ## 3. 建议测试用例清单
 

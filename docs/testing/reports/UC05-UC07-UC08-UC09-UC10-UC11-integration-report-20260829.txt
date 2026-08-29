@@ -1,0 +1,217 @@
+=== RUN   TestEngagementUseCasesWithMySQL
+=== RUN   TestEngagementUseCasesWithMySQL/UC05_video_interaction_persists_and_updates_counts
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/comment/comment_handler.go:274 [35;1mrecord not found
+[0m[33m[2.092ms] [34;1m[rows:0][0m SELECT * FROM `comment_likes` WHERE (user_id = 2 AND comment_id = 1) AND `comment_likes`.`deleted_at` IS NULL ORDER BY `comment_likes`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/video/video_handler.go:416 [35;1mrecord not found
+[0m[33m[2.112ms] [34;1m[rows:0][0m SELECT * FROM `likes` WHERE (user_id = 2 AND video_id = 1) AND `likes`.`deleted_at` IS NULL ORDER BY `likes`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/video/video_handler.go:480 [35;1mrecord not found
+[0m[33m[1.041ms] [34;1m[rows:0][0m SELECT * FROM `collects` WHERE (user_id = 2 AND video_id = 1) AND `collects`.`deleted_at` IS NULL ORDER BY `collects`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/danmaku/danmaku_handler.go:125 [35;1mrecord not found
+[0m[33m[1.036ms] [34;1m[rows:0][0m SELECT `id`,`status` FROM `videos` WHERE id = 10000 AND `videos`.`deleted_at` IS NULL ORDER BY `videos`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/comment/comment_handler.go:263 [35;1mrecord not found
+[0m[33m[0.521ms] [34;1m[rows:0][0m SELECT * FROM `comments` WHERE `comments`.`id` = 999999 AND `comments`.`deleted_at` IS NULL ORDER BY `comments`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/comment/comment_handler.go:231 [35;1mrecord not found
+[0m[33m[1.054ms] [34;1m[rows:0][0m SELECT * FROM `comments` WHERE `comments`.`id` = 999999 AND `comments`.`deleted_at` IS NULL ORDER BY `comments`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/comment/comment_handler.go:188 [35;1mrecord not found
+[0m[33m[1.060ms] [34;1m[rows:0][0m SELECT `id`,`video_id` FROM `comments` WHERE `comments`.`id` = 999999 AND `comments`.`deleted_at` IS NULL ORDER BY `comments`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/video/video_handler.go:403 [35;1mrecord not found
+[0m[33m[1.050ms] [34;1m[rows:0][0m SELECT `id`,`status` FROM `videos` WHERE `videos`.`id` = 999999 AND `videos`.`deleted_at` IS NULL ORDER BY `videos`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/video/video_handler.go:467 [35;1mrecord not found
+[0m[33m[1.563ms] [34;1m[rows:0][0m SELECT `id`,`status`,`author_id` FROM `videos` WHERE `videos`.`id` = 999999 AND `videos`.`deleted_at` IS NULL ORDER BY `videos`.`id` LIMIT 1
+=== RUN   TestEngagementUseCasesWithMySQL/UC09_rejects_conflicting_schedule_and_toggles_reservation
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/schedule_handler.go:252 [35;1mrecord not found
+[0m[33m[2.597ms] [34;1m[rows:0][0m SELECT * FROM `live_reservations` WHERE (schedule_id = 1 AND user_id = 2) AND `live_reservations`.`deleted_at` IS NULL ORDER BY `live_reservations`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/schedule_handler.go:208 [35;1mrecord not found
+[0m[33m[1.046ms] [34;1m[rows:0][0m SELECT * FROM `live_schedules` WHERE `live_schedules`.`id` = 999999 AND `live_schedules`.`deleted_at` IS NULL ORDER BY `live_schedules`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/schedule_handler.go:241 [35;1mrecord not found
+[0m[33m[1.595ms] [34;1m[rows:0][0m SELECT * FROM `live_schedules` WHERE `live_schedules`.`id` = 999999 AND `live_schedules`.`deleted_at` IS NULL ORDER BY `live_schedules`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/schedule_handler.go:252 [35;1mrecord not found
+[0m[33m[1.059ms] [34;1m[rows:0][0m SELECT * FROM `live_reservations` WHERE (schedule_id = 3 AND user_id = 2) AND `live_reservations`.`deleted_at` IS NULL ORDER BY `live_reservations`.`id` LIMIT 1
+=== RUN   TestEngagementUseCasesWithMySQL/UC10_create_manage_interact_and_end_live_room
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/live_handler.go:337 [35;1mrecord not found
+[0m[33m[2.627ms] [34;1m[rows:0][0m SELECT * FROM `live_rooms` WHERE owner_id = 1 AND `live_rooms`.`deleted_at` IS NULL ORDER BY `live_rooms`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/live_handler.go:136 [35;1mrecord not found
+[0m[33m[1.048ms] [34;1m[rows:0][0m SELECT * FROM `live_rooms` WHERE (id = 999999 AND status = 'live') AND `live_rooms`.`deleted_at` IS NULL ORDER BY `live_rooms`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/live_handler.go:159 [35;1mrecord not found
+[0m[33m[1.042ms] [34;1m[rows:0][0m SELECT * FROM `live_rooms` WHERE (id = 1 AND owner_id = 2 AND status = 'live') AND `live_rooms`.`deleted_at` IS NULL ORDER BY `live_rooms`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/live_handler.go:200 [35;1mrecord not found
+[0m[33m[1.141ms] [34;1m[rows:0][0m SELECT * FROM `live_rooms` WHERE `live_rooms`.`id` = 999999 AND `live_rooms`.`deleted_at` IS NULL ORDER BY `live_rooms`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/interaction_handler.go:176 [35;1mrecord not found
+[0m[33m[1.049ms] [34;1m[rows:0][0m SELECT * FROM `live_likes` WHERE room_id = 1 AND user_id = 2 ORDER BY `live_likes`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/interaction_handler.go:403 [35;1mrecord not found
+[0m[33m[1.570ms] [34;1m[rows:0][0m SELECT * FROM `live_rooms` WHERE (id = 999999 AND status = 'live') AND `live_rooms`.`deleted_at` IS NULL ORDER BY `live_rooms`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/interaction_handler.go:403 [35;1mrecord not found
+[0m[33m[1.589ms] [34;1m[rows:0][0m SELECT * FROM `live_rooms` WHERE (id = 999999 AND status = 'live') AND `live_rooms`.`deleted_at` IS NULL ORDER BY `live_rooms`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/interaction_handler.go:61 [35;1mrecord not found
+[0m[33m[1.577ms] [34;1m[rows:0][0m SELECT * FROM `live_rooms` WHERE (id = 1 AND owner_id = 2 AND status = 'live') AND `live_rooms`.`deleted_at` IS NULL ORDER BY `live_rooms`.`id` LIMIT 1
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/interaction_handler.go:291 [35;1mrecord not found
+[0m[33m[1.378ms] [34;1m[rows:0][0m SELECT * FROM `live_rooms` WHERE (id = 999999 AND status = 'live') AND `live_rooms`.`deleted_at` IS NULL ORDER BY `live_rooms`.`id` LIMIT 1 FOR UPDATE
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/interaction_handler.go:172 [35;1mrecord not found
+[0m[33m[1.040ms] [34;1m[rows:0][0m SELECT * FROM `live_rooms` WHERE (id = 999999 AND status = 'live') AND `live_rooms`.`deleted_at` IS NULL ORDER BY `live_rooms`.`id` LIMIT 1 FOR UPDATE
+
+2026/08/29 11:06:59 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/live_handler.go:423 [35;1mrecord not found
+[0m[33m[1.645ms] [34;1m[rows:0][0m SELECT * FROM `live_rooms` WHERE `live_rooms`.`id` = 999999 AND `live_rooms`.`deleted_at` IS NULL ORDER BY `live_rooms`.`id` LIMIT 1
+
+2026/08/29 11:07:00 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/live_handler.go:136 [35;1mrecord not found
+[0m[33m[1.567ms] [34;1m[rows:0][0m SELECT * FROM `live_rooms` WHERE (id = 1 AND status = 'live') AND `live_rooms`.`deleted_at` IS NULL ORDER BY `live_rooms`.`id` LIMIT 1
+--- PASS: TestEngagementUseCasesWithMySQL (4.56s)
+    --- PASS: TestEngagementUseCasesWithMySQL/UC05_video_interaction_persists_and_updates_counts (0.39s)
+    --- PASS: TestEngagementUseCasesWithMySQL/UC09_rejects_conflicting_schedule_and_toggles_reservation (0.21s)
+    --- PASS: TestEngagementUseCasesWithMySQL/UC10_create_manage_interact_and_end_live_room (1.69s)
+=== RUN   TestEngagementDatabaseFailureResponses
+=== RUN   TestEngagementDatabaseFailureResponses/UC05_persistence_tables_unavailable
+
+2026/08/29 11:07:03 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/danmaku/danmaku_handler.go:86 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.danmakus' doesn't exist
+[0m[33m[1.069ms] [34;1m[rows:0][0m SELECT * FROM `danmakus` WHERE (video_id = 1 AND scene = 'video' AND blocked = false) AND `danmakus`.`deleted_at` IS NULL ORDER BY time ASC
+
+2026/08/29 11:07:03 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/danmaku/danmaku_handler.go:145 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.danmakus' doesn't exist
+[0m[33m[2.985ms] [34;1m[rows:0][0m INSERT INTO `danmakus` (`created_at`,`updated_at`,`deleted_at`,`video_id`,`scene`,`user_id`,`content`,`time`,`color`,`font_size`,`type`,`blocked`) VALUES ('2026-08-29 11:07:03.431','2026-08-29 11:07:03.431',NULL,1,'video',1,'cannot persist',0,'#FFFFFF','medium','scroll',false)
+
+2026/08/29 11:07:03 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/comment/comment_handler.go:64 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.comments' doesn't exist
+[0m[33m[1.058ms] [34;1m[rows:0][0m SELECT * FROM `comments` WHERE video_id = 1 AND `comments`.`deleted_at` IS NULL ORDER BY created_at ASC
+
+2026/08/29 11:07:03 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/comment/comment_handler.go:205 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.comments' doesn't exist
+[0m[33m[2.746ms] [34;1m[rows:0][0m INSERT INTO `comments` (`created_at`,`updated_at`,`deleted_at`,`video_id`,`user_id`,`parent_id`,`content`,`like_count`) VALUES ('2026-08-29 11:07:03.589','2026-08-29 11:07:03.589',NULL,1,1,NULL,'cannot persist',0)
+
+2026/08/29 11:07:03 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/comment/comment_handler.go:82 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.comment_likes' doesn't exist
+[0m[33m[0.514ms] [34;1m[rows:0][0m SELECT * FROM `comment_likes` WHERE (user_id = 1 AND comment_id IN (1)) AND `comment_likes`.`deleted_at` IS NULL
+
+2026/08/29 11:07:03 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/comment/comment_handler.go:274 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.comment_likes' doesn't exist
+[0m[33m[1.062ms] [34;1m[rows:0][0m SELECT * FROM `comment_likes` WHERE (user_id = 1 AND comment_id = 1) AND `comment_likes`.`deleted_at` IS NULL ORDER BY `comment_likes`.`id` LIMIT 1
+
+2026/08/29 11:07:03 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/video/video_handler.go:416 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.likes' doesn't exist
+[0m[33m[1.174ms] [34;1m[rows:0][0m SELECT * FROM `likes` WHERE (user_id = 1 AND video_id = 1) AND `likes`.`deleted_at` IS NULL ORDER BY `likes`.`id` LIMIT 1
+
+2026/08/29 11:07:04 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/video/video_handler.go:480 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.collects' doesn't exist
+[0m[33m[1.610ms] [34;1m[rows:0][0m SELECT * FROM `collects` WHERE (user_id = 1 AND video_id = 1) AND `collects`.`deleted_at` IS NULL ORDER BY `collects`.`id` LIMIT 1
+=== RUN   TestEngagementDatabaseFailureResponses/UC09_schedule_tables_unavailable
+
+2026/08/29 11:07:04 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/schedule_handler.go:73 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.live_schedules' doesn't exist
+[0m[33m[0.521ms] [34;1m[rows:0][0m SELECT count(*) FROM `live_schedules` WHERE status = 'pending' AND `live_schedules`.`deleted_at` IS NULL
+
+2026/08/29 11:07:04 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/schedule_handler.go:166 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.live_schedules' doesn't exist
+[0m[33m[0.521ms] [34;1m[rows:0][0m SELECT count(*) FROM `live_schedules` WHERE (owner_id = 1 AND scheduled_at = '2026-08-29 12:07:04' AND status = 'pending') AND `live_schedules`.`deleted_at` IS NULL
+
+2026/08/29 11:07:04 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/schedule_handler.go:97 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.live_reservations' doesn't exist
+[0m[33m[1.056ms] [34;1m[rows:0][0m SELECT * FROM `live_reservations` WHERE (user_id = 1 AND schedule_id IN (1)) AND `live_reservations`.`deleted_at` IS NULL
+=== RUN   TestEngagementDatabaseFailureResponses/UC10_live_interaction_tables_unavailable
+
+2026/08/29 11:07:04 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/live_handler.go:365 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.live_likes' doesn't exist
+[0m[33m[2.117ms] [34;1m[rows:0][0m DELETE FROM `live_likes` WHERE room_id = 1
+
+2026/08/29 11:07:04 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/live_handler.go:369 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.live_gifts' doesn't exist
+[0m[33m[2.657ms] [34;1m[rows:0][0m DELETE FROM `live_gifts` WHERE room_id = 1
+
+2026/08/29 11:07:05 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/live_handler.go:98 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.live_rooms' doesn't exist
+[0m[33m[0.519ms] [34;1m[rows:0][0m SELECT count(*) FROM `live_rooms` WHERE status = 'live' AND `live_rooms`.`deleted_at` IS NULL
+
+2026/08/29 11:07:05 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/live_handler.go:136 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.live_rooms' doesn't exist
+[0m[33m[1.041ms] [34;1m[rows:0][0m SELECT * FROM `live_rooms` WHERE (id = 1 AND status = 'live') AND `live_rooms`.`deleted_at` IS NULL ORDER BY `live_rooms`.`id` LIMIT 1
+
+2026/08/29 11:07:05 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/live_handler.go:159 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.live_rooms' doesn't exist
+[0m[33m[1.061ms] [34;1m[rows:0][0m SELECT * FROM `live_rooms` WHERE (id = 1 AND owner_id = 1 AND status = 'live') AND `live_rooms`.`deleted_at` IS NULL ORDER BY `live_rooms`.`id` LIMIT 1
+
+2026/08/29 11:07:05 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/live_handler.go:337 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.live_rooms' doesn't exist
+[0m[33m[1.042ms] [34;1m[rows:0][0m SELECT * FROM `live_rooms` WHERE owner_id = 1 AND `live_rooms`.`deleted_at` IS NULL ORDER BY `live_rooms`.`id` LIMIT 1
+
+2026/08/29 11:07:05 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/live_handler.go:423 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.live_rooms' doesn't exist
+[0m[33m[1.074ms] [34;1m[rows:0][0m SELECT * FROM `live_rooms` WHERE `live_rooms`.`id` = 1 AND `live_rooms`.`deleted_at` IS NULL ORDER BY `live_rooms`.`id` LIMIT 1
+
+2026/08/29 11:07:05 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/interaction_handler.go:226 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.live_likes' doesn't exist
+[0m[33m[1.055ms] [34;1m[rows:0][0m SELECT count(*) FROM `live_likes` WHERE (room_id = 1 AND user_id = 1) AND `live_likes`.`deleted_at` IS NULL
+
+2026/08/29 11:07:05 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/interaction_handler.go:176 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.live_likes' doesn't exist
+[0m[33m[1.060ms] [34;1m[rows:0][0m SELECT * FROM `live_likes` WHERE room_id = 1 AND user_id = 1 ORDER BY `live_likes`.`id` LIMIT 1
+
+2026/08/29 11:07:05 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/interaction_handler.go:378 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.live_gifts' doesn't exist
+[0m[33m[1.062ms] [34;1m[rows:-][0m SELECT user_id, SUM(value) AS value, SUM(count) AS gift_count FROM `live_gifts` WHERE room_id = 1 AND `live_gifts`.`deleted_at` IS NULL GROUP BY `user_id` ORDER BY value DESC LIMIT 10
+
+2026/08/29 11:07:05 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/interaction_handler.go:298 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.live_gifts' doesn't exist
+[0m[33m[1.065ms] [34;1m[rows:0][0m INSERT INTO `live_gifts` (`created_at`,`updated_at`,`deleted_at`,`room_id`,`user_id`,`gift_key`,`name`,`count`,`value`,`message`,`display_seconds`) VALUES ('2026-08-29 11:07:05.473','2026-08-29 11:07:05.473',NULL,1,1,'flower','鲜花',1,10,'',0)
+
+2026/08/29 11:07:05 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/interaction_handler.go:333 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.live_gifts' doesn't exist
+[0m[33m[0.534ms] [34;1m[rows:0][0m SELECT * FROM `live_gifts` WHERE (room_id = 1 AND message <> '') AND created_at >= '2026-08-29 11:07:05.271' AND `live_gifts`.`deleted_at` IS NULL ORDER BY created_at DESC LIMIT 50
+
+2026/08/29 11:07:05 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/interaction_handler.go:245 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.danmakus' doesn't exist
+[0m[33m[0.531ms] [34;1m[rows:0][0m SELECT * FROM `danmakus` WHERE (video_id = 1 AND scene = 'live' AND blocked = false) AND created_at >= '2026-08-29 11:07:05.271' AND `danmakus`.`deleted_at` IS NULL ORDER BY created_at ASC LIMIT 300
+
+2026/08/29 11:07:05 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/live/interaction_handler.go:71 [35;1mError 1146 (42S02): Table 'danmakustream_d_sxh_1787972821710722600.danmakus' doesn't exist
+[0m[33m[1.060ms] [34;1m[rows:0][0m SELECT * FROM `danmakus` WHERE (video_id = 1 AND scene = 'live' AND blocked = false) AND created_at >= '2026-08-29 11:07:05.271' AND `danmakus`.`deleted_at` IS NULL ORDER BY created_at DESC LIMIT 100
+--- PASS: TestEngagementDatabaseFailureResponses (4.45s)
+    --- PASS: TestEngagementDatabaseFailureResponses/UC05_persistence_tables_unavailable (0.81s)
+    --- PASS: TestEngagementDatabaseFailureResponses/UC09_schedule_tables_unavailable (0.46s)
+    --- PASS: TestEngagementDatabaseFailureResponses/UC10_live_interaction_tables_unavailable (1.14s)
+=== RUN   TestMemberBUseCasesWithMySQL
+=== RUN   TestMemberBUseCasesWithMySQL/UC01_register_login_and_profile
+=== RUN   TestMemberBUseCasesWithMySQL/UC07_follow_group_and_block
+
+2026/08/29 11:07:07 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/user/user_handler.go:262 [35;1mrecord not found
+[0m[33m[1.065ms] [34;1m[rows:0][0m SELECT `id` FROM `users` WHERE `users`.`id` = 999999 AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT 1
+
+2026/08/29 11:07:07 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/user/user_handler.go:284 [35;1mrecord not found
+[0m[33m[2.082ms] [34;1m[rows:0][0m SELECT * FROM `follows` WHERE (follower_id = 1 AND followee_id = 2) AND `follows`.`deleted_at` IS NULL ORDER BY `follows`.`id` LIMIT 1
+
+2026/08/29 11:07:07 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/user/relationship_handler.go:259 [35;1mrecord not found
+[0m[33m[1.569ms] [34;1m[rows:0][0m SELECT * FROM `user_blocks` WHERE (blocker_id = 1 AND blocked_id = 2) AND `user_blocks`.`deleted_at` IS NULL ORDER BY `user_blocks`.`id` LIMIT 1
+
+2026/08/29 11:07:07 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/user/relationship_handler.go:286 [35;1mrecord not found
+[0m[33m[1.618ms] [34;1m[rows:0][0m SELECT * FROM `follows` WHERE (follower_id = 2 AND followee_id = 1) AND `follows`.`deleted_at` IS NULL ORDER BY `follows`.`id` LIMIT 1
+
+2026/08/29 11:07:07 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/user/user_handler.go:284 [35;1mrecord not found
+[0m[33m[1.599ms] [34;1m[rows:0][0m SELECT * FROM `follows` WHERE (follower_id = 1 AND followee_id = 2) AND `follows`.`deleted_at` IS NULL ORDER BY `follows`.`id` LIMIT 1
+=== RUN   TestMemberBUseCasesWithMySQL/UC08_membership_payment_is_idempotent
+
+2026/08/29 11:07:07 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/membership/membership_handler.go:132 [35;1mrecord not found
+[0m[33m[2.140ms] [34;1m[rows:0][0m SELECT * FROM `creator_membership_plans` WHERE creator_id = 2 AND `creator_membership_plans`.`deleted_at` IS NULL ORDER BY `creator_membership_plans`.`id` LIMIT 1
+
+2026/08/29 11:07:07 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/membership/membership_handler.go:245 [35;1mrecord not found
+[0m[33m[2.517ms] [34;1m[rows:0][0m SELECT * FROM `creator_subscriptions` WHERE (subscriber_id = 1 AND creator_id = 2) AND `creator_subscriptions`.`deleted_at` IS NULL ORDER BY `creator_subscriptions`.`id` LIMIT 1
+
+2026/08/29 11:07:07 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/user/relationship_handler.go:259 [35;1mrecord not found
+[0m[33m[1.567ms] [34;1m[rows:0][0m SELECT * FROM `user_blocks` WHERE (blocker_id = 1 AND blocked_id = 3) AND `user_blocks`.`deleted_at` IS NULL ORDER BY `user_blocks`.`id` LIMIT 1
+
+2026/08/29 11:07:07 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/user/relationship_handler.go:286 [35;1mrecord not found
+[0m[33m[1.224ms] [34;1m[rows:0][0m SELECT * FROM `follows` WHERE (follower_id = 1 AND followee_id = 3) AND `follows`.`deleted_at` IS NULL ORDER BY `follows`.`id` LIMIT 1
+
+2026/08/29 11:07:07 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/user/relationship_handler.go:286 [35;1mrecord not found
+[0m[33m[1.616ms] [34;1m[rows:0][0m SELECT * FROM `follows` WHERE (follower_id = 3 AND followee_id = 1) AND `follows`.`deleted_at` IS NULL ORDER BY `follows`.`id` LIMIT 1
+=== RUN   TestMemberBUseCasesWithMySQL/UC11_message_history_unread_and_read
+
+2026/08/29 11:07:07 [31;1mD:/wo/DanmakuStream/backend/internal/logic/chat/hub.go:205 [35;1mrecord not found
+[0m[33m[1.576ms] [34;1m[rows:0][0m SELECT * FROM `videos` WHERE (id = 10000 AND status = 'approved') AND `videos`.`deleted_at` IS NULL ORDER BY `videos`.`id` LIMIT 1
+
+2026/08/29 11:07:07 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/user/relationship_handler.go:259 [35;1mrecord not found
+[0m[33m[1.625ms] [34;1m[rows:0][0m SELECT * FROM `user_blocks` WHERE (blocker_id = 2 AND blocked_id = 1) AND `user_blocks`.`deleted_at` IS NULL ORDER BY `user_blocks`.`id` LIMIT 1
+
+2026/08/29 11:07:07 [31;1mD:/wo/DanmakuStream/backend/internal/handler/v1/user/relationship_handler.go:286 [35;1mrecord not found
+[0m[33m[1.700ms] [34;1m[rows:0][0m SELECT * FROM `follows` WHERE (follower_id = 2 AND followee_id = 1) AND `follows`.`deleted_at` IS NULL ORDER BY `follows`.`id` LIMIT 1
+--- PASS: TestMemberBUseCasesWithMySQL (2.00s)
+    --- PASS: TestMemberBUseCasesWithMySQL/UC01_register_login_and_profile (0.20s)
+    --- PASS: TestMemberBUseCasesWithMySQL/UC07_follow_group_and_block (0.17s)
+    --- PASS: TestMemberBUseCasesWithMySQL/UC08_membership_payment_is_idempotent (0.16s)
+    --- PASS: TestMemberBUseCasesWithMySQL/UC11_message_history_unread_and_read (0.15s)
+PASS
+ok  	danmakustream/backend/integration	13.651s

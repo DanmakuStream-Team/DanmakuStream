@@ -268,17 +268,18 @@ type UserBlock struct {
 
 type ChatMessage struct {
 	gorm.Model
-	SenderID      uint   `gorm:"not null;index;index:idx_chat_pair"`
-	ReceiverID    uint   `gorm:"not null;index;index:idx_chat_pair;index:idx_chat_receiver_read"`
-	MessageType   string `gorm:"size:20;not null;default:text;index"` // text | image | video | video_share
-	Content       string `gorm:"type:text;not null"`
-	MediaURL      string `gorm:"size:500"`
-	MediaName     string `gorm:"size:255"`
-	SharedVideoID *uint  `gorm:"index"`
-	Read          bool   `gorm:"default:false;index;index:idx_chat_receiver_read"`
-	Sender        User   `gorm:"foreignKey:SenderID"`
-	Receiver      User   `gorm:"foreignKey:ReceiverID"`
-	SharedVideo   Video  `gorm:"foreignKey:SharedVideoID"`
+	SenderID        uint    `gorm:"not null;index;index:idx_chat_pair;uniqueIndex:idx_chat_sender_client_message"`
+	ReceiverID      uint    `gorm:"not null;index;index:idx_chat_pair;index:idx_chat_receiver_read"`
+	ClientMessageID *string `gorm:"size:64;uniqueIndex:idx_chat_sender_client_message"`
+	MessageType     string  `gorm:"size:20;not null;default:text;index"` // text | image | video | video_share
+	Content         string  `gorm:"type:text;not null"`
+	MediaURL        string  `gorm:"size:500"`
+	MediaName       string  `gorm:"size:255"`
+	SharedVideoID   *uint   `gorm:"index"`
+	Read            bool    `gorm:"default:false;index;index:idx_chat_receiver_read"`
+	Sender          User    `gorm:"foreignKey:SenderID"`
+	Receiver        User    `gorm:"foreignKey:ReceiverID"`
+	SharedVideo     Video   `gorm:"foreignKey:SharedVideoID"`
 }
 
 type CreatorMembershipPlan struct {

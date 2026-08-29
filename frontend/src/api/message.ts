@@ -13,6 +13,7 @@ export interface SharedChatVideo {
 
 export interface MessageSendPayload {
   receiverId: number
+  clientMessageId?: string
   type: ChatMessageType
   content?: string
   mediaUrl?: string
@@ -30,6 +31,7 @@ export interface UploadedMessageMedia {
 
 export interface ChatMessageInfo {
   id: number
+  clientMessageId?: string
   senderId: number
   receiverId: number
   type: ChatMessageType

@@ -2,10 +2,16 @@ import { defineConfig, devices } from '@playwright/test'
 
 const isDEngagementRun = process.argv.some((argument) => argument.includes('d-engagement'))
 const isMemberCRun = process.argv.some((argument) => argument.includes('member-c-content'))
+const isMemberBRun = process.argv.some((argument) => argument.includes('member-b-workflows'))
 if (isDEngagementRun) process.env.E2E_SKIP_UC13_SETUP = '1'
 if (isMemberCRun) process.env.E2E_MEMBER_C_RUN = '1'
+if (isMemberBRun) {
+  process.env.E2E_MEMBER_B_RUN = '1'
+  process.env.E2E_SKIP_UC13_SETUP = '1'
+}
 const backendConfig = process.env.E2E_BACKEND_CONFIG ?? 'etc/config.yaml'
 const useGateway = process.env.E2E_USE_GATEWAY === '1'
+const frontendPort = Number(process.env.E2E_FRONTEND_PORT ?? 5173)
 
 // ── E2E 网关链路约定 ────────────────────────────────────────────────────
 // 默认（本地 go run + vite dev 模式）：Vite proxy 直连本机 backend(8080)，
@@ -31,6 +37,8 @@ export default defineConfig({
     ['html', {
       outputFolder: isDEngagementRun
         ? '../docs/testing/reports/engagement-e2e'
+        : isMemberBRun
+          ? '../docs/testing/reports/UC07-UC08-UC11-e2e-report'
         : isMemberCRun
           ? '../docs/testing/reports/UC02-03-04-12-e2e-report'
           : '../docs/testing/reports/uc13-e2e',
@@ -38,7 +46,7 @@ export default defineConfig({
     }],
   ],
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL: `http://127.0.0.1:${frontendPort}`,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -56,9 +64,9 @@ export default defineConfig({
     },
     {
       command: isMemberCRun
-        ? 'npm run build && npm run preview -- --host 127.0.0.1 --port 5173'
-        : 'npm run dev -- --host 127.0.0.1',
-      url: 'http://127.0.0.1:5173',
+        ? `npm run build && npm run preview -- --host 127.0.0.1 --port ${frontendPort}`
+        : `npm run dev -- --host 127.0.0.1 --port ${frontendPort}`,
+      url: `http://127.0.0.1:${frontendPort}`,
       reuseExistingServer: true,
       timeout: 60_000,
       env: {

@@ -1,0 +1,102 @@
+=== RUN   TestCreateFollowGroupHandlerValidation
+=== RUN   TestCreateFollowGroupHandlerValidation/invalid_json
+=== RUN   TestCreateFollowGroupHandlerValidation/blank_name
+=== RUN   TestCreateFollowGroupHandlerValidation/name_too_long
+--- PASS: TestCreateFollowGroupHandlerValidation (0.00s)
+    --- PASS: TestCreateFollowGroupHandlerValidation/invalid_json (0.00s)
+    --- PASS: TestCreateFollowGroupHandlerValidation/blank_name (0.00s)
+    --- PASS: TestCreateFollowGroupHandlerValidation/name_too_long (0.00s)
+=== RUN   TestUpdateFollowSettingsHandlerValidation
+=== RUN   TestUpdateFollowSettingsHandlerValidation/invalid_target_id
+=== RUN   TestUpdateFollowSettingsHandlerValidation/no_changes
+=== RUN   TestUpdateFollowSettingsHandlerValidation/paid_special_cannot_be_edited
+--- PASS: TestUpdateFollowSettingsHandlerValidation (0.00s)
+    --- PASS: TestUpdateFollowSettingsHandlerValidation/invalid_target_id (0.00s)
+    --- PASS: TestUpdateFollowSettingsHandlerValidation/no_changes (0.00s)
+    --- PASS: TestUpdateFollowSettingsHandlerValidation/paid_special_cannot_be_edited (0.00s)
+=== RUN   TestRelationshipHandlersRejectSelfOperations
+=== RUN   TestRelationshipHandlersRejectSelfOperations/follow_self
+=== RUN   TestRelationshipHandlersRejectSelfOperations/block_self
+--- PASS: TestRelationshipHandlersRejectSelfOperations (0.00s)
+    --- PASS: TestRelationshipHandlersRejectSelfOperations/follow_self (0.00s)
+    --- PASS: TestRelationshipHandlersRejectSelfOperations/block_self (0.00s)
+PASS
+ok  	danmakustream/backend/internal/handler/v1/user	2.822s
+=== RUN   TestUpdateMyPlanHandlerValidation
+=== RUN   TestUpdateMyPlanHandlerValidation/ordinary_user_forbidden
+=== RUN   TestUpdateMyPlanHandlerValidation/malformed_json
+=== RUN   TestUpdateMyPlanHandlerValidation/price_below_minimum
+=== RUN   TestUpdateMyPlanHandlerValidation/price_above_maximum
+=== RUN   TestUpdateMyPlanHandlerValidation/benefits_too_long
+--- PASS: TestUpdateMyPlanHandlerValidation (0.00s)
+    --- PASS: TestUpdateMyPlanHandlerValidation/ordinary_user_forbidden (0.00s)
+    --- PASS: TestUpdateMyPlanHandlerValidation/malformed_json (0.00s)
+    --- PASS: TestUpdateMyPlanHandlerValidation/price_below_minimum (0.00s)
+    --- PASS: TestUpdateMyPlanHandlerValidation/price_above_maximum (0.00s)
+    --- PASS: TestUpdateMyPlanHandlerValidation/benefits_too_long (0.00s)
+=== RUN   TestCreateOrderHandlerValidation
+=== RUN   TestCreateOrderHandlerValidation/malformed_json
+=== RUN   TestCreateOrderHandlerValidation/missing_creator
+=== RUN   TestCreateOrderHandlerValidation/subscribe_self
+=== RUN   TestCreateOrderHandlerValidation/unsupported_months
+--- PASS: TestCreateOrderHandlerValidation (0.00s)
+    --- PASS: TestCreateOrderHandlerValidation/malformed_json (0.00s)
+    --- PASS: TestCreateOrderHandlerValidation/missing_creator (0.00s)
+    --- PASS: TestCreateOrderHandlerValidation/subscribe_self (0.00s)
+    --- PASS: TestCreateOrderHandlerValidation/unsupported_months (0.00s)
+=== RUN   TestPlanHandlerRejectsInvalidCreatorID
+--- PASS: TestPlanHandlerRejectsInvalidCreatorID (0.00s)
+=== RUN   TestMembershipInfoFormatting
+--- PASS: TestMembershipInfoFormatting (0.05s)
+PASS
+ok  	danmakustream/backend/internal/handler/v1/membership	2.888s
+=== RUN   TestSendHandlerValidation
+=== RUN   TestSendHandlerValidation/malformed_json
+=== RUN   TestSendHandlerValidation/missing_receiver
+--- PASS: TestSendHandlerValidation (0.00s)
+    --- PASS: TestSendHandlerValidation/malformed_json (0.00s)
+    --- PASS: TestSendHandlerValidation/missing_receiver (0.00s)
+=== RUN   TestHistoryHandlerRejectsInvalidUserID
+--- PASS: TestHistoryHandlerRejectsInvalidUserID (0.00s)
+=== RUN   TestGetPageNormalizesBounds
+--- PASS: TestGetPageNormalizesBounds (0.00s)
+=== RUN   TestWriteSendErrorStatus
+--- PASS: TestWriteSendErrorStatus (0.00s)
+PASS
+ok  	danmakustream/backend/internal/handler/v1/message	2.789s
+=== RUN   TestValidateMessageInput
+=== RUN   TestValidateMessageInput/text
+=== RUN   TestValidateMessageInput/empty_text
+=== RUN   TestValidateMessageInput/owned_image
+=== RUN   TestValidateMessageInput/other_user_image
+=== RUN   TestValidateMessageInput/wrong_media_extension
+=== RUN   TestValidateMessageInput/video_share
+=== RUN   TestValidateMessageInput/missing_shared_video
+=== RUN   TestValidateMessageInput/unknown_type
+=== RUN   TestValidateMessageInput/text_too_long
+=== RUN   TestValidateMessageInput/media_name_too_long
+=== RUN   TestValidateMessageInput/path_traversal
+=== RUN   TestValidateMessageInput/query_string
+=== RUN   TestValidateMessageInput/owned_video
+--- PASS: TestValidateMessageInput (0.00s)
+    --- PASS: TestValidateMessageInput/text (0.00s)
+    --- PASS: TestValidateMessageInput/empty_text (0.00s)
+    --- PASS: TestValidateMessageInput/owned_image (0.00s)
+    --- PASS: TestValidateMessageInput/other_user_image (0.00s)
+    --- PASS: TestValidateMessageInput/wrong_media_extension (0.00s)
+    --- PASS: TestValidateMessageInput/video_share (0.00s)
+    --- PASS: TestValidateMessageInput/missing_shared_video (0.00s)
+    --- PASS: TestValidateMessageInput/unknown_type (0.00s)
+    --- PASS: TestValidateMessageInput/text_too_long (0.00s)
+    --- PASS: TestValidateMessageInput/media_name_too_long (0.00s)
+    --- PASS: TestValidateMessageInput/path_traversal (0.00s)
+    --- PASS: TestValidateMessageInput/query_string (0.00s)
+    --- PASS: TestValidateMessageInput/owned_video (0.00s)
+=== RUN   TestCreateAndBroadcastRejectsSelfBeforeDatabase
+--- PASS: TestCreateAndBroadcastRejectsSelfBeforeDatabase (0.00s)
+=== RUN   TestChatErrorMessage
+--- PASS: TestChatErrorMessage (0.00s)
+=== RUN   TestNormalizedMessageType
+--- PASS: TestNormalizedMessageType (0.00s)
+PASS
+ok  	danmakustream/backend/internal/logic/chat	1.285s
