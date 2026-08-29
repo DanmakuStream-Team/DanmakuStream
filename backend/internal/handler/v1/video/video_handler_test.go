@@ -36,6 +36,19 @@ func TestIsValidVideoStatus(t *testing.T) {
 	}
 }
 
+func TestIsValidReviewDecision(t *testing.T) {
+	for _, status := range []string{"approved", "rejected"} {
+		if !isValidReviewDecision(status) {
+			t.Errorf("isValidReviewDecision(%q) = false, want true", status)
+		}
+	}
+	for _, status := range []string{"", "pending", "published", "failed"} {
+		if isValidReviewDecision(status) {
+			t.Errorf("isValidReviewDecision(%q) = true, want false", status)
+		}
+	}
+}
+
 // UNIT-TC02-02 详情参数：非数字视频 ID 在访问数据库前返回 400。
 func TestDetailHandlerRejectsInvalidID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
