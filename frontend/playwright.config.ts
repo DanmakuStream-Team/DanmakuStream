@@ -59,7 +59,7 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: isMemberCRun
+      command: isMemberCRun || isUC01UC06Run
         ? 'npm run build && npm run preview -- --host 127.0.0.1 --port 5173'
         : 'npm run dev -- --host 127.0.0.1',
       url: 'http://127.0.0.1:5173',
