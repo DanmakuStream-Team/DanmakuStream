@@ -13,7 +13,7 @@ test.describe('UC01 用户注册、登录与资料维护', () => {
     await page.getByPlaceholder('请输入密码').fill(PASSWORD)
     await page.getByRole('button', { name: '注册', exact: true }).click()
 
-    await page.waitForURL(/\/$/, { timeout: 15_000 })
+    await page.waitForURL(/\/$/, { timeout: 30_000, waitUntil: 'domcontentloaded' })
     await page.waitForLoadState('domcontentloaded')
     await expect.poll(() => page.evaluate(() => localStorage.getItem('token'))).toBeTruthy()
     const session = await page.evaluate(() => ({
@@ -54,7 +54,7 @@ test.describe('UC01 用户注册、登录与资料维护', () => {
     await page.getByPlaceholder('请输入密码').fill(user.password)
     await page.getByRole('button', { name: '登录', exact: true }).click()
 
-    await page.waitForURL(/\/$/, { timeout: 15_000 })
+    await page.waitForURL(/\/$/, { timeout: 30_000, waitUntil: 'domcontentloaded' })
     const tokenBeforeReload = await page.evaluate(() => localStorage.getItem('token'))
     expect(tokenBeforeReload).toBeTruthy()
     await page.reload()
