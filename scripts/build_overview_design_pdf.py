@@ -27,7 +27,7 @@ from reportlab.platypus.tableofcontents import TableOfContents
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / "output" / "pdf" / "软件概要设计说明书.pdf"
+OUTPUT = ROOT / "docs" / "delivery" / "软件概要设计说明书.pdf"
 PAGE_SIZE = A4
 
 NAVY = colors.HexColor("#17365D")
@@ -42,8 +42,21 @@ ORANGE = colors.HexColor("#C55A11")
 
 
 def register_fonts() -> None:
-    pdfmetrics.registerFont(TTFont("CN", r"C:\Windows\Fonts\Deng.ttf"))
-    pdfmetrics.registerFont(TTFont("CN-Bold", r"C:\Windows\Fonts\Dengb.ttf"))
+    font_candidates = [
+        ("CN", ["C:/Windows/Fonts/Deng.ttf",
+                "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+                "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"]),
+        ("CN-Bold", ["C:/Windows/Fonts/Dengb.ttf",
+                     "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+                     "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"]),
+    ]
+    for name, candidates in font_candidates:
+        for path in candidates:
+            if Path(path).exists():
+                pdfmetrics.registerFont(TTFont(name, path))
+                break
+        else:
+            raise SystemExit(f"未找到可用中文字体，请安装文泉驿微米黑或 Noto Sans CJK: {name}")
 
 
 class DesignDocTemplate(BaseDocTemplate):
