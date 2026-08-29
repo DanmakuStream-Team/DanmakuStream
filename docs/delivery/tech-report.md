@@ -12,13 +12,13 @@
 
 ### 1.1 背景与目标
 
-DanmakuStream 是一个面向创作者与社区的弹幕视频 + 直播平台，覆盖视频投稿审核、弹幕墙互动、直播推流 + 实时互动、创作者会员、个人视频资料库、创作者数据分析、平台后台治理，并完成从 Docker Compose 单体到 Kubernetes 编排的部署改造。**交付目标**是经教师确认的 13 个核心用例（UC01～UC13，含 UC11 用户私信与媒体分享）100% 追溯覆盖，关键用例 E2E 通过。UC11 已交付（`message/` 后端 + `ChatPage.vue` + 集成测试）。
+DanmakuStream 是一个面向创作者与社区的弹幕视频 + 直播平台，覆盖视频投稿审核、弹幕墙互动、直播推流 + 实时互动、创作者会员、个人视频资料库、用户私信、创作者数据分析和平台后台治理，并完成从 Docker Compose 单体到 Kubernetes 编排的部署改造。**交付目标**是 PRD 定义的 13 个核心用例（UC01~UC13）100% 追溯覆盖，关键用例 E2E 通过。
 
 ### 1.2 交付清单（是/否交付）
 
 | 类别 | 交付物 | 状态 | 位置 |
 |---|---|---|---|
-| 业务用例 | UC01～UC13 代码实现（共 13 UC，含 UC11 私信） | | `frontend/src/pages/` + `backend/internal/handler/v1/` |
+| 业务用例 | UC01~UC13 代码实现（共 13 UC） | | `frontend/src/pages/` + `backend/internal/handler/v1/` |
 | 直播媒体服务 | SRS 4（RTMP→HLS）配置 | | [srs.conf](../deploy/srs.conf) |
 | 推荐系统（离线） | ItemCF / 基线 / 评测脚本 | | [recommendation/](../recommendation/) |
 | 图档（PlantUML） | 总用例图 | ✅ 交付 | [usecase-overview.puml](../models/usecase/usecase-overview.puml) |
@@ -57,8 +57,8 @@ DanmakuStream 是一个面向创作者与社区的弹幕视频 + 直播平台，
 
 | 编号 | 问题 | 影响 | 计划 |
 |---|---|---|---|
-| R-01 | UC11 消息可靠性（离线消息投递保证） | 当前为在线投递 | 引入消息持久化队列作为增强项 |
-| R-02 | 个性化推荐不在 UC01～UC13 验收范围 | 仅离线评测脚本（recommendation/） | 作为加分演示项，不计入追溯率 |
+| R-01 | UC11 大附件上传暂不支持分片与断点续传 | 弱网下的大附件重传成本较高 | 下一迭代补分片上传、断点续传与失败重试 |
+| R-02 | 推荐能力未接入线上 `/recommendations` 路由 | 当前仅有本地标签聚合 + 离线脚本 | 下一迭代接入线上 API + A/B 评估 |
 | R-03 | WebSocket 多 Pod 水平扩容一致性（Hub 内存态） | K8s 多副本弹幕不互通 | 引入 Redis Pub/Sub 统一消息平面 |
 | R-04 | SRS 在现有 CI 环境缺部署 | UC10-01 媒体链路常被标 [MEDIA-REQUIRED] 阻塞 | docker-compose srs service 纳入统一 CI Job |
 
@@ -200,9 +200,9 @@ AI 生成骨架/代码/图档/文档
 
 | 风险 | 概率 | 影响 | 缓解 | 状态 |
 |---|---|---|---|---|
-| UC11 未签核导致范围蔓延 | | | 冻结为增量交付 | |
+| UC11 大附件上传缺少断点续传 | | | 后续补分片上传、断点续传与弱网重试测试 | |
 | SRS CI 不可达 → UC10 媒体阻塞 | | | compose srs service + [MEDIA-REQUIRED] 标记 | |
-| 个性化推荐保持离线 | | | 加分演示项，不计入 13 用例验收 | |
+| 推荐能力线上接入延期 | | | 本地标签聚合先满足主流程 | |
 | WS 多 Pod 消息不互通 | | | Redis Pub/Sub（下一迭代） | |
 | K8s 多 Pod 本地 localStorage liked/collections 不一致 | | | 明确文档说明「liked/collections/downloads 本机」，符合 UC06 设计 | |
 

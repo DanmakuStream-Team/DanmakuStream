@@ -107,6 +107,9 @@ func main() {
 		})
 		v1.POST("/auth/login", authhandler.LoginHandler(svcCtx))
 		v1.POST("/auth/register", authhandler.RegisterHandler(svcCtx))
+		// SRS publishes callbacks from the internal container network. The
+		// unguessable stream key is validated against an active room.
+		v1.POST("/live/hooks/srs", livehandler.SRSStreamHookHandler(svcCtx))
 
 		// 视频列表，支持 sort=hot|date|like|collect 排序。
 		v1.GET("/videos", videohandler.ListHandler(svcCtx))

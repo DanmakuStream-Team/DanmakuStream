@@ -262,6 +262,7 @@ async function loadHistory() {
     const res = await messageApi.history(activeUser.value.id, { page: 1, pageSize: 50 })
     messages.value = res.data.list
     messageTotal.value = res.data.total
+    await messageApi.read(activeUser.value.id)
     markLocalConversationRead(activeUser.value.id)
     await scrollToBottom(false)
   } finally {
@@ -296,6 +297,7 @@ async function sendMessage() {
 }
 
 async function sendPayload(payload: MessageSendPayload) {
+  payload.clientMessageId ||= crypto.randomUUID()
   shouldStickToBottom = true
   if (socket?.send(payload)) return true
   try {
