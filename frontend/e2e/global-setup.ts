@@ -81,6 +81,11 @@ async function prepareUC13Data(api: ApiContext) {
     ?? (process.platform === 'linux' ? 'mysql -S /home/haoyue/dms-mysql.sock -uroot -ppassword danmakustream' : '')
   if (!mysqlCommand) throw new Error('UC13 E2E setup requires MYSQL_CMD on this platform')
 
+  const videoDir = process.env.VIDEO_DIR ?? path.resolve('../backend/data')
+  const mediaFixture = path.join(videoDir, 'videos', 'e2e-uc13.mp4')
+  mkdirSync(path.dirname(mediaFixture), { recursive: true })
+  writeFileSync(mediaFixture, 'UC13 E2E media fixture', 'utf8')
+
   runSql(mysqlCommand, `
     UPDATE users SET role='user'      WHERE nickname='${USERS.target.nickname}';
     UPDATE users SET role='moderator' WHERE nickname='${USERS.moderator.nickname}';
@@ -90,8 +95,9 @@ async function prepareUC13Data(api: ApiContext) {
     DELETE FROM danmakus WHERE content LIKE 'E2E-UC13-%';
     DELETE FROM site_banners        WHERE title LIKE 'E2E-UC13-%';
     DELETE FROM site_announcements  WHERE content LIKE 'E2E-UC13-%';
-    INSERT INTO videos (created_at,updated_at,title,video_url,status,author_id) VALUES
-      (NOW(),NOW(),'E2E-UC13-待审视频','/data/videos/e2e.mp4','pending',(SELECT id FROM users WHERE nickname='${USERS.target.nickname}'));
+    INSERT INTO videos (created_at,updated_at,title,video_url,status,transcode_status,author_id) VALUES
+      (NOW(),NOW(),'E2E-UC13-待审视频','/media/videos/e2e-uc13.mp4','pending','ready',
+       (SELECT id FROM users WHERE nickname='${USERS.target.nickname}'));
     INSERT INTO danmakus (created_at,updated_at,video_id,user_id,content,time) VALUES
       (NOW(),NOW(),(SELECT id FROM videos WHERE title='E2E-UC13-待审视频'),
        (SELECT id FROM users WHERE nickname='${USERS.target.nickname}'),'E2E-UC13-待屏蔽弹幕',5);

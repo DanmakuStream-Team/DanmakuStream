@@ -205,8 +205,8 @@ jobs:
           if-no-files-found: warn
           path: |
             /tmp/e2e-output.txt
-            test-results/
-            ../docs/testing/reports/e2e/
+            frontend/test-results/
+            docs/testing/reports/e2e/
 
   docker-build:
     name: 构建前后端镜像（版本号 = commit sha）
