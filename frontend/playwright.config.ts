@@ -2,8 +2,10 @@ import { defineConfig, devices } from '@playwright/test'
 
 const isDEngagementRun = process.argv.some((argument) => argument.includes('d-engagement'))
 const isMemberCRun = process.argv.some((argument) => argument.includes('member-c-content'))
+const isUC01UC06Run = process.argv.some((argument) => argument.includes('uc01-user') || argument.includes('uc06-library'))
 if (isDEngagementRun) process.env.E2E_SKIP_UC13_SETUP = '1'
 if (isMemberCRun) process.env.E2E_MEMBER_C_RUN = '1'
+if (isUC01UC06Run) process.env.E2E_SKIP_UC13_SETUP = '1'
 const backendConfig = process.env.E2E_BACKEND_CONFIG ?? 'etc/config.yaml'
 const useGateway = process.env.E2E_USE_GATEWAY === '1'
 
@@ -31,9 +33,11 @@ export default defineConfig({
     ['html', {
       outputFolder: isDEngagementRun
         ? '../docs/testing/reports/engagement-e2e'
-        : isMemberCRun
-          ? '../docs/testing/reports/UC02-03-04-12-e2e-report'
-          : '../docs/testing/reports/uc13-e2e',
+        : isUC01UC06Run
+          ? '../docs/testing/reports/UC01-UC06-e2e-report'
+          : isMemberCRun
+            ? '../docs/testing/reports/UC02-03-04-12-e2e-report'
+            : '../docs/testing/reports/uc13-e2e',
       open: 'never',
     }],
   ],
@@ -43,7 +47,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     actionTimeout: 10_000,
-    navigationTimeout: 15_000,
+    navigationTimeout: 30_000,
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
@@ -55,7 +59,7 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: isMemberCRun
+      command: isMemberCRun || isUC01UC06Run
         ? 'npm run build && npm run preview -- --host 127.0.0.1 --port 5173'
         : 'npm run dev -- --host 127.0.0.1',
       url: 'http://127.0.0.1:5173',

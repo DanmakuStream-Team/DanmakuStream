@@ -11,7 +11,7 @@
         <el-form-item label="密码">
           <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" />
         </el-form-item>
-        <el-button type="primary" size="large" :loading="loading" @click="submit" class="wide">注册</el-button>
+        <el-button native-type="button" type="primary" size="large" :loading="loading" @click="submit" class="wide">注册</el-button>
       </el-form>
       <div class="switch">
         已有账号？

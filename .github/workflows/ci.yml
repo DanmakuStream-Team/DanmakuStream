@@ -3,10 +3,11 @@
 # 流水线顺序（任一步失败即终止，后续步骤不执行）：
 #   backend-test ─┬─> api-test ──────────────────┐
 #                 ├─> e2e-test ──────────────────┤
-#                 ├─> e2e-member-c ──────────────┼─> docker-build（仅构建，不推送）
+#                 ├─> e2e-member-c ──────────────┤
+#                 ├─> e2e-uc01-uc06 ─────────────┼─> docker-build（仅构建，不推送）
 #                 ├─> member-b-integration ──────┤
 #                 └─> test-uc06 ─────────────────┘
-#   frontend-build ─> 两个 E2E Job ──────────────┘
+#   frontend-build ─> 三个 E2E Job ──────────────┘
 #
 # 阻断规则（对齐课程任务书）：
 #   - 单元测试失败 → 停止，不构建镜像
@@ -69,7 +70,7 @@ jobs:
         run: npm run build
 
   api-test:
-    name: API/集成测试（UC02/03/04/05/09/10/12/13）
+    name: API/集成测试（UC02/03/04/05/06/09/10/12/13）
     runs-on: ubuntu-latest
     needs: backend-test
     services:
@@ -147,6 +148,12 @@ jobs:
         run: |
           set -o pipefail
           tests/api/member-c-content-test.sh | tee member-c-api-test-output.txt
+      - name: Run UC06 API test suite
+        env:
+          MYSQL_CMD: "mysql -h127.0.0.1 -P3306 -uroot -ppassword danmakustream"
+        run: |
+          set -o pipefail
+          tests/api/uc06-library-test.sh | tee uc06-api-test-output.txt
       - name: Upload test output
         if: always()
         uses: actions/upload-artifact@v4
@@ -155,6 +162,7 @@ jobs:
           path: |
             uc13-api-test-output.txt
             member-c-api-test-output.txt
+            uc06-api-test-output.txt
           if-no-files-found: ignore
       - name: Upload UC05/09/10 integration output
         if: always()
@@ -304,6 +312,61 @@ jobs:
             /tmp/danmakustream-member-c-test-results/
             docs/testing/reports/UC02-03-04-12-e2e-report/
 
+  e2e-uc01-uc06:
+    name: UC01/06 浏览器 E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [backend-test, frontend-build]
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: danmakustream
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -ppassword"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install MySQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq mysql-client
+      - name: Install frontend and Chromium
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Run UC01/06 Playwright tests
+        working-directory: frontend
+        env:
+          MYSQL_CMD: "mysql -h127.0.0.1 -P3306 -uroot -ppassword danmakustream"
+          E2E_BACKEND_CONFIG: "etc/config.yaml"
+        run: |
+          set -o pipefail
+          npm run test:e2e:uc01-uc06 2>&1 | tee /tmp/e2e-uc01-uc06-output.txt
+      - name: Upload UC01/06 E2E evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uc01-uc06-e2e-evidence
+          if-no-files-found: warn
+          path: |
+            /tmp/e2e-uc01-uc06-output.txt
+            frontend/test-results/
+            docs/testing/reports/UC01-UC06-e2e-report/
+
   member-b-integration:
     name: 成员 B 用例集成测试（INT-TC01/07/08/11）
     runs-on: ubuntu-latest
@@ -390,7 +453,7 @@ jobs:
   docker-build:
     name: 构建前后端镜像（版本号 = commit sha）
     runs-on: ubuntu-latest
-    needs: [backend-test, frontend-build, api-test, e2e-test, e2e-member-c, member-b-integration, test-uc06]
+    needs: [backend-test, frontend-build, api-test, e2e-test, e2e-member-c, e2e-uc01-uc06, member-b-integration, test-uc06]
     steps:
       - uses: actions/checkout@v4
       - name: Build backend image
