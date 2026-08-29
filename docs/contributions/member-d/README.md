@@ -44,7 +44,7 @@
 - [CI 工作流](../../../.github/workflows/ci.yml)：PR/推送时自动执行三个用例的 MySQL 集成测试与 Playwright E2E，失败会阻止后续 Docker 镜像构建。
 - 后端全量验证：`go test ./...` 已通过。
 - 三用例及直播机制集成验证：`go test -tags=integration ./internal/handler/v1/live ./internal/logic/danmaku ./integration -v` 已通过。
-- 浏览器 E2E：`npm run test:e2e:d`，Chromium 3/3 通过。
+- 浏览器 E2E：统一入口 `npm run test:e2e`（本域为 e2e/d-engagement.spec.ts），Chromium 3/3 通过。
 - 前端生产验证：`npm run build` 已通过；仅有既有的包体积提示，无编译错误。
 - 真实媒体链路：FFmpeg 推送 30 秒测试流至 SRS，HLS 主清单、媒体清单和 TS 分片均返回 HTTP 200。
 - 覆盖率：成员 D 用例函数口径 90.3%（924/1023），相关文件保守口径 58.1%（940/1618）。

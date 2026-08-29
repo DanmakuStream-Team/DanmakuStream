@@ -1,17 +1,12 @@
 # DanmakuStream 单体版 CI（第一阶段）
 #
-# 流水线顺序（任一步失败即终止，后续步骤不执行）：
-#   backend-test ─┬─> api-test ──────────────────┐
-#                 ├─> e2e-test ──────────────────┤
-#                 ├─> e2e-member-c ──────────────┤
-#                 ├─> e2e-uc01-uc06 ─────────────┼─> docker-build（仅构建，不推送）
-#                 ├─> member-b-integration ──────┤
-#                 └─> test-uc06 ─────────────────┘
-#   frontend-build ─> 三个 E2E Job ──────────────┘
+# 流水线按测试层组织（不按成员拆分；任一步失败即终止，后续步骤不执行）：
+#   backend-test ─┬─> api-integration（Go 集成 + 全部 API 脚本）─┐
+#                 └─> e2e（全部用例统一入口）─────────────────────┼─> docker-build ─> deploy
+#   frontend-build ─┘
 #
 # 阻断规则（对齐课程任务书）：
 #   - 单元测试失败 → 停止，不构建镜像
-#   - UC06 资料库单元测试失败 → 停止，不构建镜像
 #   - API/集成测试失败 → 停止，不构建镜像
 #   - E2E 测试失败 → 停止，不构建镜像
 #   - 前端构建失败 → 停止，不构建镜像
@@ -69,8 +64,8 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-  api-test:
-    name: API/集成测试（UC02/03/04/05/06/09/10/12/13）
+  api-integration:
+    name: API/集成测试（全部用例 · 单一后端实例）
     runs-on: ubuntu-latest
     needs: backend-test
     services:
@@ -94,7 +89,7 @@ jobs:
           cache-dependency-path: backend/go.sum
       - name: Install mysql client and FFmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq mysql-client ffmpeg
-      - name: Run UC05/09/10 MySQL integration tests
+      - name: Run MySQL integration tests (UC01/05/07/08/09/10/11)
         working-directory: backend
         env:
           DANMAKU_TEST_ADMIN_DSN: "root:password@tcp(127.0.0.1:3306)/danmakustream?charset=utf8mb4&parseTime=True&loc=Local"
@@ -104,7 +99,7 @@ jobs:
             ./internal/handler/v1/live \
             ./internal/logic/danmaku \
             ./integration -v \
-            | tee d-engagement-integration-output.txt
+            | tee integration-output.txt
       - name: Build backend
         working-directory: backend
         run: go build -o /tmp/dms-api ./api/main.go
@@ -134,50 +129,34 @@ jobs:
             [ "$i" = 30 ] && { cat /tmp/dms-api.log; exit 1; }
             sleep 2
           done
-      - name: Run UC13 API test suite
+      - name: Run API test suites (UC02/03/04/06/12/13)
         env:
           MYSQL_CMD: "mysql -h127.0.0.1 -P3306 -uroot -ppassword danmakustream"
           VIDEO_DIR: "/tmp/dms-data"
         run: |
           set -o pipefail
-          tests/api/uc13-admin-test.sh | tee uc13-api-test-output.txt
-      - name: Run member C API test suite
-        env:
-          MYSQL_CMD: "mysql -h127.0.0.1 -P3306 -uroot -ppassword danmakustream"
-          VIDEO_DIR: "/tmp/dms-data"
-        run: |
-          set -o pipefail
-          tests/api/member-c-content-test.sh | tee member-c-api-test-output.txt
-      - name: Run UC06 API test suite
-        env:
-          MYSQL_CMD: "mysql -h127.0.0.1 -P3306 -uroot -ppassword danmakustream"
-        run: |
-          set -o pipefail
-          tests/api/uc06-library-test.sh | tee uc06-api-test-output.txt
+          tests/api/uc13-admin-test.sh        | tee uc13-api-test-output.txt
+          tests/api/member-c-content-test.sh  | tee member-c-api-test-output.txt
+          tests/api/uc06-library-test.sh      | tee uc06-api-test-output.txt
       - name: Upload test output
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: api-test-output
+          name: api-integration-output
           path: |
+            integration-output.txt
             uc13-api-test-output.txt
             member-c-api-test-output.txt
             uc06-api-test-output.txt
           if-no-files-found: ignore
-      - name: Upload UC05/09/10 integration output
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: d-engagement-integration-output
-          path: backend/d-engagement-integration-output.txt
-          if-no-files-found: ignore
       - name: Stop backend
         if: always()
         run: pkill -f dms-api || true
 
-  e2e-test:
-    name: 浏览器 E2E（UC05/09/10）
+  e2e:
+    name: 浏览器 E2E（全部用例 · 统一入口）
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     needs: [backend-test, frontend-build]
     services:
       mysql:
@@ -203,257 +182,36 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Install frontend and browser dependencies
-        working-directory: frontend
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
-      - name: Install mysql client
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq mysql-client
-      - name: Build and start backend
-        run: |
-          cat > /tmp/config-ci.yaml <<'EOF'
-          Name: danmakustream-api
-          Host: 0.0.0.0
-          Port: 8080
-          Auth:
-            AccessSecret: "ci-only-secret"
-            AccessExpire: 86400
-          Database:
-            DataSource: "root:password@tcp(127.0.0.1:3306)/danmakustream?charset=utf8mb4&parseTime=True&loc=Local"
-          VideoDir: "/tmp/dms-data"
-          Live:
-            RTMPHost: "localhost:1935"
-            HTTPHost: "localhost:8081"
-          Log:
-            Mode: console
-            Level: info
-          EOF
-          mkdir -p /tmp/dms-data
-          cd backend
-          go build -o /tmp/dms-api ./api/main.go
-          /tmp/dms-api -f /tmp/config-ci.yaml > /tmp/dms-api-e2e.log 2>&1 &
-          for i in $(seq 1 30); do
-            curl -sf http://localhost:8080/api/v1/health | grep -q '"status":"ok"' && break
-            [ "$i" = 30 ] && { cat /tmp/dms-api-e2e.log; exit 1; }
-            sleep 2
-          done
-      - name: Run UC05/09/10 Playwright tests
-        working-directory: frontend
-        env:
-          MYSQL_CMD: "mysql -h127.0.0.1 -P3306 -uroot -ppassword danmakustream"
-          VIDEO_DIR: "/tmp/dms-data"
-        run: npm run test:e2e:d
-      - name: Upload E2E report and failure evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: d-engagement-e2e-report
-          path: |
-            docs/testing/reports/engagement-e2e/
-            frontend/test-results/
-          if-no-files-found: ignore
-      - name: Stop backend
-        if: always()
-        run: pkill -f dms-api || true
-
-  e2e-member-c:
-    name: 成员 C 内容域 E2E（E2E-TC02/03/04/12）
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: [backend-test, frontend-build]
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: password
-          MYSQL_DATABASE: danmakustream
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd "mysqladmin ping -h localhost -ppassword"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: backend/go.mod
-          cache-dependency-path: backend/go.sum
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - name: Install MySQL, FFmpeg and browser dependencies
+      - name: Install MySQL client, FFmpeg and browser dependencies
         run: sudo apt-get update -qq && sudo apt-get install -y -qq mysql-client ffmpeg
       - name: Install frontend and Chromium
         working-directory: frontend
         run: |
           npm ci
           npx playwright install --with-deps chromium
-      - name: Run member C Playwright tests
+      - name: Run unified Playwright E2E (all use cases)
         working-directory: frontend
         env:
           MYSQL_CMD: "mysql -h127.0.0.1 -P3306 -uroot -ppassword danmakustream"
           E2E_BACKEND_CONFIG: "etc/config.yaml"
         run: |
           set -o pipefail
-          npm run test:e2e:member-c 2>&1 | tee /tmp/e2e-member-c-output.txt
-      - name: Upload member C E2E evidence
+          npm run test:e2e 2>&1 | tee /tmp/e2e-output.txt
+      - name: Upload E2E evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: member-c-e2e-evidence
+          name: e2e-evidence
           if-no-files-found: warn
           path: |
-            /tmp/e2e-member-c-output.txt
-            /tmp/danmakustream-member-c-test-results/
-            docs/testing/reports/UC02-03-04-12-e2e-report/
-
-  e2e-uc01-uc06:
-    name: UC01/06 浏览器 E2E
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: [backend-test, frontend-build]
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: password
-          MYSQL_DATABASE: danmakustream
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd "mysqladmin ping -h localhost -ppassword"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: backend/go.mod
-          cache-dependency-path: backend/go.sum
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - name: Install MySQL client
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq mysql-client
-      - name: Install frontend and Chromium
-        working-directory: frontend
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
-      - name: Run UC01/06 Playwright tests
-        working-directory: frontend
-        env:
-          MYSQL_CMD: "mysql -h127.0.0.1 -P3306 -uroot -ppassword danmakustream"
-          E2E_BACKEND_CONFIG: "etc/config.yaml"
-        run: |
-          set -o pipefail
-          npm run test:e2e:uc01-uc06 2>&1 | tee /tmp/e2e-uc01-uc06-output.txt
-      - name: Upload UC01/06 E2E evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: uc01-uc06-e2e-evidence
-          if-no-files-found: warn
-          path: |
-            /tmp/e2e-uc01-uc06-output.txt
-            frontend/test-results/
-            docs/testing/reports/UC01-UC06-e2e-report/
-
-  member-b-integration:
-    name: 成员 B 用例集成测试（INT-TC01/07/08/11）
-    runs-on: ubuntu-latest
-    needs: backend-test
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: password
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd "mysqladmin ping -h localhost -ppassword"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: backend/go.mod
-          cache-dependency-path: backend/go.sum
-      - name: Run UC01/07/08/11 MySQL integration tests
-        working-directory: backend
-        env:
-          DANMAKU_TEST_ADMIN_DSN: "root:password@tcp(127.0.0.1:3306)/?charset=utf8mb4&parseTime=True&loc=Local"
-        run: |
-          set -o pipefail
-          go test -tags=integration ./integration \
-            -run '^TestMemberBUseCasesWithMySQL$' -count=1 -v \
-            | tee member-b-integration-output.txt
-      - name: Upload member B test output
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: member-b-integration-output
-          path: backend/member-b-integration-output.txt
-          if-no-files-found: ignore
-
-  test-uc06:
-    name: UC06 个人资料库单元测试（user + collection 包）
-    runs-on: ubuntu-latest
-    needs: backend-test
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: password
-          MYSQL_DATABASE: danmakustream
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd "mysqladmin ping -h localhost -ppassword"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: backend/go.mod
-          cache-dependency-path: backend/go.sum
-      - name: Run UC06 unit tests (user + collection)
-        working-directory: backend
-        env:
-          DANMAKU_TEST_ADMIN_DSN: "root:password@tcp(127.0.0.1:3306)/danmakustream?charset=utf8mb4&parseTime=True&loc=Local"
-        run: |
-          set -o pipefail
-          {
-            echo "===== ./internal/handler/v1/user/... ====="
-            go test -count=1 -v ./internal/handler/v1/user/...
-            echo ""
-            echo "===== ./internal/handler/v1/collection/... ====="
-            go test -count=1 -v ./internal/handler/v1/collection/...
-          } | tee uc06-unit-output.txt
-      - name: Upload UC06 unit output
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: uc06-unit-output
-          path: backend/uc06-unit-output.txt
-          if-no-files-found: warn
+            /tmp/e2e-output.txt
+            test-results/
+            ../docs/testing/reports/e2e/
 
   docker-build:
     name: 构建前后端镜像（版本号 = commit sha）
     runs-on: ubuntu-latest
-    needs: [backend-test, frontend-build, api-test, e2e-test, e2e-member-c, e2e-uc01-uc06, member-b-integration, test-uc06]
+    needs: [backend-test, frontend-build, api-integration, e2e]
     steps:
       - uses: actions/checkout@v4
       - name: Build backend image

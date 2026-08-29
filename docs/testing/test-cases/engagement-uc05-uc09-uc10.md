@@ -40,5 +40,5 @@ $env:DANMAKU_TEST_ADMIN_DSN='<测试管理员DSN>'
 go test -count=1 -tags=integration ./internal/handler/v1/live ./internal/logic/danmaku ./integration
 
 cd ../frontend
-npm run test:e2e:d
+npm run test:e2e -- e2e/d-engagement.spec.ts（统一入口；全量则 npm run test:e2e）
 ```

@@ -4,7 +4,7 @@ import path from 'node:path'
 import { USERS } from './test-data'
 
 export default async function globalTeardown() {
-  if (process.env.E2E_MEMBER_C_RUN !== '1') return
+  // 统一 E2E：无条件清理成员 C 媒体夹具
 
   const mysqlCommand = process.env.MYSQL_CMD
     ?? (process.platform === 'linux' ? 'mysql -S /home/haoyue/dms-mysql.sock -uroot -ppassword danmakustream' : '')

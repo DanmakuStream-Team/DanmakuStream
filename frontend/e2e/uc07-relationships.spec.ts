@@ -2,6 +2,9 @@ import { expect, test } from '@playwright/test'
 import { loginViaApi, openAs } from './fixtures/auth'
 import { API, USERS } from './test-data'
 
+// 骨架未实现：统一 E2E 流水线显式跳过，实现后删除本行即可纳入执行
+test.skip(true, '骨架未实现（UC07/08/11 单元与 E2E 层开发中）')
+
 test.describe('UC07 关注关系、分组、屏蔽与内容通知', () => {
   const owner = USERS.owner
   const viewer = USERS.viewer

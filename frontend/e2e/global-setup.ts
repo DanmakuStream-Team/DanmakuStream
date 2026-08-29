@@ -143,9 +143,10 @@ async function prepareMemberCData(api: ApiContext) {
 export default async function globalSetup() {
   const api = await playwrightRequest.newContext()
   try {
+    // 统一 E2E：三域数据全部就绪（各域数据按前缀隔离、可重复执行）
     await prepareEngagementData(api)
-    if (process.env.E2E_SKIP_UC13_SETUP !== '1') await prepareUC13Data(api)
-    if (process.env.E2E_MEMBER_C_RUN === '1') await prepareMemberCData(api)
+    await prepareUC13Data(api)
+    await prepareMemberCData(api)
   } finally {
     await api.dispose()
   }
