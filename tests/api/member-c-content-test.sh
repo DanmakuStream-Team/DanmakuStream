@@ -2,7 +2,7 @@
 # 成员 C 内容域 API 自动化测试（UC02/UC03/UC04/UC12）
 #
 # 前置条件：后端、MySQL、curl、python3；MYSQL_CMD 可覆盖数据库命令。
-# 退出规则：断言 FAIL 返回非零；已知未实现要求记为 GAP，但不伪装为 PASS。
+# 退出规则：只有 FAIL=0 且 GAP=0 才返回成功；本套件不再保留已知缺口。
 
 set -u
 
@@ -20,7 +20,6 @@ GAP=0
 log() { printf '%s | %s\n' "$(date '+%F %T')" "$*"; }
 ok() { PASS=$((PASS + 1)); log "PASS | $*"; }
 bad() { FAIL=$((FAIL + 1)); log "FAIL | $*"; }
-gap() { GAP=$((GAP + 1)); log "GAP  | $*"; }
 
 assert_eq() {
   if [ "$2" = "$3" ]; then ok "$1 (got=$3)"; else bad "$1: expected=$2 actual=$3"; fi
@@ -65,6 +64,7 @@ cleanup() {
   if [[ "${UPLOAD_ID:-}" =~ ^[0-9]+$ ]]; then
     rm -rf -- "$VIDEO_DIR/videos/$UPLOAD_ID"
   fi
+  rm -rf -- "$VIDEO_DIR/videos/mc-$RUN_TAG"
   rm -f "$BODY_FILE"
   rm -rf "$FIXTURE_DIR"
 }
@@ -84,12 +84,15 @@ setup() {
 
   db "UPDATE users SET role='creator' WHERE nickname IN ('$CREATOR','$OTHER','$EMPTY');
       UPDATE users SET role='moderator' WHERE nickname='$MODERATOR';
-      INSERT INTO videos (created_at,updated_at,title,description,video_url,status,author_id,view_count,collect_count,category,tags) VALUES
-       (NOW(),NOW(),'MC-$RUN_TAG-approved','search target','/media/videos/fixture/playlist.m3u8','approved',(SELECT id FROM users WHERE nickname='$CREATOR'),20,4,'tech','ci,member-c'),
-       (DATE_SUB(NOW(),INTERVAL 1 DAY),NOW(),'MC-$RUN_TAG-second','second approved','/media/videos/fixture/playlist.m3u8','approved',(SELECT id FROM users WHERE nickname='$CREATOR'),8,2,'life','member-c'),
-       (NOW(),NOW(),'MC-$RUN_TAG-pending-ready','ready for review','/media/videos/fixture/playlist.m3u8','pending',(SELECT id FROM users WHERE nickname='$CREATOR'),0,0,'tech','ci'),
-       (NOW(),NOW(),'MC-$RUN_TAG-pending-missing','missing media','', 'pending',(SELECT id FROM users WHERE nickname='$CREATOR'),0,0,'tech','ci'),
-       (NOW(),NOW(),'MC-$RUN_TAG-other','other creator','/media/videos/fixture/playlist.m3u8','approved',(SELECT id FROM users WHERE nickname='$OTHER'),99,9,'tech','ci');
+      INSERT INTO videos (created_at,updated_at,title,description,video_url,status,transcode_status,author_id,view_count,collect_count,category,tags) VALUES
+       (NOW(),NOW(),'MC-$RUN_TAG-approved','search target','/media/videos/mc-$RUN_TAG/playlist.m3u8','approved','ready',(SELECT id FROM users WHERE nickname='$CREATOR'),20,4,'tech','ci,member-c'),
+       (DATE_SUB(NOW(),INTERVAL 1 DAY),NOW(),'MC-$RUN_TAG-second','second approved','/media/videos/mc-$RUN_TAG/playlist.m3u8','approved','ready',(SELECT id FROM users WHERE nickname='$CREATOR'),8,2,'life','member-c'),
+       (NOW(),NOW(),'MC-$RUN_TAG-approved-missing','missing published media','/media/videos/mc-$RUN_TAG/missing.m3u8','approved','ready',(SELECT id FROM users WHERE nickname='$CREATOR'),5,1,'tech','ci'),
+       (NOW(),NOW(),'MC-$RUN_TAG-pending-ready','ready for review','/media/videos/mc-$RUN_TAG/playlist.m3u8','pending','ready',(SELECT id FROM users WHERE nickname='$CREATOR'),0,0,'tech','ci'),
+       (NOW(),NOW(),'MC-$RUN_TAG-pending-reject','ready to reject','/media/videos/mc-$RUN_TAG/playlist.m3u8','pending','ready',(SELECT id FROM users WHERE nickname='$CREATOR'),0,0,'tech','ci'),
+       (NOW(),NOW(),'MC-$RUN_TAG-pending-missing','missing upload','', 'pending','processing',(SELECT id FROM users WHERE nickname='$CREATOR'),0,0,'tech','ci'),
+       (NOW(),NOW(),'MC-$RUN_TAG-pending-missing-hls','missing hls','/media/videos/mc-$RUN_TAG/missing.m3u8','pending','ready',(SELECT id FROM users WHERE nickname='$CREATOR'),0,0,'tech','ci'),
+       (NOW(),NOW(),'MC-$RUN_TAG-other','other creator','/media/videos/mc-$RUN_TAG/playlist.m3u8','approved','ready',(SELECT id FROM users WHERE nickname='$OTHER'),99,9,'tech','ci');
       INSERT INTO creator_daily_stats (created_at,updated_at,creator_id,date,view_delta,collect_delta,stream_count) VALUES
        (NOW(),NOW(),(SELECT id FROM users WHERE nickname='$CREATOR'),DATE_FORMAT(CURDATE(),'%Y-%m-%d'),10,2,1),
        (NOW(),NOW(),(SELECT id FROM users WHERE nickname='$CREATOR'),DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'%Y-%m-%d'),5,1,2);
@@ -100,14 +103,19 @@ setup() {
   CREATOR_ID=$(db "SELECT id FROM users WHERE nickname='$CREATOR'")
   APPROVED_ID=$(db "SELECT id FROM videos WHERE title='MC-$RUN_TAG-approved'")
   SECOND_ID=$(db "SELECT id FROM videos WHERE title='MC-$RUN_TAG-second'")
+  APPROVED_MISSING_ID=$(db "SELECT id FROM videos WHERE title='MC-$RUN_TAG-approved-missing'")
   READY_ID=$(db "SELECT id FROM videos WHERE title='MC-$RUN_TAG-pending-ready'")
+  REJECT_ID=$(db "SELECT id FROM videos WHERE title='MC-$RUN_TAG-pending-reject'")
   MISSING_ID=$(db "SELECT id FROM videos WHERE title='MC-$RUN_TAG-pending-missing'")
+  MISSING_HLS_ID=$(db "SELECT id FROM videos WHERE title='MC-$RUN_TAG-pending-missing-hls'")
   OTHER_ID=$(db "SELECT id FROM videos WHERE title='MC-$RUN_TAG-other'")
   TOKEN_CREATOR=$(login "$CREATOR")
   TOKEN_OTHER=$(login "$OTHER")
   TOKEN_MOD=$(login "$MODERATOR")
   TOKEN_EMPTY=$(login "$EMPTY")
   printf 'not a media file\n' > "$FIXTURE_DIR/invalid.mp4"
+  mkdir -p "$VIDEO_DIR/videos/mc-$RUN_TAG"
+  printf '#EXTM3U\n#EXT-X-ENDLIST\n' > "$VIDEO_DIR/videos/mc-$RUN_TAG/playlist.m3u8"
   log "data ready: creator=$CREATOR_ID approved=$APPROVED_ID ready=$READY_ID missing=$MISSING_ID"
 }
 
@@ -131,8 +139,11 @@ assert_eq "INT-TC02-03 待审详情不可公开 => 404" 404 "$c"
 c=$(http_code GET "$API_BASE/videos/not-a-number")
 assert_eq "INT-TC02-03 非法详情 ID => 400" 400 "$c"
 c=$(http_code GET "$API_BASE/videos?page=1&pageSize=10&sort=views")
-if [ "$c" = 400 ]; then ok "INT-TC02-04 非法排序 => 400"; else gap "INT-TC02-04 非法排序当前返回 $c，期望 400"; fi
-gap "UC02 详情接口未校验 videoUrl 对应媒体文件是否真实存在"
+assert_eq "INT-TC02-04 非法排序 => 400" 400 "$c"
+missing_before=$(db "SELECT view_count FROM videos WHERE id=$APPROVED_MISSING_ID")
+c=$(http_code GET "$API_BASE/videos/$APPROVED_MISSING_ID")
+assert_eq "INT-TC02-04 媒体缺失详情 => 503" 503 "$c"
+assert_eq "INT-TC02-04 媒体缺失不增加播放量" "$missing_before" "$(db "SELECT view_count FROM videos WHERE id=$APPROVED_MISSING_ID")"
 
 # ---------- UC03：投稿、取消与状态跟踪 ----------
 c=$(http_code POST "$API_BASE/videos/upload")
@@ -145,10 +156,18 @@ assert_eq "INT-TC03-01 JSON 请求不能代替 multipart 视频 => 400" 400 "$c"
 c=$(upload_code "$TOKEN_CREATOR" "MC-$RUN_TAG-transcode-failure" "$FIXTURE_DIR/invalid.mp4")
 assert_eq "INT-TC03-02 上传请求创建待审记录 => 200" 200 "$c"
 UPLOAD_ID=$(db "SELECT id FROM videos WHERE title='MC-$RUN_TAG-transcode-failure'")
-sleep 1
-assert_eq "INT-TC03-02 转码失败视频保持 pending" pending "$(db "SELECT status FROM videos WHERE id=$UPLOAD_ID")"
+for _ in $(seq 1 30); do
+  [ "$(db "SELECT transcode_status FROM videos WHERE id=$UPLOAD_ID")" = failed ] && break
+  sleep 0.2
+done
+assert_eq "INT-TC03-02 转码失败视频审核状态保持 pending" pending "$(db "SELECT status FROM videos WHERE id=$UPLOAD_ID")"
+assert_eq "INT-TC03-02 转码失败状态回写" failed "$(db "SELECT transcode_status FROM videos WHERE id=$UPLOAD_ID")"
 assert_eq "INT-TC03-02 转码失败视频没有公开视频地址" 0 "$(db "SELECT LENGTH(video_url) FROM videos WHERE id=$UPLOAD_ID")"
-gap "UC03 转码失败仅写服务日志，数据模型没有 failed 状态或失败原因"
+if [ "$(db "SELECT LENGTH(transcode_error) FROM videos WHERE id=$UPLOAD_ID")" -gt 0 ]; then
+  ok "INT-TC03-02 转码失败原因已回写"
+else
+  bad "INT-TC03-02 转码失败原因为空"
+fi
 
 truncate -s 16777216 "$FIXTURE_DIR/cancel.mp4"
 set +e
@@ -163,6 +182,7 @@ assert_eq "INT-TC03-03 中止上传不产生视频记录" 0 "$(db "SELECT COUNT(
 c=$(http_code GET "$API_BASE/users/me/videos?page=1&pageSize=100" "$TOKEN_CREATOR")
 assert_eq "INT-TC03-04 创作者查询自己的投稿 => 200" 200 "$c"
 assert_contains "INT-TC03-04 返回转码失败待审记录" "MC-$RUN_TAG-transcode-failure" "$(cat "$BODY_FILE")"
+assert_contains "INT-TC03-04 返回 failed 转码状态" '"transcodeStatus":"failed"' "$(cat "$BODY_FILE")"
 
 # ---------- UC04：审核与发布 ----------
 c=$(http_code GET "$API_BASE/admin/videos")
@@ -178,17 +198,21 @@ assert_eq "INT-TC04-02 审核通过 => 200" 200 "$c"
 assert_eq "INT-TC04-02 审核状态持久化" approved "$(db "SELECT status FROM videos WHERE id=$READY_ID")"
 c=$(http_code GET "$API_BASE/videos/$READY_ID")
 assert_eq "INT-TC04-02 通过后可公开访问 => 200" 200 "$c"
-c=$(http_code PUT "$API_BASE/admin/videos/$SECOND_ID/status" "$TOKEN_MOD" '{"status":"rejected"}')
+c=$(http_code PUT "$API_BASE/admin/videos/$REJECT_ID/status" "$TOKEN_MOD" '{"status":"rejected"}')
 assert_eq "INT-TC04-03 审核拒绝 => 200" 200 "$c"
-c=$(http_code GET "$API_BASE/videos/$SECOND_ID")
+c=$(http_code GET "$API_BASE/videos/$REJECT_ID")
 assert_eq "INT-TC04-03 拒绝后不可公开访问 => 404" 404 "$c"
+c=$(http_code PUT "$API_BASE/admin/videos/$READY_ID/status" "$TOKEN_MOD" '{"status":"rejected"}')
+assert_eq "INT-TC04-04 重复审核 => 409" 409 "$c"
+assert_eq "INT-TC04-04 重复审核不覆盖终态" approved "$(db "SELECT status FROM videos WHERE id=$READY_ID")"
 c=$(http_code PUT "$API_BASE/admin/videos/$MISSING_ID/status" "$TOKEN_MOD" '{"status":"approved"}')
 assert_eq "INT-TC04-04 无媒体源不能通过 => 403" 403 "$c"
+c=$(http_code PUT "$API_BASE/admin/videos/$MISSING_HLS_ID/status" "$TOKEN_MOD" '{"status":"approved"}')
+assert_eq "INT-TC04-04 HLS 文件缺失不能通过 => 403" 403 "$c"
 c=$(http_code PUT "$API_BASE/admin/videos/$MISSING_ID/status" "$TOKEN_MOD" '{"status":"published"}')
 assert_eq "INT-TC04-04 非法状态 => 400" 400 "$c"
 c=$(http_code PUT "$API_BASE/admin/videos/999999999/status" "$TOKEN_MOD" '{"status":"rejected"}')
 assert_eq "INT-TC04-04 不存在视频 => 404" 404 "$c"
-gap "UC04 重复审核可以覆盖既有终态，且审核通过未检查 HLS 文件真实存在"
 
 # ---------- UC12：创作者数据分析 ----------
 c=$(http_code GET "$API_BASE/creator/analytics?days=7")
@@ -212,11 +236,8 @@ c=$(http_code GET "$API_BASE/creator/analytics?days=7&videoId=$APPROVED_ID" "$TO
 assert_eq "INT-TC12-03 单作品分析 => 200" 200 "$c"
 assert_eq "INT-TC12-03 单作品范围观看" 10 "$(jexpr 'd["data"]["summary"]["rangeViews"]')"
 assert_eq "INT-TC12-03 返回选中作品 ID" "$APPROVED_ID" "$(jexpr 'd["data"]["selectedVideoId"]')"
-if [ "$(jexpr 'len(d["data"]["topVideos"])')" = 1 ]; then
-  ok "INT-TC12-03 单作品模式排行同步收窄"
-else
-  gap "UC12 单作品模式的 topVideos 仍返回创作者全部作品"
-fi
+assert_eq "INT-TC12-03 单作品模式排行同步收窄" 1 "$(jexpr 'len(d["data"]["topVideos"])')"
+assert_eq "INT-TC12-03 排行只返回选中作品" "$APPROVED_ID" "$(jexpr 'd["data"]["topVideos"][0]["id"]')"
 
 c=$(http_code GET "$API_BASE/creator/analytics?days=30" "$TOKEN_EMPTY")
 assert_eq "INT-TC12-04 空数据分析 => 200" 200 "$c"
@@ -224,5 +245,5 @@ assert_eq "INT-TC12-04 空数据仍返回 30 个零值点" 30 "$(jexpr 'len(d["d
 assert_eq "INT-TC12-04 空数据总播放为 0" 0 "$(jexpr 'd["data"]["summary"]["totalViews"]')"
 
 log "===== RESULT: TOTAL=$((PASS + FAIL + GAP)) PASS=$PASS FAIL=$FAIL GAP=$GAP ====="
-[ "$FAIL" -eq 0 ] || exit 1
+[ "$FAIL" -eq 0 ] && [ "$GAP" -eq 0 ] || exit 1
 exit 0

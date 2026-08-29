@@ -15,7 +15,9 @@ set -u
 
 API_BASE="${API_BASE:-http://localhost:8080/api/v1}"
 MYSQL_CMD="${MYSQL_CMD:-mysql -S /home/haoyue/dms-mysql.sock -uroot -ppassword danmakustream}"
+VIDEO_DIR="${VIDEO_DIR:-backend/data}"
 RUN_TAG="uc13api-$(date +%s)"
+MEDIA_FIXTURE_DIR="$VIDEO_DIR/videos/uc13-$RUN_TAG"
 PASS=0
 FAIL=0
 
@@ -41,8 +43,16 @@ body() { cat /tmp/uc13-body; }
 jget() { body | python3 -c "import json,sys;d=json.load(sys.stdin);print(eval(sys.argv[1]))" "$1" 2>/dev/null; }
 db() { $MYSQL_CMD -N -e "$1" 2>/dev/null; }
 
+cleanup() {
+  rm -rf -- "$MEDIA_FIXTURE_DIR"
+  rm -f /tmp/uc13-body /tmp/uc13-pub
+}
+trap cleanup EXIT
+
 # ---------- 测试数据准备 ----------
 setup() {
+	  mkdir -p "$MEDIA_FIXTURE_DIR"
+	  printf 'UC13 local media fixture\n' > "$MEDIA_FIXTURE_DIR/fixture.mp4"
   for n in tuser tmod tadmin; do
     curl -s -X POST "$API_BASE/auth/register" -H 'Content-Type: application/json' \
       -d "{\"nickname\":\"$n\",\"password\":\"Test1234!\"}" > /dev/null
@@ -53,9 +63,9 @@ setup() {
     UPDATE users SET role='admin'     WHERE nickname='tadmin';
     DELETE FROM videos  WHERE title LIKE 'UC13-API-%';
     DELETE FROM danmakus WHERE content LIKE 'UC13-API-%';
-    INSERT INTO videos (created_at,updated_at,title,video_url,status,author_id) VALUES
-      (NOW(),NOW(),'UC13-API-$RUN_TAG-ready','/data/videos/x.mp4','pending',(SELECT id FROM users WHERE nickname='tuser')),
-      (NOW(),NOW(),'UC13-API-$RUN_TAG-transcoding','','pending',          (SELECT id FROM users WHERE nickname='tuser'));
+    INSERT INTO videos (created_at,updated_at,title,video_url,status,transcode_status,author_id) VALUES
+      (NOW(),NOW(),'UC13-API-$RUN_TAG-ready','/media/videos/uc13-$RUN_TAG/fixture.mp4','pending','ready',(SELECT id FROM users WHERE nickname='tuser')),
+      (NOW(),NOW(),'UC13-API-$RUN_TAG-transcoding','','pending','processing',                   (SELECT id FROM users WHERE nickname='tuser'));
     INSERT INTO danmakus (created_at,updated_at,video_id,user_id,content,time) VALUES
       (NOW(),NOW(),(SELECT id FROM videos WHERE title='UC13-API-$RUN_TAG-ready'),
        (SELECT id FROM users WHERE nickname='tuser'),'UC13-API-$RUN_TAG-danmaku',5);" 2>/dev/null

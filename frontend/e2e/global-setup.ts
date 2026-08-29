@@ -48,6 +48,11 @@ async function prepareEngagementData(api: ApiContext) {
 
   const mysqlCommand = process.env.MYSQL_CMD
   if (mysqlCommand) {
+    const videoDir = process.env.VIDEO_DIR ?? path.resolve('../backend/data')
+    const mediaFixture = path.join(videoDir, 'videos', 'e2e-uc05.mp4')
+    mkdirSync(path.dirname(mediaFixture), { recursive: true })
+    writeFileSync(mediaFixture, 'UC05 E2E media fixture', 'utf8')
+
     runSql(mysqlCommand, `
       UPDATE users SET role='creator' WHERE nickname='${USERS.owner.nickname}';
       SET FOREIGN_KEY_CHECKS=0;
@@ -61,7 +66,7 @@ async function prepareEngagementData(api: ApiContext) {
       DELETE FROM videos WHERE title='${ENGAGEMENT_VIDEO_TITLE}';
       SET FOREIGN_KEY_CHECKS=1;
       INSERT INTO videos (created_at,updated_at,title,description,video_url,status,author_id)
-      VALUES (NOW(),NOW(),'${ENGAGEMENT_VIDEO_TITLE}','UC05 自动化测试数据','/data/videos/e2e-uc05.mp4','approved',
+      VALUES (NOW(),NOW(),'${ENGAGEMENT_VIDEO_TITLE}','UC05 自动化测试数据','/media/videos/e2e-uc05.mp4','approved',
         (SELECT id FROM users WHERE nickname='${USERS.owner.nickname}'));
     `)
   }
@@ -122,10 +127,10 @@ async function prepareMemberCData(api: ApiContext) {
     DELETE FROM video_daily_stats WHERE creator_id=(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}');
     DELETE FROM creator_daily_stats WHERE creator_id=(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}');
     DELETE FROM videos WHERE title LIKE 'E2E-MC-%';
-    INSERT INTO videos (created_at,updated_at,title,description,video_url,status,author_id,view_count,collect_count,category,tags) VALUES
-      (NOW(),NOW(),'E2E-MC-公开视频','成员 C 搜索播放用例','/media/videos/e2e-member-c/fixture.mp4','approved',(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}'),20,4,'tech','e2e,member-c'),
-      (NOW(),NOW(),'E2E-MC-待审核通过','成员 C 审核通过用例','/media/videos/e2e-member-c/fixture.mp4','pending',(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}'),3,1,'tech','e2e'),
-      (NOW(),NOW(),'E2E-MC-待审核拒绝','成员 C 审核拒绝用例','/media/videos/e2e-member-c/fixture.mp4','pending',(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}'),2,0,'life','e2e');
+    INSERT INTO videos (created_at,updated_at,title,description,video_url,status,transcode_status,author_id,view_count,collect_count,category,tags) VALUES
+      (NOW(),NOW(),'E2E-MC-公开视频','成员 C 搜索播放用例','/media/videos/e2e-member-c/fixture.mp4','approved','ready',(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}'),20,4,'tech','e2e,member-c'),
+      (NOW(),NOW(),'E2E-MC-待审核通过','成员 C 审核通过用例','/media/videos/e2e-member-c/fixture.mp4','pending','ready',(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}'),3,1,'tech','e2e'),
+      (NOW(),NOW(),'E2E-MC-待审核拒绝','成员 C 审核拒绝用例','/media/videos/e2e-member-c/fixture.mp4','pending','ready',(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}'),2,0,'life','e2e');
     INSERT INTO creator_daily_stats (created_at,updated_at,creator_id,date,view_delta,collect_delta,stream_count) VALUES
       (NOW(),NOW(),(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}'),DATE_FORMAT(CURDATE(),'%Y-%m-%d'),10,2,1),
       (NOW(),NOW(),(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}'),DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'%Y-%m-%d'),5,1,0);
