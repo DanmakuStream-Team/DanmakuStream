@@ -74,10 +74,10 @@
 
 **发现的问题**：
 
-- **D1（缺陷，待修）**：`POST /admin/banners`、`POST /admin/announcements` 的创建响应使用 Go 结构体默认字段名（`ID`、`ImageURL`、`StartedAt`），与项目其余接口统一的 camelCase（更新/删除响应中的 `id`）不一致，前端对接易踩坑。建议在 Banner/Announcement 模型或响应结构上补 `json` tag。
+- **D1（已修复，见 §9 与 PR #62）**：原记录：`POST /admin/banners`、`POST /admin/announcements` 的创建响应使用 Go 结构体默认字段名（`ID`、`ImageURL`、`StartedAt`），与项目其余接口统一的 camelCase（更新/删除响应中的 `id`）不一致，前端对接易踩坑。建议在 Banner/Announcement 模型或响应结构上补 `json` tag。
 - **D2（备忘，非缺陷）**：登录按昵称+密码校验（`LoginReq` 虽含 `username` 字段但匹配逻辑使用昵称），新注册用户 username 为自动生成的数字。测试与联调时统一使用昵称登录。
 
-**未执行**：E2E-TC13-01～05（待前端联调后执行）。
+**执行记录**：E2E-TC13-01～05 已于 2026-08-26 执行并通过，见 §9。
 
 ## 7. 单元测试执行记录（2026-08-26）
 
@@ -98,7 +98,7 @@ GOCACHE=/tmp/go-build go test ./...
 
 6 个测试函数（13 个子测试）全部通过，全后端无编译/回归问题。原始报告：`docs/testing/reports/uc13-unit-2026-08-26.txt`（总数 6、通过 6、失败 0）。
 
-**结论**：单元测试未发现新的业务缺陷；此前 API 层发现的 D1（JSON 字段命名不一致）不属单元层断言范围，仍待修。
+**结论**：单元测试未发现新的业务缺陷；此前 API 层发现的 D1（JSON 字段命名不一致）不属单元层断言范围，已随 PR #62 修复并回归。
 
 ## 8. API 自动化测试（2026-08-26）
 
