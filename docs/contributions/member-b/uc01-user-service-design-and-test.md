@@ -50,343 +50,83 @@
 
 ### 3.1 UC001 系统顺序图
 
-```mermaid
-sequenceDiagram
-    actor U as 用户
-    participant S as DanmakuStream系统
-
-    alt 注册
-        U->>S: 1. 提交注册信息（昵称、密码）
-        S->>S: 1.1 校验格式与昵称唯一性
-        alt 信息合法且昵称可用
-            S-->>U: 1.2 注册成功（登录凭证、用户资料）
-        else 信息非法或昵称重复
-            S-->>U: 1.3 注册失败原因
-        end
-    else 登录
-        U->>S: 2. 提交登录凭据（昵称、密码）
-        S->>S: 2.1 校验用户凭据
-        alt 凭据正确
-            S-->>U: 2.2 登录成功（登录凭证、用户资料）
-        else 凭据错误
-            S-->>U: 2.3 登录失败
-        end
-    else 资料维护
-        U->>S: 3. 提交资料修改（昵称、简介或头像）
-        S->>S: 3.1 校验身份、资料与文件
-        alt 校验通过
-            S-->>U: 3.2 修改成功（最新资料）
-        else 身份失效或资料非法
-            S-->>U: 3.3 修改失败原因
-        end
-    end
-```
+> 正式图：[系统级顺序图 SYS-SEQ01](../../models/system/SYS-SEQ01.puml)（含本节主流程与备选/异常分支；本节原 Mermaid 草图已按仓库规范移除，以 PlantUML 正式图为准）。
+>
+> ![系统级顺序图 SYS-SEQ01](../../models/system/SYS-SEQ01.svg)
 
 > 系统顺序图将 DanmakuStream 视为黑盒，只表达参与者与系统之间的系统事件；Web、API、数据库等内部对象放到组件级和对象级顺序图中。
 
 ### 3.2 系统状态图
 
-```mermaid
-stateDiagram-v2
-    [*] --> Anonymous
-    Anonymous --> Registering: 提交注册
-    Registering --> Authenticated: 注册成功
-    Registering --> Anonymous: 格式错误/昵称重复
-    Anonymous --> Authenticating: 提交登录
-    Authenticating --> Authenticated: 密码正确
-    Authenticating --> Anonymous: 密码错误
-    Authenticated --> ProfileEditing: 修改资料
-    ProfileEditing --> Authenticated: 校验通过并保存
-    ProfileEditing --> Authenticated: 非法资料，保留旧资料
-    Authenticated --> Expired: JWT过期
-    Authenticated --> LoggedOut: 主动退出
-    Expired --> Anonymous: 清除会话并重新登录
-    LoggedOut --> Anonymous
-```
+> 正式图：[对象级顺序图 OBJ-SEQ01](../../models/object/OBJ-SEQ01.puml)（含本节主流程与备选/异常分支；本节原 Mermaid 草图已按仓库规范移除，以 PlantUML 正式图为准）。
+>
+> ![对象级顺序图 OBJ-SEQ01](../../models/object/OBJ-SEQ01.svg)
 
 ### 3.3 系统活动图
 
-```mermaid
-flowchart TD
-    A[进入账户功能] --> B{已有有效JWT?}
-    B -- 否 --> C{选择注册或登录}
-    C -->|注册| D[填写昵称和密码]
-    C -->|登录| E[填写昵称和密码]
-    D --> F{格式和唯一性校验}
-    F -- 失败 --> D1[显示错误并保留表单]
-    F -- 通过 --> G[哈希密码并创建用户]
-    E --> H{查询用户并校验密码}
-    H -- 失败 --> E1[统一返回认证失败]
-    H -- 通过 --> I[签发JWT]
-    G --> I
-    I --> J[保存会话并进入首页]
-    B -- 是 --> J
-    J --> K{选择资料操作}
-    K -->|查看| L[GET /auth/me]
-    K -->|编辑| M[校验资料并更新]
-    K -->|头像| N[校验图片并保存]
-    L --> O[展示最新资料]
-    M --> O
-    N --> O
-    J --> P{请求返回401?}
-    P -- 是 --> Q[清除token并跳转登录]
-```
+> 正式图：[系统级顺序图 SYS-SEQ01](../../models/system/SYS-SEQ01.puml)（含本节主流程与备选/异常分支；本节原 Mermaid 草图已按仓库规范移除，以 PlantUML 正式图为准）。
+>
+> ![系统级顺序图 SYS-SEQ01](../../models/system/SYS-SEQ01.svg)
 
 ## 4. 概要设计：user-service 拆分
 
 ### 4.1 组件图
 
-```mermaid
-flowchart LR
-    Browser["«component»<br/>Vue Web前端"]
-    Gateway["«component»<br/>Nginx / API Gateway"]
-    Auth["«component»<br/>认证管理"]
-    Profile["«component»<br/>用户资料管理"]
-    Avatar["«component»<br/>头像管理"]
-    Other["«component»<br/>视频／评论／关注服务"]
-    UserDB[("User Schema")]
-    ObjectStore[("头像文件存储")]
-
-    Browser -- "用户操作接口" --> Gateway
-    Gateway -- "IAuth（注册／登录／鉴权）" --> Auth
-    Gateway -- "IProfile（查询／修改资料）" --> Profile
-    Gateway -- "IAvatar（上传头像）" --> Avatar
-    Other -- "IUserQuery（只读用户信息）" --> Profile
-    Auth -- "IUserRepository" --> UserDB
-    Profile -- "IUserRepository" --> UserDB
-    Avatar -- "IFileStore" --> ObjectStore
-    Avatar -- "更新头像地址" --> UserDB
-
-    classDef component fill:#f5f8ff,stroke:#2457d6,stroke-width:2px,color:#111;
-    class Browser,Gateway,Auth,Profile,Avatar,Other component;
-```
+> 正式图：[成员B组件图 COMPONENT-B](../../models/component/COMPONENT-B.puml)（含本节主流程与备选/异常分支；本节原 Mermaid 草图已按仓库规范移除，以 PlantUML 正式图为准）。
+>
+> ![成员B组件图 COMPONENT-B](../../models/component/COMPONENT-B.svg)
 
 拆分边界：认证、用户资料和头像归 user-service；视频、评论、直播等服务只通过 `userId` 和内部只读用户接口获取用户信息，不直接写入用户表。阶段一可保留现有 Go 单体进程，采用 package/module 边界；阶段二再独立部署服务。
 
 ### 4.2 组件顺序图：登录与资料更新
 
-```mermaid
-sequenceDiagram
-    actor U as 用户
-    participant UI as «component» Web前端
-    participant GW as «component» API Gateway
-    participant Auth as «component» 认证管理
-    participant Profile as «component» 用户资料管理
-
-    U->>UI: 1. 提交登录凭据
-    UI->>GW: 1.1 POST /auth/login
-    GW->>Auth: 1.2 login(nickname, password)
-    Auth-->>GW: 1.3 JWT + UserInfo／认证失败
-    GW-->>UI: 1.4 登录结果
-    UI-->>U: 1.5 显示登录结果
-
-    U->>UI: 2. 提交资料修改
-    UI->>GW: 2.1 PUT /users/me + Bearer JWT
-    GW->>Auth: 2.2 validateToken(token)
-    Auth-->>GW: 2.3 userId／401
-    opt 身份有效
-        GW->>Profile: 2.4 updateProfile(userId, patch)
-        Profile-->>GW: 2.5 最新资料／校验失败
-    end
-    GW-->>UI: 2.6 修改结果
-    UI-->>U: 2.7 显示最新资料或失败原因
-```
+> 正式图：[组件级顺序图 COMP-SEQ01](../../models/component/COMP-SEQ01.puml)（含本节主流程与备选/异常分支；本节原 Mermaid 草图已按仓库规范移除，以 PlantUML 正式图为准）。
+>
+> ![组件级顺序图 COMP-SEQ01](../../models/component/COMP-SEQ01.svg)
 
 ### 4.3 组件状态图
 
-```mermaid
-stateDiagram-v2
-    [*] --> UserServiceReady
-    UserServiceReady --> Authenticating: 登录请求
-    Authenticating --> Authenticated: 校验成功
-    Authenticating --> Rejected: 凭据错误
-    Authenticated --> UpdatingProfile: 修改资料请求
-    UpdatingProfile --> Authenticated: 保存成功
-    UpdatingProfile --> Rejected: 参数非法
-    Authenticated --> Expired: JWT到期/用户禁用
-    Expired --> UserServiceReady: 返回401
-    Rejected --> UserServiceReady
-```
+> 正式图：[组件级顺序图 COMP-SEQ01](../../models/component/COMP-SEQ01.puml)（含本节主流程与备选/异常分支；本节原 Mermaid 草图已按仓库规范移除，以 PlantUML 正式图为准）。
+>
+> ![组件级顺序图 COMP-SEQ01](../../models/component/COMP-SEQ01.svg)
 
 ### 4.4 组件活动图
 
-```mermaid
-flowchart TD
-    A[请求到达user-service] --> B{路由}
-    B -->|公开| C[注册/登录处理器]
-    B -->|受保护| D[Auth Middleware]
-    D --> E{JWT有效且用户存在?}
-    E -- 否 --> F[401]
-    E -- 是 --> G[资料/头像处理器]
-    C --> H[应用服务校验]
-    G --> H
-    H --> I[Repository事务]
-    I --> J[(User Schema)]
-    J --> K[统一响应]
-```
+> 正式图：[组件级顺序图 COMP-SEQ01](../../models/component/COMP-SEQ01.puml)（含本节主流程与备选/异常分支；本节原 Mermaid 草图已按仓库规范移除，以 PlantUML 正式图为准）。
+>
+> ![组件级顺序图 COMP-SEQ01](../../models/component/COMP-SEQ01.svg)
 
 ## 5. 详细设计
 
 ### 5.1 类图
 
-```mermaid
-classDiagram
-    class User {
-        <<entity>>
-        +uint ID
-        +string Username
-        +string Nickname
-        +string PasswordHash
-        +string Avatar
-        +string Bio
-        +string Role
-        +time CreatedAt
-    }
-    class UserRepository {
-        <<repository>>
-        +FindByNickname(nickname) User
-        +FindByID(id) User
-        +Create(user) error
-        +UpdateProfile(id, patch) error
-        +ExistsByNickname(nickname, excludeID) bool
-    }
-    class AuthService {
-        <<control>>
-        +Register(nickname, password) Session
-        +Login(nickname, password) Session
-        +ValidateToken(token) Claims
-    }
-    class ProfileService {
-        <<control>>
-        +GetMe(userID) ProfileDTO
-        +UpdateMe(userID, patch) ProfileDTO
-        +UpdateAvatar(userID, file) ProfileDTO
-    }
-    class TokenService {
-        <<service>>
-        +Issue(user) string
-        +Parse(token) Claims
-    }
-    class UserHandler {
-        <<boundary>>
-        +Register(request) response
-        +Login(request) response
-        +Me(request) response
-        +UpdateMe(request) response
-        +UploadAvatar(request) response
-    }
-    UserHandler --> AuthService
-    UserHandler --> ProfileService
-    AuthService --> UserRepository
-    AuthService --> TokenService
-    ProfileService --> UserRepository
-    UserRepository --> User
-```
+> 正式图：[成员B类图 CLASS-B](../../models/class/CLASS-B.puml)（含本节主流程与备选/异常分支；本节原 Mermaid 草图已按仓库规范移除，以 PlantUML 正式图为准）。
+>
+> ![成员B类图 CLASS-B](../../models/class/CLASS-B.svg)
 
 ### 5.2 注册对象顺序图
 
-```mermaid
-sequenceDiagram
-    actor U as 用户
-    participant H as «boundary» UserHandler
-    participant S as «control» AuthService
-    participant R as «repository» UserRepository
-    participant B as «service» Bcrypt
-    participant T as «service» TokenService
-
-    U->>H: 1. register(nickname, password)
-    H->>S: 1.1 register(request)
-    S->>S: 1.2 trimAndValidate(request)
-    S->>R: 1.3 existsByNickname(nickname)
-    R-->>S: 1.4 exists
-    alt 昵称可用且格式合法
-        S->>B: 1.5 hash(password)
-        B-->>S: 1.6 passwordHash
-        S->>R: 1.7 create(user)
-        R-->>S: 1.8 savedUser
-        S->>T: 1.9 issue(savedUser)
-        T-->>S: 1.10 JWT
-        S-->>H: 1.11 session(token, userInfo)
-        H-->>U: 1.12 注册成功
-    else 昵称重复或格式非法
-        S-->>H: 1.5 validationError
-        H-->>U: 1.6 注册失败原因
-    end
-```
+> 正式图：[对象级顺序图 OBJ-SEQ01](../../models/object/OBJ-SEQ01.puml)（含本节主流程与备选/异常分支；本节原 Mermaid 草图已按仓库规范移除，以 PlantUML 正式图为准）。
+>
+> ![对象级顺序图 OBJ-SEQ01](../../models/object/OBJ-SEQ01.svg)
 
 ### 5.3 登录对象顺序图
 
-```mermaid
-sequenceDiagram
-    actor U as 用户
-    participant H as «boundary» UserHandler
-    participant S as «control» AuthService
-    participant R as «repository» UserRepository
-    participant B as «service» Bcrypt
-    participant T as «service» TokenService
-
-    U->>H: Login(nickname,password)
-    H->>S: Login(request)
-    S->>R: FindByNickname
-    R-->>S: User or not found
-    S->>B: CompareHashAndPassword
-    alt 校验成功
-        B-->>S: ok
-        S->>T: Issue(User)
-        T-->>S: JWT
-        S-->>H: Session
-        H-->>U: 200
-    else 校验失败
-        B-->>S: error
-        S-->>H: ErrInvalidCredentials
-        H-->>U: 401
-    end
-```
+> 正式图：[对象级顺序图 OBJ-SEQ01](../../models/object/OBJ-SEQ01.puml)（含本节主流程与备选/异常分支；本节原 Mermaid 草图已按仓库规范移除，以 PlantUML 正式图为准）。
+>
+> ![对象级顺序图 OBJ-SEQ01](../../models/object/OBJ-SEQ01.svg)
 
 ### 5.4 资料维护对象顺序图
 
-```mermaid
-sequenceDiagram
-    actor U as 用户
-    participant H as «boundary» ProfileHandler
-    participant M as «control» AuthMiddleware
-    participant S as «control» ProfileService
-    participant R as «repository» UserRepository
-    participant FS as «service» FileStore
-
-    U->>H: PUT /users/me 或 POST /users/me/avatar
-    H->>M: Parse Bearer JWT
-    M-->>H: userID
-    alt 文字资料
-        H->>S: UpdateMe(userID, patch)
-        S->>R: ExistsByNickname(exclude userID)
-        S->>R: UpdateProfile(userID, patch)
-    else 头像
-        H->>S: UpdateAvatar(userID, file)
-        S->>FS: Validate and save image
-        S->>R: Update avatar URL
-    end
-    R-->>S: updated user
-    S-->>H: ProfileDTO
-    H-->>U: 200
-```
+> 正式图：[对象级顺序图 OBJ-SEQ01](../../models/object/OBJ-SEQ01.puml)（含本节主流程与备选/异常分支；本节原 Mermaid 草图已按仓库规范移除，以 PlantUML 正式图为准）。
+>
+> ![对象级顺序图 OBJ-SEQ01](../../models/object/OBJ-SEQ01.svg)
 
 ### 5.5 资料维护状态图
 
-```mermaid
-stateDiagram-v2
-    [*] --> ExistingProfile
-    ExistingProfile --> Validating: 提交修改
-    Validating --> ExistingProfile: 空更新/非法长度/非法字符
-    Validating --> CheckingUnique: 修改昵称
-    Validating --> SavingAvatar: 上传头像
-    Validating --> SavingProfile: 仅修改简介
-    CheckingUnique --> ExistingProfile: 昵称已被占用
-    CheckingUnique --> SavingProfile: 昵称可用
-    SavingAvatar --> ExistingProfile: 图片保存成功
-    SavingProfile --> ExistingProfile: 数据库事务成功
-    SavingAvatar --> ExistingProfile: 文件或数据库失败，回滚/清理临时文件
-```
+> 正式图：[对象级顺序图 OBJ-SEQ01](../../models/object/OBJ-SEQ01.puml)（含本节主流程与备选/异常分支；本节原 Mermaid 草图已按仓库规范移除，以 PlantUML 正式图为准）。
+>
+> ![对象级顺序图 OBJ-SEQ01](../../models/object/OBJ-SEQ01.svg)
 
 ## 6. 独立 User Schema
 
@@ -451,20 +191,9 @@ CREATE TABLE users (
 
 ### 7.3 E2E 主链路
 
-```mermaid
-flowchart LR
-    A[打开注册页] --> B[注册新昵称]
-    B --> C[自动登录并进入首页]
-    C --> D[打开个人资料]
-    D --> E[修改简介和头像]
-    E --> F[刷新页面]
-    F --> G{资料保持一致?}
-    G -- 是 --> H[退出登录]
-    H --> I[使用正确密码重新登录]
-    I --> J[使用错误密码验证失败]
-    J --> K[等待/构造过期JWT]
-    K --> L[访问受保护接口返回401并回到登录页]
-```
+> 正式图：[系统级顺序图 SYS-SEQ01](../../models/system/SYS-SEQ01.puml)（含本节主流程与备选/异常分支；本节原 Mermaid 草图已按仓库规范移除，以 PlantUML 正式图为准）。
+>
+> ![系统级顺序图 SYS-SEQ01](../../models/system/SYS-SEQ01.svg)
 
 E2E 验收数据至少包含：一个正常用户、一个重复昵称、一个错误密码、一个过期 JWT、一个非法头像文件和一个超长简介。
 
