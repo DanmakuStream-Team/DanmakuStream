@@ -41,7 +41,7 @@ precheck() {
     [ "${ready:-0}" -ge 1 ] || die "基础服务 $dep 未就绪（readyReplicas=${ready:-0}）"
   done
   for dep in backend frontend; do
-    $KUBECTL -n "$NS" get deploy "$dep" > /dev/null || die "Deployment $dep 不存在"
+    $KUBECTL -n "$NS" get deploy "$dep" > /dev/null || die "Deployment $dep 不存在（nginx-gateway 为 #88 新增资源，请在服务器执行 kubectl apply -f deploy/k8s/monolith/）"
   done
   log "预检通过：节点/Namespace/Secret/PVC/基础服务/目标 Deployment 均正常"
 }

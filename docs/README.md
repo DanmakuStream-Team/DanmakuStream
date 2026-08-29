@@ -10,8 +10,8 @@
 | `architecture/` | 单体与 Kubernetes 部署设计 | [部署设计](architecture/deployment-design.md) |
 | `models/` | PlantUML 源文件、SVG/PNG 与检查记录 | [模型索引](models/README.md) |
 | `testing/` | 测试用例和原始测试报告 | [测试用例](testing/test-cases/) |
-| `traceability/` | 需求—设计—代码—测试追溯 | [UC13 追溯表](traceability/uc13.md) |
-| `contributions/` | 按成员归档的领域交付 | [成员 D 交付](contributions/member-d/README.md) |
+| `traceability/` | 需求—设计—代码—测试追溯（总表 + 单用例） | [总追溯表 master.md](traceability/master.md) |
+| `contributions/` | 按成员归档的领域交付（B/D/E） | [成员 D 交付](contributions/member-d/README.md) · [成员 B](contributions/member-b/README.md) |
 
 ## 项目文档
 
