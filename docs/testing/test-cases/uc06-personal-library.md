@@ -49,5 +49,5 @@
 
 - 单元测试：`backend-test` 和 `test-uc06` Job。
 - API：`api-test` Job 执行 `tests/api/uc06-library-test.sh`。
-- E2E：`e2e-uc01-uc06` Job 执行 `npm run test:e2e:uc01-uc06`。
+- E2E：统一 `e2e` Job 执行 `npm run test:e2e`（见 tests/api 无关，CI 按测试层组织）。
 - 三层任一失败，`docker-build` 不执行；CI 上传 API 输出、Playwright HTML、trace、截图和视频。

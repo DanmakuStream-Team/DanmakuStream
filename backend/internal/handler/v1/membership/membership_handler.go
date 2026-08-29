@@ -248,13 +248,9 @@ func DemoPayHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			} else if err != nil {
 				return err
 			}
-			base := now
-			if subscription.Status == "active" && subscription.ExpiresAt.After(now) {
-				base = subscription.ExpiresAt
-			}
 			subscription.PriceCents = order.AmountCents / int64(order.Months)
 			subscription.Status = "active"
-			subscription.ExpiresAt = base.AddDate(0, order.Months, 0)
+			subscription.ExpiresAt = renewalExpiry(subscription, now, order.Months)
 			if subscription.ID == 0 {
 				if err := tx.Create(&subscription).Error; err != nil {
 					return err
@@ -289,6 +285,14 @@ func DemoPayHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		}
 		response.Ok(c, toSubscriptionInfo(result))
 	}
+}
+
+func renewalExpiry(subscription model.CreatorSubscription, now time.Time, months int) time.Time {
+	base := now
+	if subscription.Status == "active" && subscription.ExpiresAt.After(now) {
+		base = subscription.ExpiresAt
+	}
+	return base.AddDate(0, months, 0)
 }
 
 func MineHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {

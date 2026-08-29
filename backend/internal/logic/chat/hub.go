@@ -12,17 +12,19 @@ import (
 	"danmakustream/backend/internal/svc"
 
 	"github.com/gorilla/websocket"
+	"gorm.io/gorm"
 )
 
 var (
-	ErrEmptyContent = errors.New("message content is empty")
-	ErrTooLong      = errors.New("message content is too long")
-	ErrSelfMessage  = errors.New("cannot message yourself")
-	ErrUserNotFound = errors.New("receiver not found")
-	ErrBlocked      = errors.New("blocked relationship")
-	ErrInvalidType  = errors.New("invalid message type")
-	ErrInvalidMedia = errors.New("invalid message media")
-	ErrVideoMissing = errors.New("shared video not found")
+	ErrEmptyContent           = errors.New("message content is empty")
+	ErrTooLong                = errors.New("message content is too long")
+	ErrSelfMessage            = errors.New("cannot message yourself")
+	ErrUserNotFound           = errors.New("receiver not found")
+	ErrBlocked                = errors.New("blocked relationship")
+	ErrInvalidType            = errors.New("invalid message type")
+	ErrInvalidMedia           = errors.New("invalid message media")
+	ErrVideoMissing           = errors.New("shared video not found")
+	ErrInvalidClientMessageID = errors.New("invalid client message id")
 )
 
 const (
@@ -33,12 +35,13 @@ const (
 )
 
 type CreateMessageInput struct {
-	ReceiverID uint   `json:"receiverId"`
-	Type       string `json:"type"`
-	Content    string `json:"content"`
-	MediaURL   string `json:"mediaUrl"`
-	MediaName  string `json:"mediaName"`
-	VideoID    uint   `json:"videoId"`
+	ReceiverID      uint   `json:"receiverId"`
+	ClientMessageID string `json:"clientMessageId"`
+	Type            string `json:"type"`
+	Content         string `json:"content"`
+	MediaURL        string `json:"mediaUrl"`
+	MediaName       string `json:"mediaName"`
+	VideoID         uint   `json:"videoId"`
 }
 
 type SharedVideoInfo struct {
@@ -50,18 +53,19 @@ type SharedVideoInfo struct {
 }
 
 type MessageInfo struct {
-	ID         uint             `json:"id"`
-	SenderID   uint             `json:"senderId"`
-	ReceiverID uint             `json:"receiverId"`
-	Content    string           `json:"content"`
-	Type       string           `json:"type"`
-	MediaURL   string           `json:"mediaUrl"`
-	MediaName  string           `json:"mediaName"`
-	Video      *SharedVideoInfo `json:"video,omitempty"`
-	Read       bool             `json:"read"`
-	Sender     model.UserInfo   `json:"sender"`
-	Receiver   model.UserInfo   `json:"receiver"`
-	CreatedAt  string           `json:"createdAt"`
+	ID              uint             `json:"id"`
+	SenderID        uint             `json:"senderId"`
+	ReceiverID      uint             `json:"receiverId"`
+	ClientMessageID string           `json:"clientMessageId,omitempty"`
+	Content         string           `json:"content"`
+	Type            string           `json:"type"`
+	MediaURL        string           `json:"mediaUrl"`
+	MediaName       string           `json:"mediaName"`
+	Video           *SharedVideoInfo `json:"video,omitempty"`
+	Read            bool             `json:"read"`
+	Sender          model.UserInfo   `json:"sender"`
+	Receiver        model.UserInfo   `json:"receiver"`
+	CreatedAt       string           `json:"createdAt"`
 }
 
 type envelope struct {
@@ -168,6 +172,10 @@ func (h *Hub) CreateAndBroadcast(senderID uint, input CreateMessageInput) (Messa
 	input.Content = strings.TrimSpace(input.Content)
 	input.MediaURL = strings.TrimSpace(input.MediaURL)
 	input.MediaName = strings.TrimSpace(input.MediaName)
+	input.ClientMessageID = strings.TrimSpace(input.ClientMessageID)
+	if len(input.ClientMessageID) > 64 {
+		return MessageInfo{}, ErrInvalidClientMessageID
+	}
 	if senderID == input.ReceiverID {
 		return MessageInfo{}, ErrSelfMessage
 	}
@@ -195,10 +203,24 @@ func (h *Hub) CreateAndBroadcast(senderID uint, input CreateMessageInput) (Messa
 	if blockCount > 0 {
 		return MessageInfo{}, ErrBlocked
 	}
+	if input.ClientMessageID != "" {
+		var existing model.ChatMessage
+		err := h.svc.DB.Preload("Sender").Preload("Receiver").Preload("SharedVideo.Author").
+			Where("sender_id = ? AND client_message_id = ?", senderID, input.ClientMessageID).First(&existing).Error
+		if err == nil {
+			return ToMessageInfo(existing), nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return MessageInfo{}, err
+		}
+	}
 
 	message := model.ChatMessage{
 		SenderID: senderID, ReceiverID: input.ReceiverID, MessageType: input.Type,
 		Content: input.Content, MediaURL: input.MediaURL, MediaName: input.MediaName,
+	}
+	if input.ClientMessageID != "" {
+		message.ClientMessageID = &input.ClientMessageID
 	}
 	if input.Type == MessageTypeVideoShare {
 		var video model.Video
@@ -208,6 +230,17 @@ func (h *Hub) CreateAndBroadcast(senderID uint, input CreateMessageInput) (Messa
 		message.SharedVideoID = &video.ID
 	}
 	if err := h.svc.DB.Create(&message).Error; err != nil {
+		// Two HTTP/WebSocket retries may race after both miss the lookup above.
+		// The composite unique index is the final arbiter; return its winning row
+		// so callers still observe a successful idempotent operation.
+		if input.ClientMessageID != "" {
+			var existing model.ChatMessage
+			lookupErr := h.svc.DB.Preload("Sender").Preload("Receiver").Preload("SharedVideo.Author").
+				Where("sender_id = ? AND client_message_id = ?", senderID, input.ClientMessageID).First(&existing).Error
+			if lookupErr == nil {
+				return ToMessageInfo(existing), nil
+			}
+		}
 		return MessageInfo{}, err
 	}
 	if err := h.svc.DB.Preload("Sender").Preload("Receiver").Preload("SharedVideo.Author").First(&message, message.ID).Error; err != nil {
@@ -314,6 +347,9 @@ func ToMessageInfo(message model.ChatMessage) MessageInfo {
 		},
 		CreatedAt: message.CreatedAt.Format("2006-01-02 15:04:05"),
 	}
+	if message.ClientMessageID != nil {
+		info.ClientMessageID = *message.ClientMessageID
+	}
 	if message.SharedVideoID != nil && message.SharedVideo.ID != 0 {
 		info.Video = &SharedVideoInfo{
 			ID: message.SharedVideo.ID, Title: message.SharedVideo.Title, CoverURL: message.SharedVideo.CoverURL,
@@ -401,6 +437,8 @@ func chatErrorMessage(err error) string {
 		return "私信附件无效，请重新上传"
 	case errors.Is(err, ErrVideoMissing):
 		return "分享的视频不存在或尚未公开"
+	case errors.Is(err, ErrInvalidClientMessageID):
+		return "客户端消息编号无效"
 	default:
 		return "消息发送失败"
 	}

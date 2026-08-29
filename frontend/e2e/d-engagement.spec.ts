@@ -74,6 +74,19 @@ test('E2E-TC10 创建直播、观众点赞赠礼、主播结束，页面与 API 
   const viewer = await loginViaApi(request, USERS.viewer.nickname, USERS.viewer.password)
   const title = `E2E-UC10-${runTag}`
 
+  await page.addInitScript(() => {
+    const NativeWebSocket = window.WebSocket
+    const trackedWindow = window as Window & { __e2eLiveSockets?: WebSocket[] }
+    trackedWindow.__e2eLiveSockets = []
+    class TrackedWebSocket extends NativeWebSocket {
+      constructor(url: string | URL, protocols?: string | string[]) {
+        super(url, protocols)
+        trackedWindow.__e2eLiveSockets?.push(this)
+      }
+    }
+    window.WebSocket = TrackedWebSocket
+  })
+
   await openAs(page, owner, '/live')
   await page.getByRole('button', { name: '开始直播', exact: true }).first().click()
   const dialog = page.locator('.el-dialog:visible')
@@ -91,6 +104,17 @@ test('E2E-TC10 创建直播、观众点赞赠礼、主播结束，页面与 API 
 
   await openAs(page, viewer, `/live/${roomID}`)
   await expect(page.getByText('直播中', { exact: true })).toBeVisible()
+  await expect(page.locator('.chat-head').getByText('已连接', { exact: true })).toBeVisible()
+  await expect(page.getByText('等待直播流', { exact: true })).toBeVisible()
+
+  await page.evaluate(() => {
+    const trackedWindow = window as Window & { __e2eLiveSockets?: WebSocket[] }
+    trackedWindow.__e2eLiveSockets?.find(socket => socket.url.includes('/ws/live/'))?.close()
+  })
+  await expect(page.locator('.chat-head').getByText('未连接', { exact: true })).toBeVisible()
+  await expect(page.locator('.chat-head').getByText('已连接', { exact: true })).toBeVisible({ timeout: 8_000 })
+  await expect(page.getByText('1 人观看', { exact: true })).toBeVisible()
+
   await page.getByRole('button', { name: /^点赞/ }).click()
   await expect(page.getByRole('button', { name: /^已点赞/ })).toBeVisible()
   await page.getByRole('button', { name: '赠送礼物', exact: true }).click()

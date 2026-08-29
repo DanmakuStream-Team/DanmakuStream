@@ -48,7 +48,7 @@
 
 ## 4. E2E 测试
 
-入口：`npm run test:e2e:member-c`。
+入口：统一 `npm run test:e2e`（成员 C 用例已并入全量 E2E）。
 
 | 编号 | UC | 场景 | 验收点 |
 |---|---|---|---|

@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strconv"
 	"sync"
+	"time"
 
 	model "danmakustream/backend/internal/model/mysql"
 	"danmakustream/backend/internal/svc"
@@ -21,6 +22,8 @@ var activeBrowserPublishers = struct {
 	sync.Mutex
 	rooms map[uint]bool
 }{rooms: make(map[uint]bool)}
+
+var browserPublisherRecoveryDelay = 15 * time.Second
 
 // LivePublishWebSocketHandler receives a continuous WebM stream produced by
 // MediaRecorder, then lets FFmpeg publish it to the room's RTMP endpoint.
@@ -56,11 +59,7 @@ func LivePublishWebSocketHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		}
 		activeBrowserPublishers.rooms[roomID] = true
 		activeBrowserPublishers.Unlock()
-		defer func() {
-			activeBrowserPublishers.Lock()
-			delete(activeBrowserPublishers.rooms, roomID)
-			activeBrowserPublishers.Unlock()
-		}()
+		defer releaseBrowserPublisher(svcCtx, roomID)
 
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
@@ -108,6 +107,27 @@ func LivePublishWebSocketHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			}
 		}
 	}
+}
+
+func releaseBrowserPublisher(svcCtx *svc.ServiceContext, roomID uint) {
+	activeBrowserPublishers.Lock()
+	delete(activeBrowserPublishers.rooms, roomID)
+	activeBrowserPublishers.Unlock()
+	time.AfterFunc(browserPublisherRecoveryDelay, func() {
+		_ = finalizeAbandonedBrowserPublisher(svcCtx, roomID, time.Now())
+	})
+}
+
+func finalizeAbandonedBrowserPublisher(svcCtx *svc.ServiceContext, roomID uint, endedAt time.Time) error {
+	activeBrowserPublishers.Lock()
+	active := activeBrowserPublishers.rooms[roomID]
+	activeBrowserPublishers.Unlock()
+	if active {
+		return nil
+	}
+	return svcCtx.DB.Model(&model.LiveRoom{}).
+		Where("id = ? AND status = ?", roomID, "live").
+		Updates(map[string]any{"status": "ended", "viewer_count": 0, "ended_at": &endedAt}).Error
 }
 
 const liveAppName = "live"

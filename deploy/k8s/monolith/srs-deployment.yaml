@@ -14,6 +14,7 @@ spec:
       containers:
         - name: srs
           image: ossrs/srs:5
+          command: ["./objs/srs", "-c", "conf/danmakustream.conf"]
           ports:
             - { containerPort: 1935 }  # RTMP 推流
             - { containerPort: 1985 }  # HTTP API（状态/健康）
@@ -25,3 +26,12 @@ spec:
           resources:
             requests: { cpu: 100m, memory: 256Mi }
             limits: { cpu: "1", memory: 1Gi }
+          volumeMounts:
+            - name: srs-config
+              mountPath: /usr/local/srs/conf/danmakustream.conf
+              subPath: danmakustream.conf
+              readOnly: true
+      volumes:
+        - name: srs-config
+          configMap:
+            name: srs-config

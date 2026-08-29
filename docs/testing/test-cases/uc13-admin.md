@@ -1,6 +1,6 @@
 # UC13 测试用例设计
 
-> 状态说明：本文只定义测试范围和断言。未执行的用例统一标记为“待实现/待执行”，不能提前填写通过。
+> 状态说明：本文同时记录测试范围、断言和已执行证据；只有真实执行并保存报告的项目才标记为通过。
 
 ## 1. 测试范围
 
@@ -74,10 +74,10 @@
 
 **发现的问题**：
 
-- **D1（已修复，见 §9 与 PR #62）**：原记录：`POST /admin/banners`、`POST /admin/announcements` 的创建响应使用 Go 结构体默认字段名（`ID`、`ImageURL`、`StartedAt`），与项目其余接口统一的 camelCase（更新/删除响应中的 `id`）不一致，前端对接易踩坑。建议在 Banner/Announcement 模型或响应结构上补 `json` tag。
+- **D1（缺陷，待修）**：`POST /admin/banners`、`POST /admin/announcements` 的创建响应使用 Go 结构体默认字段名（`ID`、`ImageURL`、`StartedAt`），与项目其余接口统一的 camelCase（更新/删除响应中的 `id`）不一致，前端对接易踩坑。建议在 Banner/Announcement 模型或响应结构上补 `json` tag。
 - **D2（备忘，非缺陷）**：登录按昵称+密码校验（`LoginReq` 虽含 `username` 字段但匹配逻辑使用昵称），新注册用户 username 为自动生成的数字。测试与联调时统一使用昵称登录。
 
-**执行记录**：E2E-TC13-01～05 已于 2026-08-26 执行并通过，见 §9。
+**E2E 补执行（2026-08-29）**：E2E-TC13-01～05 在 Chromium 中 5/5 通过，HTML 证据见 `docs/testing/reports/uc13-e2e/index.html`。
 
 ## 7. 单元测试执行记录（2026-08-26）
 
@@ -98,7 +98,7 @@ GOCACHE=/tmp/go-build go test ./...
 
 6 个测试函数（13 个子测试）全部通过，全后端无编译/回归问题。原始报告：`docs/testing/reports/uc13-unit-2026-08-26.txt`（总数 6、通过 6、失败 0）。
 
-**结论**：单元测试未发现新的业务缺陷；此前 API 层发现的 D1（JSON 字段命名不一致）不属单元层断言范围，已随 PR #62 修复并回归。
+**结论**：单元测试未发现新的业务缺陷；此前 API 层发现的 D1（JSON 字段命名不一致）不属单元层断言范围，仍待修。
 
 ## 8. API 自动化测试（2026-08-26）
 

@@ -20,7 +20,13 @@ test('E2E-TC13-01 审核员审核视频并屏蔽弹幕，刷新后状态保持',
   const row = page.locator('.row', { hasText: 'E2E-UC13-待审视频' })
   await expect(row).toBeVisible()
   await row.locator('.el-select').click()
+  const reviewResponsePromise = page.waitForResponse((response) =>
+    /\/api\/v1\/admin\/videos\/\d+\/status$/.test(response.url())
+      && response.request().method() === 'PUT',
+  )
   await dropdownOption(page, '通过').click()
+  const reviewResponse = await reviewResponsePromise
+  expect(reviewResponse.ok(), `视频审核接口返回 ${reviewResponse.status()}: ${await reviewResponse.text()}`).toBeTruthy()
   await expect(row.locator('.el-tag')).toContainText('已通过')
 
   // 弹幕屏蔽

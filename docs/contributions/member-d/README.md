@@ -44,7 +44,7 @@
 - [CI 工作流](../../../.github/workflows/ci.yml)：PR/推送时自动执行三个用例的 MySQL 集成测试与 Playwright E2E，失败会阻止后续 Docker 镜像构建。
 - 后端全量验证：`go test ./...` 已通过。
 - 三用例及直播机制集成验证：`go test -tags=integration ./internal/handler/v1/live ./internal/logic/danmaku ./integration -v` 已通过。
-- 浏览器 E2E：`npm run test:e2e:d`，Chromium 3/3 通过。
+- 浏览器 E2E：统一入口 `npm run test:e2e`（本域为 e2e/d-engagement.spec.ts），Chromium 3/3 通过。
 - 前端生产验证：`npm run build` 已通过；仅有既有的包体积提示，无编译错误。
 - 真实媒体链路：FFmpeg 推送 30 秒测试流至 SRS，HLS 主清单、媒体清单和 TS 分片均返回 HTTP 200。
 - 覆盖率：成员 D 用例函数口径 90.3%（924/1023），相关文件保守口径 58.1%（940/1618）。
@@ -55,5 +55,6 @@
 - 开发基线：已同步 `origin/dev` 的文档重组基线 `fdc44ad`。
 - 文档、单元测试、三个用例的 MySQL/API 集成测试、真实 WebSocket 测试和三条 Playwright E2E：已完成。
 - 已处理：同主播相同开播时间冲突、登录观众多连接去重、直播弹幕写入失败不广播并返回错误、UC05/UC09/UC10 集成测试证据。
-- 后续增强：保存 UC05 代表性页面截图、WebSocket 断网重连现场测试，以及异常推流状态恢复测试。
+- 已处理（2026-08-29）：UC10 浏览器 WebSocket 断开后 3 秒自动重连且在线人数不重复；浏览器推流及 SRS/OBS 推流异常断开后进入 15 秒恢复窗口，未重连则直播间自动结束。
+- 后续仅需从现有 HTML 报告中选取 UC05 代表性页面截图用于最终汇报。
 - `engagement-service` 仍是计划中的拆分目标；当前设计和代码追溯以可运行的单体实现为准。
