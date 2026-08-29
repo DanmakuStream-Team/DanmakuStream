@@ -8,12 +8,13 @@
 | 互动与直播域 | UC05、UC09、UC10 | `usecase/UC05-UC09-UC10-overview`、`object/DOMAIN-CLASS-D`、`component/COMPONENT-D`、`object/IMPLEMENTATION-CLASS-D` |
 | 用例说明 | UC13 | `usecase/UC13.md` |
 | 总用例图 | UC01～UC13 全部参与者与用例 | `usecase/USECASE-OVERVIEW` |
+| 总体组件图 | UC01～UC13 当前实现的逻辑组件与外部依赖 | `component/COMPONENT-OVERVIEW` |
 | 系统级 | UC01～UC13 全部（UC06 于 PR #68 补齐） | `system/SYS-SEQxx` |
 | 组件级 | UC01～UC13 全部 | `component/COMP-SEQxx` |
 | 对象级 | UC01～UC13 全部 | `object/OBJ-SEQxx` |
 | 部署 | 单体、单体详图、Kubernetes | `deployment/DEPLOY-MONO`、`DEPLOY-MONO-DETAILED`、`DEPLOY-K8S` |
 
-目前共有 46 个 PlantUML 正式源文件（不含 `_theme.puml`），全部应保留同名 SVG 和 PNG。当前尚未提交三层模型的用例为 UC06。
+目前共有 51 个 PlantUML 正式源文件（不含 `_theme.puml`），全部应保留同名 SVG 和 PNG。UC01～UC13 的系统级、组件级和对象级顺序图均已提交。
 
 ## 目录与图类
 

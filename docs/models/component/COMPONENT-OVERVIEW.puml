@@ -1,0 +1,87 @@
+@startuml COMPONENT-OVERVIEW
+!include ../_theme.puml
+title DanmakuStream 全系统总体组件图（UC01-UC13）
+top to bottom direction
+skinparam nodesep 28
+skinparam ranksep 34
+
+actor "游客 / 普通用户" as User
+actor "创作者 / 主播" as Creator
+actor "审核员 / 管理员" as Staff
+
+package "Vue 3 前端" as Frontend {
+  component "业务页面\n账号与资料 UC01/06/07/08/11\n视频与创作 UC02/03/05/12\n直播 UC09/10 · 后台 UC04/13" as Pages
+  component "HTTP API Client\nAxios /api/v1" as HttpClient
+  component "WebSocket Client\n/ws/live · /ws/chat" as WsClient
+  component "VideoPlayer\nMP4 / HLS" as Player
+}
+
+node "frontend 容器" as FrontContainer {
+  component "Nginx\n静态资源与反向代理" as Nginx
+}
+
+package "Gin 单体后端" as Backend {
+  component "Gin Router\n/api/v1 · /ws" as Router
+  component "Auth / Staff / Admin Middleware\nJWT 与角色鉴权" as Middleware
+
+  together {
+    component "用户与社交组件\nUC01 认证资料\nUC06 资料库\nUC07 关注通知\nUC08 会员订单\nUC11 私信分享" as UserDomain
+    component "视频内容组件\nUC02 发现播放\nUC03 投稿处理\nUC04 审核发布\nUC05 观看互动\nUC12 数据分析" as ContentDomain
+    component "直播组件\nUC09 计划预约\nUC10 房间、观看与互动" as LiveDomain
+    component "平台治理组件\nUC13 用户、运营、\n权限与基础设施管理" as AdminDomain
+  }
+
+  component "Chat Hub / Live Hub\n实时广播与在线状态" as Hubs
+  component "Schedule / Membership Worker\n预约启动与订阅到期" as Workers
+  component "GORM 数据访问与事务" as DataAccess
+}
+
+database "MySQL 8\n用户 · 视频 · 互动 · 直播\n会员 · 消息 · 运营 · 统计" as MySQL
+folder "media-data 卷\n视频 · 封面 · 头像 · 消息附件" as MediaStore
+component "FFmpeg / FFprobe\n转码 · 探测 · 截帧" as FFmpeg
+node "SRS\nRTMP / HLS" as SRS
+
+User --> Pages
+Creator --> Pages
+Staff --> Pages
+Pages --> HttpClient
+Pages --> WsClient
+Pages --> Player
+
+HttpClient --> Nginx : HTTP /api/v1
+WsClient --> Nginx : WebSocket /ws
+Nginx --> Router
+Router --> Middleware
+
+Middleware --> UserDomain
+Middleware --> ContentDomain
+Middleware --> LiveDomain
+Middleware --> AdminDomain
+
+UserDomain --> DataAccess
+ContentDomain --> DataAccess
+LiveDomain --> DataAccess
+AdminDomain --> DataAccess
+DataAccess --> MySQL
+
+UserDomain --> Hubs : 私信
+LiveDomain --> Hubs : 直播事件
+Hubs --> DataAccess : 先持久化后广播
+Workers --> UserDomain : 订阅到期
+Workers --> LiveDomain : 预约启动
+
+UserDomain --> MediaStore : 头像 / 附件
+ContentDomain --> MediaStore : 点播资源
+ContentDomain --> FFmpeg
+FFmpeg --> MediaStore
+LiveDomain --> SRS : 推流/播放信息
+Creator --> SRS : RTMP 推流
+SRS --> Player : HLS 播放
+Player --> MediaStore : /media
+
+note bottom of Backend
+当前运行基线为一个 Gin 进程；图中四个业务组件表示代码职责边界，
+不表示 user/content/engagement 微服务已经独立部署。
+end note
+
+@enduml
