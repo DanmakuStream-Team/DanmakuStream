@@ -180,9 +180,17 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="状态" width="100">
+          <el-table-column label="状态" min-width="170">
             <template #default="{ row }">
-              <el-tag :type="statusType(row.status)" effect="plain">{{ statusText(row.status) }}</el-tag>
+              <div class="status-stack">
+                <el-tag :type="statusType(row.status)" effect="plain">{{ statusText(row.status) }}</el-tag>
+                <el-tag :type="transcodeStatusType(row.transcodeStatus)" effect="plain">
+                  {{ transcodeStatusText(row.transcodeStatus) }}
+                </el-tag>
+                <small v-if="row.transcodeStatus === 'failed'" class="transcode-error">
+                  {{ row.transcodeError || '视频转码失败，请重新上传' }}
+                </small>
+              </div>
             </template>
           </el-table-column>
 
@@ -231,7 +239,7 @@ import MetricLineChart from '@/components/creator/MetricLineChart.vue'
 import { videoApi } from '@/api/video'
 import { membershipApi } from '@/api/membership'
 import { useAuthStore } from '@/store/auth'
-import type { CreatorAnalytics, VideoInfo, VideoStatus } from '@/types'
+import type { CreatorAnalytics, TranscodeStatus, VideoInfo, VideoStatus } from '@/types'
 import { formatCount, formatDuration, formatTime, mediaUrl, normalizeTags } from '@/utils/format'
 
 const router = useRouter()
@@ -363,6 +371,14 @@ function statusText(value: VideoStatus) {
 
 function statusType(value: VideoStatus) {
   return ({ pending: 'warning', approved: 'success', rejected: 'danger' } as const)[value]
+}
+
+function transcodeStatusText(value?: TranscodeStatus) {
+  return ({ processing: '转码中', ready: '转码完成', failed: '转码失败' } as const)[value || 'processing']
+}
+
+function transcodeStatusType(value?: TranscodeStatus) {
+  return ({ processing: 'warning', ready: 'success', failed: 'danger' } as const)[value || 'processing']
 }
 
 async function deleteVideo(video: VideoInfo) {
@@ -742,6 +758,19 @@ async function deleteVideo(video: VideoInfo) {
 .meta {
   display: grid;
   gap: 5px;
+}
+
+.status-stack {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.transcode-error {
+  max-width: 160px;
+  color: #d92d20;
+  line-height: 1.4;
 }
 
 .row-actions {

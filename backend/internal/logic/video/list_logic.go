@@ -2,13 +2,15 @@ package videologic
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	model "danmakustream/backend/internal/model/mysql"
 	"danmakustream/backend/internal/svc"
 
 	"gorm.io/gorm"
 )
+
+var ErrInvalidVideoSort = errors.New("无效的视频排序方式")
 
 type ListVideoLogic struct {
 	ctx    context.Context
@@ -36,21 +38,23 @@ type PageResult[T any] struct {
 }
 
 type VideoInfo struct {
-	ID           uint            `json:"id"`
-	Title        string          `json:"title"`
-	Description  string          `json:"description"`
-	CoverURL     string          `json:"coverUrl"`
-	VideoURL     string          `json:"videoUrl"`
-	Duration     int             `json:"duration"`
-	ViewCount    int64           `json:"viewCount"`
-	LikeCount    int64           `json:"likeCount"`
-	CollectCount int64           `json:"collectCount"`
-	DanmakuCount int64           `json:"danmakuCount"`
-	Status       string          `json:"status"`
-	Tags         string          `json:"tags"`
-	Category     string          `json:"category"`
-	CreatedAt    string          `json:"createdAt"`
-	Author       *model.UserInfo `json:"author"`
+	ID              uint            `json:"id"`
+	Title           string          `json:"title"`
+	Description     string          `json:"description"`
+	CoverURL        string          `json:"coverUrl"`
+	VideoURL        string          `json:"videoUrl"`
+	Duration        int             `json:"duration"`
+	ViewCount       int64           `json:"viewCount"`
+	LikeCount       int64           `json:"likeCount"`
+	CollectCount    int64           `json:"collectCount"`
+	DanmakuCount    int64           `json:"danmakuCount"`
+	Status          string          `json:"status"`
+	TranscodeStatus string          `json:"transcodeStatus"`
+	TranscodeError  string          `json:"transcodeError"`
+	Tags            string          `json:"tags"`
+	Category        string          `json:"category"`
+	CreatedAt       string          `json:"createdAt"`
+	Author          *model.UserInfo `json:"author"`
 }
 
 func (l *ListVideoLogic) List(req *VideoListReq) (*PageResult[VideoInfo], error) {
@@ -65,6 +69,12 @@ func (l *ListVideoLogic) List(req *VideoListReq) (*PageResult[VideoInfo], error)
 	}
 	if req.Sort == "" {
 		req.Sort = "hot"
+	}
+	const hotScoreExpr = "(like_count * 5 + collect_count * 3 + danmaku_count * 2 + view_count) " +
+		"/ POW(GREATEST(TIMESTAMPDIFF(HOUR, created_at, NOW()), 0) + 2, 1.2)"
+	sortExpr, err := videoSortExpr(req.Sort, hotScoreExpr)
+	if err != nil {
+		return nil, err
 	}
 
 	db := l.svcCtx.DB.Model(&model.Video{}).
@@ -88,14 +98,6 @@ func (l *ListVideoLogic) List(req *VideoListReq) (*PageResult[VideoInfo], error)
 
 	var total int64
 	if err := db.Count(&total).Error; err != nil {
-		return nil, err
-	}
-
-	const hotScoreExpr = "(like_count * 5 + collect_count * 3 + danmaku_count * 2 + view_count) " +
-		"/ POW(GREATEST(TIMESTAMPDIFF(HOUR, created_at, NOW()), 0) + 2, 1.2)"
-
-	sortExpr, err := videoSortExpr(req.Sort, hotScoreExpr)
-	if err != nil {
 		return nil, err
 	}
 
@@ -124,20 +126,22 @@ func (l *ListVideoLogic) List(req *VideoListReq) (*PageResult[VideoInfo], error)
 	list := make([]VideoInfo, 0, len(videos))
 	for _, video := range videos {
 		list = append(list, VideoInfo{
-			ID:           video.ID,
-			Title:        video.Title,
-			Description:  video.Description,
-			CoverURL:     video.CoverURL,
-			VideoURL:     video.VideoURL,
-			Duration:     video.Duration,
-			ViewCount:    video.ViewCount,
-			LikeCount:    video.LikeCount,
-			CollectCount: video.CollectCount,
-			DanmakuCount: video.DanmakuCount,
-			Status:       video.Status,
-			Tags:         video.Tags,
-			Category:     video.Category,
-			CreatedAt:    video.CreatedAt.Format("2006-01-02 15:04:05"),
+			ID:              video.ID,
+			Title:           video.Title,
+			Description:     video.Description,
+			CoverURL:        video.CoverURL,
+			VideoURL:        video.VideoURL,
+			Duration:        video.Duration,
+			ViewCount:       video.ViewCount,
+			LikeCount:       video.LikeCount,
+			CollectCount:    video.CollectCount,
+			DanmakuCount:    video.DanmakuCount,
+			Status:          video.Status,
+			TranscodeStatus: EffectiveTranscodeStatus(video),
+			TranscodeError:  video.TranscodeError,
+			Tags:            video.Tags,
+			Category:        video.Category,
+			CreatedAt:       video.CreatedAt.Format("2006-01-02 15:04:05"),
 			Author: &model.UserInfo{
 				ID:       video.Author.ID,
 				Username: video.Author.Username,
@@ -167,6 +171,6 @@ func videoSortExpr(sort string, hotScoreExpr string) (string, error) {
 	case "collect":
 		return "collect_count DESC, created_at DESC", nil
 	default:
-		return "", fmt.Errorf("无效的视频排序方式")
+		return "", ErrInvalidVideoSort
 	}
 }

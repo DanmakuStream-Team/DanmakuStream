@@ -1,5 +1,6 @@
 export type UserRole = 'user' | 'creator' | 'moderator' | 'admin'
 export type VideoStatus = 'pending' | 'approved' | 'rejected'
+export type TranscodeStatus = 'processing' | 'ready' | 'failed'
 
 export interface UserInfo {
   id: number
@@ -30,6 +31,8 @@ export interface VideoInfo {
   collectCount: number
   danmakuCount: number
   status: VideoStatus
+  transcodeStatus?: TranscodeStatus
+  transcodeError?: string
   category: string
   author: UserInfo
   tags: string | string[]

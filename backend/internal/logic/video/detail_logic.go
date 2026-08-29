@@ -11,6 +11,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var ErrVideoNotFound = errors.New("视频不存在")
+
 type DetailVideoLogic struct {
 	ctx    context.Context
 	svcCtx *svc.ServiceContext
@@ -35,10 +37,16 @@ func (l *DetailVideoLogic) Detail(req *VideoDetailReq) (*VideoDetailInfo, error)
 	}
 
 	var target model.Video
-	if err := l.svcCtx.DB.Select("id", "author_id").
+	if err := l.svcCtx.DB.Select("id", "author_id", "video_url").
 		Where("id = ? AND status = ?", req.ID, "approved").
 		First(&target).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrVideoNotFound
+		}
 		return nil, err
+	}
+	if err := EnsureMediaAvailable(l.svcCtx.VideoDir, target.VideoURL); err != nil {
+		return nil, ErrMediaUnavailable
 	}
 
 	if err := l.svcCtx.DB.Transaction(func(tx *gorm.DB) error {
@@ -71,20 +79,22 @@ func (l *DetailVideoLogic) Detail(req *VideoDetailReq) (*VideoDetailInfo, error)
 
 	return &VideoDetailInfo{
 		VideoInfo: VideoInfo{
-			ID:           video.ID,
-			Title:        video.Title,
-			Description:  video.Description,
-			CoverURL:     video.CoverURL,
-			VideoURL:     video.VideoURL,
-			Duration:     video.Duration,
-			ViewCount:    video.ViewCount,
-			LikeCount:    video.LikeCount,
-			CollectCount: video.CollectCount,
-			DanmakuCount: video.DanmakuCount,
-			Status:       video.Status,
-			Tags:         video.Tags,
-			Category:     video.Category,
-			CreatedAt:    video.CreatedAt.Format("2006-01-02 15:04:05"),
+			ID:              video.ID,
+			Title:           video.Title,
+			Description:     video.Description,
+			CoverURL:        video.CoverURL,
+			VideoURL:        video.VideoURL,
+			Duration:        video.Duration,
+			ViewCount:       video.ViewCount,
+			LikeCount:       video.LikeCount,
+			CollectCount:    video.CollectCount,
+			DanmakuCount:    video.DanmakuCount,
+			Status:          video.Status,
+			TranscodeStatus: EffectiveTranscodeStatus(video),
+			TranscodeError:  video.TranscodeError,
+			Tags:            video.Tags,
+			Category:        video.Category,
+			CreatedAt:       video.CreatedAt.Format("2006-01-02 15:04:05"),
 			Author: &model.UserInfo{
 				ID:       video.Author.ID,
 				Username: video.Author.Username,

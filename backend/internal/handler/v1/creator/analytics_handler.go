@@ -139,9 +139,13 @@ func AnalyticsHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		}
 
 		topVideos := make([]topVideoInfo, 0, 5)
-		if err := svcCtx.DB.Model(&model.Video{}).
+		topVideosQuery := svcCtx.DB.Model(&model.Video{}).
 			Select("id, title, cover_url, status, view_count, like_count, collect_count").
-			Where("author_id = ?", creatorID).
+			Where("author_id = ?", creatorID)
+		if videoID != 0 {
+			topVideosQuery = topVideosQuery.Where("id = ?", videoID)
+		}
+		if err := topVideosQuery.
 			Order("view_count DESC, collect_count DESC, created_at DESC").
 			Limit(5).
 			Scan(&topVideos).Error; err != nil {

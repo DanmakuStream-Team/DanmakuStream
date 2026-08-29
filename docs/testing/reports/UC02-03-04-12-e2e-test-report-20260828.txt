@@ -1,0 +1,37 @@
+
+> danmaku-stream-frontend@0.1.0 test:e2e:member-c
+> playwright test e2e/member-c-content.spec.ts
+
+[WebServer] (node:320589) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] node_modules/@vueuse/core/dist/index.js (3362:0): A comment
+[WebServer]
+[WebServer] "/* #__PURE__ */"
+[WebServer]
+[WebServer] in "node_modules/@vueuse/core/dist/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+[WebServer] node_modules/@vueuse/core/dist/index.js (5780:22): A comment
+[WebServer]
+[WebServer] "/* #__PURE__ */"
+[WebServer]
+[WebServer] in "node_modules/@vueuse/core/dist/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+[WebServer] [plugin vite:reporter]
+[WebServer] (!) /home/starsgazer/work/DanmakuStream/frontend/src/router/index.ts is dynamically imported by /home/starsgazer/work/DanmakuStream/frontend/src/utils/request.ts but also statically imported by /home/starsgazer/work/DanmakuStream/frontend/src/main.ts, dynamic import will not move module into another chunk.
+[WebServer]
+[WebServer]
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:320692) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 4 tests using 1 worker
+
+(node:320803) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/member-c-content.spec.ts:11:7 › 成员 C 内容域 › UC02 用户搜索公开视频并进入播放页 (13.3s)
+  ✓  2 [chromium] › e2e/member-c-content.spec.ts:35:7 › 成员 C 内容域 › UC03 创作者取消上传后重新投稿并看到待审状态 (9.7s)
+  ✓  3 [chromium] › e2e/member-c-content.spec.ts:86:7 › 成员 C 内容域 › UC04 审核员发布与拒绝视频，普通用户不能越权 (10.4s)
+  ✓  4 [chromium] › e2e/member-c-content.spec.ts:126:7 › 成员 C 内容域 › UC12 创作者切换 7 天和单作品分析范围 (10.6s)
+
+  4 passed (1.1m)
