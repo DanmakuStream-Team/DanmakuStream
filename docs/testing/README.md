@@ -1,5 +1,7 @@
 # 自动化测试目录
 
+综合测试计划、设计、规程、日志与结果汇总见 [DanmakuStream 综合测试报告](./comprehensive-test-report.md)。
+
 测试组织参考 `origin/feature/uc13-tests`：每个用例分别维护单元、API 集成和 E2E 测试设计，使用统一追溯编号。
 
 | 用例 | 测试设计 |
