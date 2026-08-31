@@ -30,6 +30,9 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		&model.Danmaku{},
 		&model.Comment{},
 		&model.LiveRoom{},
+		&model.LiveLike{},
+		&model.LiveGift{},
+		&model.LiveReplay{},
 		&model.DynamicPost{},
 		&model.LiveSchedule{},
 		&model.LiveReservation{},
@@ -37,11 +40,26 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		&model.SiteBanner{},
 		&model.SiteAnnouncement{},
 		&model.TrafficStat{},
+		&model.CreatorDailyStat{},
+		&model.VideoDailyStat{},
+		&model.FollowGroup{},
 		&model.Follow{},
+		&model.UserBlock{},
+		&model.ChatMessage{},
+		&model.CreatorMembershipPlan{},
+		&model.CreatorSubscription{},
+		&model.SubscriptionOrder{},
 		&model.Like{},
 		&model.Collect{},
 		&model.CommentLike{},
+		&model.WatchHistory{},
+		&model.WatchLater{},
 	)
+	// Existing rows predate the independent transcode state. A non-empty media
+	// URL means the legacy record completed processing; otherwise it is pending.
+	db.Model(&model.Video{}).
+		Where("transcode_status IS NULL OR transcode_status = ''").
+		Update("transcode_status", gorm.Expr("CASE WHEN video_url IS NOT NULL AND video_url <> '' THEN 'ready' ELSE 'processing' END"))
 
 	videoDir := c.VideoDir
 	if videoDir == "" {
@@ -52,6 +70,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	os.MkdirAll(filepath.Join(absDir, "covers"), 0755)
 	os.MkdirAll(filepath.Join(absDir, "avatars"), 0755)
 	os.MkdirAll(filepath.Join(absDir, "images"), 0755)
+	os.MkdirAll(filepath.Join(absDir, "live"), 0755)
 
 	return &ServiceContext{
 		Config:   c,

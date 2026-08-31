@@ -1,0 +1,24 @@
+# 非敏感配置。JWT Secret 与数据库 DSN 由 Deployment 从 Secret 注入，
+# 后端启动时通过 DMS_JWT_SECRET / DMS_DATABASE_DSN 覆盖下面的占位值。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: danmakustream
+data:
+  config.yaml: |
+    Name: danmakustream-api
+    Host: 0.0.0.0
+    Port: 8080
+    Auth:
+      AccessSecret: "overridden-by-environment"
+      AccessExpire: 86400
+    Database:
+      DataSource: "overridden-by-environment"
+    VideoDir: "data"
+    Live:
+      RTMPHost: "srs:1935"
+      HTTPHost: "srs:8080"
+    Log:
+      Mode: console
+      Level: info

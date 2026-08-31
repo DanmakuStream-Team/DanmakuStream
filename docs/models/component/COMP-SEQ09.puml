@@ -1,0 +1,33 @@
+@startuml COMP-SEQ09
+!include ../_theme.puml
+title COMP-SEQ09 UC09 直播预约与用户预约（组件级）
+actor "主播" as A
+actor "用户" as V
+participant "LiveListPage" as P
+participant "liveApi" as API
+participant "Gin Router / Auth" as R
+participant "Schedule Handler" as H
+participant "Schedule Worker" as W
+database "MySQL" as D
+
+A -> P: 填写并发布计划
+P -> API: createSchedule
+API -> R: POST /live-schedules
+R -> H: CreateScheduleHandler
+H -> D: 事务创建计划和关注通知
+D --> H: 事务提交
+H --> R: pending 计划
+R --> API: HTTP 201
+API --> P: 展示 pending 计划
+V -> P: 点击预约
+P -> API: reserveSchedule(id)
+API -> R: POST /live-schedules/:id/reserve
+R -> H: ReserveScheduleHandler
+H -> D: 事务切换预约关系和 reminder_count
+D --> H: 事务提交结果
+H --> R: reserved + reminderCount
+R --> API: HTTP 200
+API --> P: 更新预约状态和人数
+W -> D: 每 30 秒扫描到期 pending 计划
+W -> D: 事务更新 live 并准备直播间/通知
+@enduml

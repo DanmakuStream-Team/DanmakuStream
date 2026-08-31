@@ -1,0 +1,39 @@
+@startuml COMP-SEQ10
+!include ../_theme.puml
+title COMP-SEQ10 UC10 直播发布、观看与实时互动（组件级）
+actor "主播" as A
+actor "观众" as V
+participant "LiveStudioPage" as SP
+participant "LiveRoomPage" as RP
+participant "liveApi" as API
+participant "Live / Interaction Handler" as H
+participant "WebSocket Handler" as WS
+participant "Live Hub" as Hub
+database "MySQL" as DB
+participant "SRS" as SRS
+
+A -> SP: 开始直播
+SP -> API: createLive
+API -> H: POST /live
+H -> DB: 创建/复用房间并重置本场统计
+DB --> H: 事务提交
+H --> API: room + streamKey
+API --> SP: 更新直播工作台
+SP -> WS: 连接 /ws/live-publish/:id
+WS -> SRS: 转发 WebM 媒体
+V -> RP: 进入直播间
+RP -> API: detail + interaction + danmaku
+RP -> WS: 连接 /ws/live/:id
+WS -> Hub: Register(client)
+Hub -> DB: 更新 viewer_count/viewer_peak
+Hub --> RP: viewer_count
+V -> API: 点赞/礼物
+API -> H: interaction request
+H -> DB: 事务写入并更新统计
+H -> Hub: BroadcastEvent
+Hub --> RP: live_like / live_gift
+V -> WS: 发送弹幕
+WS -> Hub: 权限/慢速模式校验
+Hub -> DB: 保存 live danmaku
+Hub --> RP: danmaku
+@enduml

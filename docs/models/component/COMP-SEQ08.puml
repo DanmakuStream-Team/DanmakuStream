@@ -1,0 +1,27 @@
+@startuml
+!include ../_theme.puml
+title COMP-SEQ08 UC08 会员订阅组件顺序图
+autonumber
+actor 用户 as U
+participant "会员订阅页" as UI
+participant "API Gateway" as GW
+participant "会员订阅管理" as MEMBER
+participant "订单管理" as ORDER
+participant "支付管理" as PAY
+U -> UI: 选择方案并确认购买
+UI -> GW: 创建订阅订单
+GW -> MEMBER: validatePlan(userId, creatorId, planId)
+MEMBER --> GW: 方案与金额/规则错误
+opt 校验通过
+  GW -> ORDER: createOrder(plan, amount, idempotencyKey)
+  ORDER --> GW: 待支付订单
+  GW --> UI: 支付信息
+  UI -> PAY: 演示支付(orderNo)
+  PAY -> ORDER: confirmPayment(orderNo, amount)
+  ORDER -> MEMBER: activateOrRenew(subscription)
+  MEMBER --> ORDER: 订阅状态与有效期
+  ORDER --> PAY: 支付处理结果
+  PAY --> UI: 最终订阅结果
+end
+UI --> U: 显示结果
+@enduml

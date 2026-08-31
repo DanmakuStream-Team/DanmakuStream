@@ -15,6 +15,7 @@ import (
 	"gorm.io/gorm"
 
 	"danmakustream/backend/internal/handler/response"
+	analyticslogic "danmakustream/backend/internal/logic/analytics"
 	videologic "danmakustream/backend/internal/logic/video"
 	"danmakustream/backend/internal/middleware"
 	model "danmakustream/backend/internal/model/mysql"
@@ -38,6 +39,10 @@ func isValidVideoStatus(status string) bool {
 	return status == "pending" || status == "approved" || status == "rejected"
 }
 
+func isValidReviewDecision(status string) bool {
+	return status == "approved" || status == "rejected"
+}
+
 type updateVideoReq struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
@@ -55,6 +60,10 @@ func ListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		l := videologic.NewListVideoLogic(c.Request.Context(), svcCtx)
 		resp, err := l.List(&req)
 		if err != nil {
+			if errors.Is(err, videologic.ErrInvalidVideoSort) {
+				response.Fail(c, http.StatusBadRequest, err.Error())
+				return
+			}
 			response.Fail(c, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -73,7 +82,14 @@ func DetailHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		l := videologic.NewDetailVideoLogic(c.Request.Context(), svcCtx)
 		resp, err := l.Detail(&req)
 		if err != nil {
-			response.Fail(c, http.StatusNotFound, err.Error())
+			switch {
+			case errors.Is(err, videologic.ErrVideoNotFound):
+				response.Fail(c, http.StatusNotFound, err.Error())
+			case errors.Is(err, videologic.ErrMediaUnavailable):
+				response.Fail(c, http.StatusServiceUnavailable, err.Error())
+			default:
+				response.Fail(c, http.StatusInternalServerError, "视频详情加载失败")
+			}
 			return
 		}
 		response.Ok(c, resp)
@@ -130,12 +146,13 @@ func UploadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		dst.Close()
 
 		video := model.Video{
-			Title:       title,
-			Description: description,
-			Tags:        tags,
-			Category:    category,
-			AuthorID:    userID,
-			Status:      "pending",
+			Title:           title,
+			Description:     description,
+			Tags:            tags,
+			Category:        category,
+			AuthorID:        userID,
+			Status:          "pending",
+			TranscodeStatus: "processing",
 		}
 		if err := svcCtx.DB.Create(&video).Error; err != nil {
 			os.Remove(tmpPath)
@@ -265,16 +282,7 @@ func DownloadHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 }
 
 func mediaPathToLocalPath(videoDir string, url string) (string, error) {
-	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
-		return "", errors.New("remote media is not supported")
-	}
-	cleanURL := strings.TrimPrefix(url, "/")
-	const mediaPrefix = "media/"
-	if !strings.HasPrefix(cleanURL, mediaPrefix) {
-		return "", errors.New("invalid media path")
-	}
-	relative := strings.TrimPrefix(cleanURL, mediaPrefix)
-	return filepath.Join(videoDir, filepath.FromSlash(relative)), nil
+	return videologic.MediaPathToLocalPath(videoDir, url)
 }
 
 func safeDownloadName(title string) string {
@@ -323,6 +331,12 @@ func transcodeVideoAsync(svcCtx *svc.ServiceContext, videoID uint, videoDir, tmp
 	)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		fmt.Printf("video %d transcode failed: %s\n", videoID, string(output))
+		if updateErr := svcCtx.DB.Model(&model.Video{}).Where("id = ?", videoID).Updates(map[string]any{
+			"transcode_status": "failed",
+			"transcode_error":  "视频转码失败，请检查文件格式后重新上传",
+		}).Error; updateErr != nil {
+			fmt.Printf("video %d transcode failure state update failed: %s\n", videoID, updateErr)
+		}
 		return
 	}
 
@@ -341,7 +355,9 @@ func transcodeVideoAsync(svcCtx *svc.ServiceContext, videoID uint, videoDir, tmp
 
 	relativePlaylist := fmt.Sprintf("/media/videos/%d/playlist.m3u8", videoID)
 	updates := map[string]any{
-		"video_url": relativePlaylist,
+		"video_url":        relativePlaylist,
+		"transcode_status": "ready",
+		"transcode_error":  "",
 	}
 	if duration > 0 {
 		updates["duration"] = duration
@@ -448,7 +464,7 @@ func CollectHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		}
 
 		var video model.Video
-		if err := svcCtx.DB.Select("id", "status").First(&video, videoID).Error; err != nil {
+		if err := svcCtx.DB.Select("id", "status", "author_id").First(&video, videoID).Error; err != nil {
 			response.Fail(c, http.StatusNotFound, "视频不存在")
 			return
 		}
@@ -468,9 +484,19 @@ func CollectHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 					return err
 				}
 				collected = false
-				return tx.Model(&model.Video{}).
+				result := tx.Model(&model.Video{}).
 					Where("id = ? AND collect_count > 0", videoID).
-					UpdateColumn("collect_count", gorm.Expr("collect_count - ?", 1)).Error
+					UpdateColumn("collect_count", gorm.Expr("collect_count - ?", 1))
+				if result.Error != nil {
+					return result.Error
+				}
+				if result.RowsAffected == 0 {
+					return nil
+				}
+				if err := analyticslogic.AddCreatorDailyStat(tx, video.AuthorID, 0, -1, 0); err != nil {
+					return err
+				}
+				return analyticslogic.AddVideoDailyStat(tx, video.AuthorID, uint(videoID), 0, -1)
 			}
 
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -485,9 +511,15 @@ func CollectHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			}
 
 			collected = true
-			return tx.Model(&model.Video{}).
+			if err := tx.Model(&model.Video{}).
 				Where("id = ?", videoID).
-				UpdateColumn("collect_count", gorm.Expr("collect_count + ?", 1)).Error
+				UpdateColumn("collect_count", gorm.Expr("collect_count + ?", 1)).Error; err != nil {
+				return err
+			}
+			if err := analyticslogic.AddCreatorDailyStat(tx, video.AuthorID, 0, 1, 0); err != nil {
+				return err
+			}
+			return analyticslogic.AddVideoDailyStat(tx, video.AuthorID, uint(videoID), 0, 1)
 		})
 
 		if err != nil {
@@ -553,20 +585,22 @@ func AdminListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		list := make([]videologic.VideoInfo, 0, len(videos))
 		for _, video := range videos {
 			list = append(list, videologic.VideoInfo{
-				ID:           video.ID,
-				Title:        video.Title,
-				Description:  video.Description,
-				CoverURL:     video.CoverURL,
-				VideoURL:     video.VideoURL,
-				Duration:     video.Duration,
-				ViewCount:    video.ViewCount,
-				LikeCount:    video.LikeCount,
-				CollectCount: video.CollectCount,
-				DanmakuCount: video.DanmakuCount,
-				Status:       video.Status,
-				Tags:         video.Tags,
-				Category:     video.Category,
-				CreatedAt:    video.CreatedAt.Format("2006-01-02 15:04:05"),
+				ID:              video.ID,
+				Title:           video.Title,
+				Description:     video.Description,
+				CoverURL:        video.CoverURL,
+				VideoURL:        video.VideoURL,
+				Duration:        video.Duration,
+				ViewCount:       video.ViewCount,
+				LikeCount:       video.LikeCount,
+				CollectCount:    video.CollectCount,
+				DanmakuCount:    video.DanmakuCount,
+				Status:          video.Status,
+				TranscodeStatus: videologic.EffectiveTranscodeStatus(video),
+				TranscodeError:  video.TranscodeError,
+				Tags:            video.Tags,
+				Category:        video.Category,
+				CreatedAt:       video.CreatedAt.Format("2006-01-02 15:04:05"),
 				Author: &model.UserInfo{
 					ID:       video.Author.ID,
 					Username: video.Author.Username,
@@ -600,22 +634,27 @@ func AdminUpdateStatusHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			return
 		}
 
-		if !isValidVideoStatus(req.Status) {
+		if !isValidReviewDecision(req.Status) {
 			response.Fail(c, http.StatusBadRequest, "无效的视频状态")
 			return
 		}
 
-		if req.Status == "approved" {
-			var video model.Video
-			if err := svcCtx.DB.Select("id", "video_url").First(&video, videoID).Error; err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					response.Fail(c, http.StatusNotFound, "视频不存在")
-					return
-				}
-				response.Fail(c, http.StatusInternalServerError, "视频加载失败")
+		var video model.Video
+		if err := svcCtx.DB.Select("id", "status", "video_url", "transcode_status").First(&video, videoID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				response.Fail(c, http.StatusNotFound, "视频不存在")
 				return
 			}
-			if video.VideoURL == "" {
+			response.Fail(c, http.StatusInternalServerError, "视频加载失败")
+			return
+		}
+		if video.Status != "pending" {
+			response.Fail(c, http.StatusConflict, "视频已完成审核，不能重复处理")
+			return
+		}
+
+		if req.Status == "approved" {
+			if videologic.EffectiveTranscodeStatus(video) != "ready" || video.VideoURL == "" {
 				if !hasUploadedVideoSource(svcCtx, uint(videoID)) {
 					response.Fail(c, http.StatusForbidden, "视频文件未上传成功，不能审核通过")
 					return
@@ -623,10 +662,14 @@ func AdminUpdateStatusHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 				response.Fail(c, http.StatusForbidden, "视频仍在转码，暂时不能审核通过")
 				return
 			}
+			if err := videologic.EnsureMediaAvailable(svcCtx.VideoDir, video.VideoURL); err != nil {
+				response.Fail(c, http.StatusForbidden, "视频媒体文件不存在，不能审核通过")
+				return
+			}
 		}
 
 		result := svcCtx.DB.Model(&model.Video{}).
-			Where("id = ?", videoID).
+			Where("id = ? AND status = ?", videoID, "pending").
 			Update("status", req.Status)
 
 		if result.Error != nil {
@@ -634,7 +677,7 @@ func AdminUpdateStatusHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			return
 		}
 		if result.RowsAffected == 0 {
-			response.Fail(c, http.StatusNotFound, "视频不存在")
+			response.Fail(c, http.StatusConflict, "视频已完成审核，不能重复处理")
 			return
 		}
 

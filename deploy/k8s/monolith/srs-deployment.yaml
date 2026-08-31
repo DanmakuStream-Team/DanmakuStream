@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: srs
+  namespace: danmakustream
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: srs }
+  template:
+    metadata:
+      labels: { app: srs }
+    spec:
+      containers:
+        - name: srs
+          image: ossrs/srs:5
+          command: ["./objs/srs", "-c", "conf/danmakustream.conf"]
+          ports:
+            - { containerPort: 1935 }  # RTMP 推流
+            - { containerPort: 1985 }  # HTTP API（状态/健康）
+            - { containerPort: 8080 }  # HLS 播放
+          readinessProbe:
+            httpGet: { path: /api/v1/versions, port: 1985 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 1Gi }
+          volumeMounts:
+            - name: srs-config
+              mountPath: /usr/local/srs/conf/danmakustream.conf
+              subPath: danmakustream.conf
+              readOnly: true
+      volumes:
+        - name: srs-config
+          configMap:
+            name: srs-config

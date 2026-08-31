@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: danmakustream
+  labels:
+    app.kubernetes.io/part-of: danmakustream
+    app.kubernetes.io/stage: monolith

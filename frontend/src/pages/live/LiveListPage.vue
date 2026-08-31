@@ -85,11 +85,49 @@
     </section>
     </section>
 
+    <section>
+      <div class="section-subhead">
+        <h2>直播回放</h2>
+        <span>{{ replayTotal }} 场已结束直播</span>
+      </div>
+      <div v-loading="replayLoading" class="replay-grid">
+        <article
+          v-for="replay in replays"
+          :key="replay.id"
+          class="replay-card"
+          @click="router.push(`/live/replay/${replay.id}`)"
+        >
+          <div class="replay-cover">
+            <img v-if="replay.coverUrl" :src="mediaUrl(replay.coverUrl)" :alt="replay.title">
+            <div v-else class="live-cover-fallback">Danmaku Replay</div>
+            <span class="replay-badge">回放</span>
+            <span class="replay-duration">{{ formatDuration(replay.duration) }}</span>
+          </div>
+          <div class="replay-body">
+            <h3>{{ replay.title }}</h3>
+            <button class="live-owner" type="button" :disabled="!replay.owner?.id" @click.stop="openUser(replay.owner?.id)">
+              <el-avatar :size="26" :src="mediaUrl(replay.owner?.avatar || '')">
+                {{ replay.owner?.nickname?.slice(0, 1) || 'U' }}
+              </el-avatar>
+              <span>{{ replay.owner?.nickname || replay.owner?.username || '匿名主播' }}</span>
+            </button>
+            <p>{{ formatCount(replay.viewerPeak) }} 峰值观看 · {{ replay.endedAt }}</p>
+          </div>
+        </article>
+        <div v-if="!replays.length && !replayLoading" class="soft-panel empty-panel">
+          <el-empty description="暂无直播回放" />
+        </div>
+      </div>
+    </section>
+
     <el-dialog v-model="createVisible" title="开始直播" width="460px">
       <el-form label-position="top">
         <el-form-item label="直播标题">
           <el-input v-model="createForm.title" maxlength="40" placeholder="输入直播标题" />
         </el-form-item>
+		<el-form-item label="开播方式">
+		  <el-segmented v-model="createForm.mode" :options="broadcastModeOptions" />
+		</el-form-item>
         <el-form-item label="直播封面">
           <div class="cover-uploader">
             <button class="cover-preview" type="button" @click="coverInputRef?.click()">
@@ -113,7 +151,10 @@
         </el-form-item>
       </el-form>
 
-      <div v-if="createdRoom" class="stream-info">
+	  <p v-if="createdRoom && createForm.mode !== 'obs'" class="browser-live-tip">
+		直播间已创建，进入工作台后选择设备并开始推流。
+	  </p>
+      <div v-if="createdRoom && createForm.mode === 'obs'" class="stream-info">
         <div class="stream-info-head">
           <strong>推流参数</strong>
           <el-button size="small" @click="copyAllStreamParams">复制全部</el-button>
@@ -133,6 +174,9 @@
         <el-button v-if="createdRoom" type="success" @click="router.push(`/live/${createdRoom.id}`)">
           进入直播间
         </el-button>
+		<el-button v-if="createdRoom && createForm.mode !== 'obs'" type="success" @click="openStudio">
+		  进入直播工作台
+		</el-button>
       </template>
     </el-dialog>
 
@@ -187,8 +231,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { liveApi } from '@/api/live'
 import { mediaApi } from '@/api/media'
-import type { LiveRoom, LiveSchedule } from '@/types'
-import { formatCount, mediaUrl } from '@/utils/format'
+import type { LiveReplay, LiveRoom, LiveSchedule } from '@/types'
+import { formatCount, formatDuration, mediaUrl } from '@/utils/format'
 import { useAuthStore } from '@/store/auth'
 
 const router = useRouter()
@@ -196,6 +240,7 @@ const route = useRoute()
 const authStore = useAuthStore()
 const loading = ref(false)
 const scheduleLoading = ref(false)
+const replayLoading = ref(false)
 const creating = ref(false)
 const creatingSchedule = ref(false)
 const uploadingCover = ref(false)
@@ -205,11 +250,20 @@ const coverInputRef = ref<HTMLInputElement>()
 const scheduleCoverInputRef = ref<HTMLInputElement>()
 const rooms = ref<LiveRoom[]>([])
 const schedules = ref<LiveSchedule[]>([])
+const replays = ref<LiveReplay[]>([])
+const replayTotal = ref(0)
 const createdRoom = ref<LiveRoom>()
 const createForm = reactive({
   title: '',
   coverUrl: '',
+	mode: 'obs' as 'obs' | 'camera' | 'screen' | 'screen_camera',
 })
+const broadcastModeOptions = [
+	{ label: 'OBS', value: 'obs' },
+	{ label: '摄像头', value: 'camera' },
+	{ label: '屏幕', value: 'screen' },
+	{ label: '画中画', value: 'screen_camera' },
+]
 const scheduleForm = reactive({
   title: '',
   coverUrl: '',
@@ -232,9 +286,23 @@ const streamParams = computed(() => {
 })
 
 onMounted(async () => {
-  await Promise.all([loadLiveRooms(), loadLiveSchedules()])
+  await Promise.all([loadLiveRooms(), loadLiveSchedules(), loadReplays()])
   if (route.query.create === '1') openCreateDialog()
 })
+
+async function loadReplays() {
+  replayLoading.value = true
+  try {
+    const res = await liveApi.replays({ page: 1, pageSize: 8 })
+    replays.value = res.data.list
+    replayTotal.value = res.data.total
+  } catch {
+    replays.value = []
+    replayTotal.value = 0
+  } finally {
+    replayLoading.value = false
+  }
+}
 
 async function loadLiveRooms() {
   loading.value = true
@@ -271,6 +339,7 @@ function openCreateDialog() {
   createdRoom.value = undefined
   createForm.title = `${authStore.userInfo?.nickname || '我的'}的直播间`
   createForm.coverUrl = ''
+	createForm.mode = 'obs'
   createVisible.value = true
 }
 
@@ -394,6 +463,12 @@ async function createLiveRoom() {
   } finally {
     creating.value = false
   }
+}
+
+function openStudio() {
+  if (!createdRoom.value || createForm.mode === 'obs') return
+  createVisible.value = false
+  router.push({ path: `/live/studio/${createdRoom.value.id}`, query: { mode: createForm.mode } })
 }
 
 async function copyText(text: string, label = '内容') {
@@ -749,7 +824,89 @@ function copyAllStreamParams() {
   width: 100%;
 }
 
+.browser-live-tip { margin: 0; padding: 12px; border-left: 3px solid #00aeec; background: #f4fbff; color: #61666d; font-size: 13px; }
+
+.replay-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 22px 16px;
+}
+
+.replay-grid .empty-panel {
+  grid-column: 1 / -1;
+}
+
+.replay-card {
+  min-width: 0;
+  cursor: pointer;
+}
+
+.replay-cover {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  place-items: center;
+  border-radius: 8px;
+  background: #eef1f5;
+}
+
+.replay-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.2s ease;
+}
+
+.replay-card:hover .replay-cover img {
+  transform: scale(1.025);
+}
+
+.replay-badge,
+.replay-duration {
+  position: absolute;
+  bottom: 8px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 68%);
+  color: #fff;
+  font-size: 11px;
+}
+
+.replay-badge { left: 8px; }
+.replay-duration { right: 8px; }
+
+.replay-body {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  padding-top: 10px;
+}
+
+.replay-body h3 {
+  overflow: hidden;
+  margin: 0;
+  color: #18191c;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replay-body p {
+  margin: 0;
+  color: #9499a0;
+  font-size: 12px;
+}
+
+.replay-card:hover h3 { color: #00aeec; }
+
+@media (max-width: 960px) {
+  .replay-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 520px) {
+  .replay-grid { grid-template-columns: 1fr; }
   .schedule-card {
     grid-template-columns: 1fr;
   }

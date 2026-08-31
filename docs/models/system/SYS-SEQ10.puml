@@ -1,0 +1,26 @@
+@startuml SYS-SEQ10
+!include ../_theme.puml
+title SYS-SEQ10 UC10 直播发布、观看与实时互动（系统级）
+actor "主播" as A
+actor "观众" as V
+participant "DanmakuStream 系统" as S
+participant "SRS" as M
+
+A -> S: 创建并开始直播
+S --> A: 房间、推流密钥和播放信息
+A -> S: 通过发布 WebSocket 上传媒体分片
+S -> M: 转发媒体流
+V -> S: 进入直播间并连接实时通道
+S --> V: 房间详情、HLS 地址和当前互动
+M --> V: HLS 媒体
+V -> S: 弹幕/点赞/礼物或 Super Chat
+alt 权限与参数合法
+  S --> A: 广播监控事件
+  S --> V: 广播互动与统计
+else 校验或持久化失败
+  S --> V: 返回错误且不广播失败数据
+end
+A -> S: 结束直播
+S --> A: 房间状态 ended
+@enduml
+

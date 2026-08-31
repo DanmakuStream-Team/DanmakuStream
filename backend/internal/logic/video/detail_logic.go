@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 
+	analyticslogic "danmakustream/backend/internal/logic/analytics"
 	model "danmakustream/backend/internal/model/mysql"
 	"danmakustream/backend/internal/svc"
 
 	"gorm.io/gorm"
 )
+
+var ErrVideoNotFound = errors.New("视频不存在")
 
 type DetailVideoLogic struct {
 	ctx    context.Context
@@ -33,9 +36,30 @@ func (l *DetailVideoLogic) Detail(req *VideoDetailReq) (*VideoDetailInfo, error)
 		return nil, errors.New("invalid video id")
 	}
 
-	if err := l.svcCtx.DB.Model(&model.Video{}).
+	var target model.Video
+	if err := l.svcCtx.DB.Select("id", "author_id", "video_url").
 		Where("id = ? AND status = ?", req.ID, "approved").
-		UpdateColumn("view_count", gorm.Expr("view_count + ?", 1)).Error; err != nil {
+		First(&target).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrVideoNotFound
+		}
+		return nil, err
+	}
+	if err := EnsureMediaAvailable(l.svcCtx.VideoDir, target.VideoURL); err != nil {
+		return nil, ErrMediaUnavailable
+	}
+
+	if err := l.svcCtx.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.Video{}).
+			Where("id = ?", req.ID).
+			UpdateColumn("view_count", gorm.Expr("view_count + ?", 1)).Error; err != nil {
+			return err
+		}
+		if err := analyticslogic.AddCreatorDailyStat(tx, target.AuthorID, 1, 0, 0); err != nil {
+			return err
+		}
+		return analyticslogic.AddVideoDailyStat(tx, target.AuthorID, target.ID, 1, 0)
+	}); err != nil {
 		return nil, err
 	}
 
@@ -55,20 +79,22 @@ func (l *DetailVideoLogic) Detail(req *VideoDetailReq) (*VideoDetailInfo, error)
 
 	return &VideoDetailInfo{
 		VideoInfo: VideoInfo{
-			ID:           video.ID,
-			Title:        video.Title,
-			Description:  video.Description,
-			CoverURL:     video.CoverURL,
-			VideoURL:     video.VideoURL,
-			Duration:     video.Duration,
-			ViewCount:    video.ViewCount,
-			LikeCount:    video.LikeCount,
-			CollectCount: video.CollectCount,
-			DanmakuCount: video.DanmakuCount,
-			Status:       video.Status,
-			Tags:         video.Tags,
-			Category:     video.Category,
-			CreatedAt:    video.CreatedAt.Format("2006-01-02 15:04:05"),
+			ID:              video.ID,
+			Title:           video.Title,
+			Description:     video.Description,
+			CoverURL:        video.CoverURL,
+			VideoURL:        video.VideoURL,
+			Duration:        video.Duration,
+			ViewCount:       video.ViewCount,
+			LikeCount:       video.LikeCount,
+			CollectCount:    video.CollectCount,
+			DanmakuCount:    video.DanmakuCount,
+			Status:          video.Status,
+			TranscodeStatus: EffectiveTranscodeStatus(video),
+			TranscodeError:  video.TranscodeError,
+			Tags:            video.Tags,
+			Category:        video.Category,
+			CreatedAt:       video.CreatedAt.Format("2006-01-02 15:04:05"),
 			Author: &model.UserInfo{
 				ID:       video.Author.ID,
 				Username: video.Author.Username,

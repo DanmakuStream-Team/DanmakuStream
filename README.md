@@ -22,10 +22,13 @@ DanmakuStream 是一个前后端分离的视频社区系统，支持视频点播
 DanmakuStream/
 ├── frontend/          # Vue 3 前端应用和 Nginx 配置
 ├── backend/           # Gin API 服务
+├── docs/              # 项目、架构、模型、测试与追溯文档
 ├── scripts/           # 数据库初始化和测试脚本
 ├── docker-compose.yml
 └── README.md
 ```
+
+项目计划、架构、模型、测试与追溯材料见 [文档中心](docs/README.md)。
 
 ## 快速启动
 
@@ -39,17 +42,49 @@ DanmakuStream/
 ### Docker Compose 启动
 
 ```bash
+# 空环境一键启动（首次会构建镜像，MySQL 数据卷不存在时自动建库）
 docker compose up -d --build
+
+# 播放固定测试数据（幂等）：test_user / test_moderator / test_admin
+scripts/seed-test-data.sh
 ```
+
+容器内后端使用 [backend/etc/config.docker.yaml](backend/etc/config.docker.yaml)（以服务名 `mysql`/`srs` 访问依赖，本地开发用的 `config.yaml` 仍是 `localhost`）。所有服务配置了健康检查与 `restart: unless-stopped`；前端会等后端健康后才启动。
 
 默认访问地址：
 
 | 服务 | 地址 |
 |---|---|
 | 前端 | `http://localhost` |
-| 后端 API | 前端 Nginx 代理到 `/api/v1/*` |
+| 后端 API | `http://localhost:8080/api/v1/*`，同时可由前端 Nginx 代理到 `/api/v1/*` |
+| 健康检查 | `http://localhost/api/v1/health`（`data.status=ok`、`data.db=up`） |
 | SRS RTMP | `rtmp://localhost:1935/live/<streamKey>` |
 | SRS HLS | `http://localhost:8081/live/<streamKey>.m3u8` |
+
+#### 测试账号（仅本地测试）
+
+| 昵称（登录用） | 角色 | 用途 |
+|---|---|---|
+| `test_user` | user | 普通用户/越权测试 |
+| `test_moderator` | moderator | 内容审核 |
+| `test_admin` | admin | 权限与运营管理 |
+
+密码均为 `Test1234!`。账号经真实注册接口创建（bcrypt 由后端生成），示例视频/弹幕/横幅/公告以 `SEED-` 前缀标识，可重复执行种子脚本重建。
+
+#### 验证与清理
+
+```bash
+docker compose ps                          # 四个服务均应为 healthy/up
+curl -f http://localhost/api/v1/health     # 健康检查
+docker compose logs backend | tail -20     # 后端日志
+
+# 测试（从仓库根目录执行；E2E 见 frontend/e2e）
+(cd backend && go test ./...)
+tests/api/uc13-admin-test.sh               # 需先合入 UC13 测试分支，且后端在 8080 运行
+
+# 彻底清理（删除数据库与视频数据卷）
+docker compose down -v
+```
 
 公网部署时需要把 [backend/etc/config.yaml](backend/etc/config.yaml) 里的直播地址改成公网可访问地址：
 
@@ -64,7 +99,8 @@ Live:
 ### 本地开发启动
 
 ```bash
-docker compose up mysql srs -d
+# 依赖服务 + nginx-gateway（API 统一入口，宿主端口默认 8888）
+docker compose up mysql srs nginx-gateway backend -d
 
 cd backend
 go mod tidy
@@ -76,6 +112,8 @@ npm run dev
 ```
 
 本地前端默认访问 `http://localhost:5173`。
+
+> **代理说明**：`npm run dev` 的 `/api`、`/media`、`/ws` 代理默认指向 `http://localhost:8888`（compose 里的 nginx-gateway；后端容器不再对宿主暴露 8080，为微服务拆分做准备）。改用其他网关地址：`VITE_DEV_GATEWAY_TARGET=http://x npm run dev`；构建期 API 前缀可用 `VITE_API_BASE_URL`（见 `frontend/.env.example`）。若只起了 `mysql srs` 而后端用 `go run` 本地跑，请把网关 upstream 指到宿主：`deploy/nginx-gateway.conf` 中 backend 地址默认解析容器名，本地场景用完整 compose 栈最省事。
 
 ## 核心功能
 
@@ -247,6 +285,8 @@ npm run build
 - 接口、权限或部署方式变化后，需要同步更新 README 或相关文档
 - 重要后端变更至少运行 `GOCACHE=/tmp/go-build go test ./...`
 - 重要前端变更至少运行 `npm run build`
+- 每个 Issue 必须记录负责人、分支、用例编号、验收条件、PR、测试和文档证据；证据齐全后才能关闭并进入 Done。详细规则见 [Issue、PR 与 Done 验收规则](docs/project/collaboration-and-acceptance.md)。
+- 所有正式图统一使用 PlantUML，源文件及 SVG/PNG 导出图集中存放在 [docs/models](docs/models/README.md)；项目看板统一使用 `Backlog → Ready → In Progress → Review → Done`，另设 `Blocked`。
 
 ## 项目进度
 

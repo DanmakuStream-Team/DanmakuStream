@@ -1,0 +1,37 @@
+# nginx-gateway：frontend 容器内 nginx 的统一 API 上游（#88）。
+# PR #83 起 frontend/nginx.conf 的 proxy_pass 指向 nginx-gateway:80，
+# Compose 侧已有同名服务；本 Deployment + Service 补齐 K8s 侧的 DNS 解析，
+# 避免 frontend Pod 启动阶段 upstream 解析失败而 CrashLoop（触发 CD 回滚）。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-gateway
+  namespace: danmakustream
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: nginx-gateway }
+  template:
+    metadata:
+      labels: { app: nginx-gateway }
+    spec:
+      containers:
+        - name: nginx-gateway
+          image: nginx:1.27-alpine
+          ports: [{ containerPort: 80 }]
+          volumeMounts:
+            - { name: conf, mountPath: /etc/nginx/nginx.conf, subPath: nginx.conf, readOnly: true }
+          readinessProbe:
+            httpGet: { path: /api/v1/health, port: 80 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/v1/health, port: 80 }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 200m, memory: 256Mi }
+      volumes:
+        - name: conf
+          configMap: { name: nginx-gateway-conf }

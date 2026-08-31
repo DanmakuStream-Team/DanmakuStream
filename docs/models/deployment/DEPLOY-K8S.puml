@@ -1,0 +1,75 @@
+@startuml DEPLOY-K8S
+!include ../_theme.puml
+title 改造后：Kubernetes 部署图
+left to right direction
+
+actor "用户浏览器" as User
+actor "主播推流端" as Anchor
+cloud "Internet" as Internet
+
+node "Kubernetes Cluster" as K8S {
+  node "Ingress / LoadBalancer" as Ingress {
+    component "HTTP / WebSocket / HLS 路由" as Routes
+  }
+  node "Namespace: danmakustream" as NS {
+    node "frontend Deployment" as Frontend {
+      component "Nginx + Vue\nreplicas >= 2" as Web
+    }
+    node "api-gateway Deployment" as Gateway {
+      component "Gateway / JWT / routing\nreplicas >= 2" as API
+    }
+    node "user-service Deployment" as UserSvc
+    node "content-service Deployment" as ContentSvc
+    node "engagement-service Deployment" as EngagementSvc
+    node "worker Deployment" as WorkerNode {
+      component "Schedule Worker\nleader/幂等任务" as Worker
+    }
+    node "srs Deployment / StatefulSet" as SRS {
+      component "RTMP / HLS" as Media
+    }
+    node "MySQL StatefulSet / 托管数据库" as MySQL {
+      database "user schema" as UserDB
+      database "content schema" as ContentDB
+      database "engagement schema" as EngagementDB
+    }
+    database "Redis" as Redis
+    storage "PersistentVolume\nmedia-data" as PV
+    component "ConfigMap" as Config
+    component "Secret" as Secret
+    component "HPA" as HPA
+  }
+}
+
+User --> Internet
+Anchor --> Internet
+Internet --> Routes
+Routes --> Web : /
+Routes --> API : /api /ws
+Routes --> Media : /live /rtmp
+API --> UserSvc : auth/profile
+API --> ContentSvc : video/media
+API --> EngagementSvc : danmaku/comment/like/message/membership
+Worker --> EngagementSvc : internal scheduled-job API
+UserSvc --> UserDB : owns
+ContentSvc --> ContentDB : owns
+EngagementSvc --> EngagementDB : owns
+ContentSvc --> UserSvc : internal API: author summary
+EngagementSvc --> UserSvc : internal API: user/member check
+EngagementSvc --> ContentSvc : internal API: video metadata
+EngagementSvc --> Redis : hub/cache/rate limit
+EngagementSvc --> SRS : stream metadata via internal adapter
+ContentSvc --> PV : owns video/cover
+Media --> PV : HLS segments
+Config --> Web
+Config --> API
+Config --> Media
+Secret --> API
+Secret --> MySQL
+HPA ..> Web : CPU/traffic scaling
+HPA ..> API : CPU/connection scaling
+
+note right of K8S
+改造后仅保留 user / content / engagement 三个业务服务；
+每个服务只写入所属 Schema，跨域数据通过内部 API 获取。
+end note
+@enduml

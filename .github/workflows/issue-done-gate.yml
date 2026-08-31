@@ -1,0 +1,60 @@
+name: Issue Done Evidence Gate
+
+on:
+  issues:
+    types: [closed]
+
+permissions:
+  issues: write
+
+jobs:
+  evidence-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate evidence before closing
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = issue.body || '';
+            const missing = [];
+
+            const section = (title) => {
+              const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const match = body.match(new RegExp(`##\\s+${escaped}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`, 'i'));
+              return match ? match[1].trim() : '';
+            };
+            const completed = (title) => {
+              const value = section(title);
+              return value && !/待补|请补充|UCXX|ISSUE编号|GitHub用户名|用户名|任务名称|feature\/\.\.\./i.test(value);
+            };
+
+            if (!completed('负责人') || !/@[A-Za-z0-9-]+/.test(section('负责人'))) missing.push('负责人');
+            if (!completed('分支')) missing.push('分支');
+            if (!/UC\d{2}/i.test(section('用例编号'))) missing.push('用例编号');
+            if (!completed('验收条件')) missing.push('验收条件');
+            if (!completed('Pull Request') || !/(?:#\d+|\/pull\/\d+)/i.test(section('Pull Request'))) missing.push('PR 链接或编号');
+            if (!completed('测试证据')) missing.push('测试证据');
+            if (!completed('文档证据')) missing.push('文档证据');
+
+            const unchecked = [...body.matchAll(/^\s*- \[ \]\s+(.+)$/gmi)].map((m) => m[1].trim());
+            if (unchecked.length) missing.push(`未完成的检查项 ${unchecked.length} 项`);
+
+            if (missing.length === 0) {
+              core.info('Issue evidence is complete. It may remain closed and enter Done.');
+              return;
+            }
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              state: 'open'
+            });
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: `该 Issue 尚不能进入 Done，已自动重新打开。请补齐：${missing.join('、')}。补齐证据并勾选全部验收项后再关闭。`
+            });
+            core.setFailed(`Issue #${issue.number} evidence is incomplete: ${missing.join(', ')}`);

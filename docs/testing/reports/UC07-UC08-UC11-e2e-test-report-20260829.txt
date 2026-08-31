@@ -1,0 +1,14 @@
+
+> danmaku-stream-frontend@0.1.0 test:e2e:member-b
+> playwright test e2e/member-b-workflows.spec.ts
+
+
+Running 3 tests using 1 worker
+
+(node:23740) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [chromium] › e2e\member-b-workflows.spec.ts:6:7 › UC07 / UC08 / UC11 完整业务流程 › E2E-TC07 关注、分组与黑名单状态在页面可验证 (2.6s)
+  ok 2 [chromium] › e2e\member-b-workflows.spec.ts:42:7 › UC07 / UC08 / UC11 完整业务流程 › E2E-TC08 配置套餐、页面订阅、幂等支付与特别关注 (3.0s)
+  ok 3 [chromium] › e2e\member-b-workflows.spec.ts:77:7 › UC07 / UC08 / UC11 完整业务流程 › E2E-TC11 会话、WebSocket 实时消息、已读和媒体分享 (1.7s)
+
+  3 passed (9.7s)

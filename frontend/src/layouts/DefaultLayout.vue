@@ -8,27 +8,19 @@
             <span class="brand-name">Stream</span>
           </button>
 
-          <nav v-if="visibleNavItems.length" class="nav">
-            <button
-              v-for="item in visibleNavItems"
-              :key="item.key"
-              type="button"
-              :class="{ active: isActive(item.key) }"
-              @click="goNav(item)"
-            >
-              {{ item.label }}
-            </button>
-          </nav>
         </div>
 
         <div class="search-wrap">
           <el-input
+            ref="searchInputRef"
             v-model="keyword"
             class="search"
             placeholder="搜索视频、创作者"
+            aria-label="搜索视频或创作者"
             clearable
             @focus="isSearchFocused = true"
             @blur="isSearchFocused = false"
+            @keydown.esc="closeSearch"
             @keyup.enter="search"
           >
             <template #suffix>
@@ -36,6 +28,10 @@
             </template>
           </el-input>
           <div v-if="showSearchPanel" class="search-panel">
+            <div class="search-panel-head">
+              <span>搜索历史</span>
+              <button type="button" @mousedown.prevent="clearSearchHistory">清空</button>
+            </div>
             <div
               v-for="item in visibleSearchHistory"
               :key="item"
@@ -63,6 +59,11 @@
         </div>
 
         <div class="actions">
+          <el-badge v-if="authStore.isLoggedIn" :value="messageUnreadCount" :hidden="messageUnreadCount === 0" :max="99">
+            <el-button class="round-action" circle title="私信" @click="router.push('/messages')">
+              <el-icon><ChatDotRound /></el-icon>
+            </el-button>
+          </el-badge>
           <el-dropdown v-if="authStore.isLoggedIn" trigger="click" @visible-change="handleNotificationVisible">
             <el-badge :value="unreadCount" :hidden="unreadCount === 0" :max="99">
               <el-button class="round-action" circle title="通知">
@@ -124,13 +125,33 @@
       </div>
     </el-header>
 
+    <nav
+      v-if="mobileNavItems.length"
+      class="nav"
+      aria-label="移动端主导航"
+      :style="{ '--mobile-nav-count': mobileNavItems.length }"
+    >
+      <button
+        v-for="item in mobileNavItems"
+        :key="item.key"
+        type="button"
+        :class="{ active: isActive(item.key) }"
+        :aria-current="isActive(item.key) ? 'page' : undefined"
+        @click="goNav(item)"
+      >
+        <el-icon><component :is="item.icon" /></el-icon>
+        <span>{{ item.label }}</span>
+      </button>
+    </nav>
+
     <div class="layout-body" :class="{ collapsed: isSidebarCollapsed }">
       <aside class="sidebar" :class="{ collapsed: isSidebarCollapsed }">
         <button
           class="collapse-toggle"
           type="button"
           :title="isSidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
-          @click="isSidebarCollapsed = !isSidebarCollapsed"
+          :aria-label="isSidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
+          @click="toggleSidebar"
         >
           <span />
           <span />
@@ -143,6 +164,7 @@
             :key="item.key"
             class="side-item"
             :class="{ active: isActive(item.key) }"
+            :aria-current="isActive(item.key) ? 'page' : undefined"
             type="button"
             @click="router.push(item.path)"
           >
@@ -199,6 +221,14 @@
             <el-icon><Clock /></el-icon>
             <span>历史记录</span>
           </button>
+          <button class="side-item" :class="{ active: isActive('messages') }" type="button" @click="router.push('/messages')">
+            <el-icon><ChatDotRound /></el-icon>
+            <span>私信</span>
+          </button>
+          <button class="side-item" :class="{ active: isActive('watchlater') }" type="button" @click="router.push('/me/watchlater')">
+            <el-icon><VideoPlay /></el-icon>
+            <span>稍后再看</span>
+          </button>
           <button class="side-item" :class="{ active: isActive('tags') }" type="button" @click="router.push('/me/tags')">
             <el-icon><CollectionTag /></el-icon>
             <span>标签相关度</span>
@@ -253,12 +283,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   ArrowDown,
   ArrowRight,
   Bell,
+  ChatDotRound,
   Clock,
   CollectionTag,
   Download,
@@ -270,6 +301,7 @@ import {
   UserFilled,
   VideoCamera,
   VideoCameraFilled,
+  VideoPlay,
 } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
@@ -277,6 +309,7 @@ import { userApi } from '@/api/user'
 import type { FolloweeInfo } from '@/api/user'
 import ThumbUpIcon from '@/components/icons/ThumbUpIcon.vue'
 import { notificationApi } from '@/api/notification'
+import { messageApi } from '@/api/message'
 import type { NotificationInfo } from '@/types'
 
 const router = useRouter()
@@ -284,16 +317,20 @@ const route = useRoute()
 const authStore = useAuthStore()
 const keyword = ref('')
 const isSearchFocused = ref(false)
-const isSidebarCollapsed = ref(false)
+const searchInputRef = ref<{ focus: () => void; blur: () => void }>()
+const sidebarStorageKey = 'danmaku:sidebar-collapsed'
+const isSidebarCollapsed = ref(localStorage.getItem(sidebarStorageKey) === '1')
 const searchHistory = ref<string[]>([])
 const subscriptions = ref<FolloweeInfo[]>([])
 const notifications = ref<NotificationInfo[]>([])
 const unreadCount = ref(0)
+const messageUnreadCount = ref(0)
 const displayCount = ref(5)
 const searchHistoryKey = 'danmaku:search-history'
 const visibleSubscriptions = computed(() => subscriptions.value.slice(0, displayCount.value))
 const visibleSearchHistory = computed(() => searchHistory.value.slice(0, 8))
 const showSearchPanel = computed(() => isSearchFocused.value && visibleSearchHistory.value.length > 0)
+let messageUnreadTimer: ReturnType<typeof setInterval> | undefined
 
 async function loadFollowing() {
   if (!authStore.isLoggedIn) return
@@ -314,6 +351,15 @@ async function loadNotifications() {
   } catch {
     notifications.value = []
     unreadCount.value = 0
+  }
+}
+
+async function loadMessageUnread() {
+  if (!authStore.isLoggedIn) return
+  try {
+    messageUnreadCount.value = (await messageApi.unread()).data.count
+  } catch {
+    messageUnreadCount.value = 0
   }
 }
 
@@ -343,6 +389,31 @@ function removeSearchHistory(value: string) {
   localStorage.setItem(searchHistoryKey, JSON.stringify(searchHistory.value))
 }
 
+function clearSearchHistory() {
+  searchHistory.value = []
+  localStorage.removeItem(searchHistoryKey)
+  isSearchFocused.value = false
+}
+
+function closeSearch() {
+  isSearchFocused.value = false
+  searchInputRef.value?.blur()
+}
+
+function toggleSidebar() {
+  isSidebarCollapsed.value = !isSidebarCollapsed.value
+  localStorage.setItem(sidebarStorageKey, isSidebarCollapsed.value ? '1' : '0')
+}
+
+function handleGlobalKeydown(event: KeyboardEvent) {
+  const target = event.target as HTMLElement | null
+  const isEditing = target?.matches('input, textarea, select, [contenteditable="true"]')
+  const wantsSearch = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k'
+  if (!wantsSearch && (event.key !== '/' || isEditing)) return
+  event.preventDefault()
+  searchInputRef.value?.focus()
+}
+
 function useSearchHistory(value: string) {
   keyword.value = value
   search()
@@ -351,18 +422,28 @@ function useSearchHistory(value: string) {
 onMounted(() => {
   loadFollowing()
   loadNotifications()
+  loadMessageUnread()
   loadSearchHistory()
   keyword.value = String(route.query.keyword || '')
+  messageUnreadTimer = setInterval(loadMessageUnread, 30000)
+  window.addEventListener('keydown', handleGlobalKeydown)
+})
+
+onBeforeUnmount(() => {
+  if (messageUnreadTimer) clearInterval(messageUnreadTimer)
+  window.removeEventListener('keydown', handleGlobalKeydown)
 })
 
 watch(() => authStore.isLoggedIn, (loggedIn) => {
   if (loggedIn) {
     loadFollowing()
     loadNotifications()
+    loadMessageUnread()
   } else {
     subscriptions.value = []
     notifications.value = []
     unreadCount.value = 0
+    messageUnreadCount.value = 0
   }
 })
 
@@ -370,12 +451,16 @@ watch(() => route.query.keyword, (value) => {
   keyword.value = String(value || '')
 })
 
+watch(() => route.path, () => {
+  if (authStore.isLoggedIn) window.setTimeout(loadMessageUnread, 300)
+})
+
 const navItems = [
-  { key: 'home', label: '首页', path: '/' },
-  { key: 'video', label: '视频', path: '/', query: { feature: 'video' } },
-  { key: 'live', label: '直播', path: '/live' },
-  { key: 'creator', label: '投稿', path: '/creator/upload' },
-  { key: 'admin', label: '审核', path: '/admin' },
+  { key: 'home', label: '首页', path: '/', icon: HomeFilled },
+  { key: 'video', label: '视频', path: '/', query: { feature: 'video' }, icon: VideoCamera },
+  { key: 'live', label: '直播', path: '/live', icon: VideoCameraFilled },
+  { key: 'creator', label: '投稿', path: '/creator/upload', icon: Upload },
+  { key: 'admin', label: '审核', path: '/admin', icon: Notebook },
 ]
 
 const visibleNavItems = computed(() => {
@@ -396,7 +481,17 @@ const visibleAdminNavItems = computed(() => {
   return adminNavItems.filter((item) => !item.adminOnly || authStore.isAdmin)
 })
 
-function goNav(item: (typeof navItems)[number]) {
+const mobileNavItems = computed(() => {
+  if (!authStore.isStaff) return visibleNavItems.value
+  return visibleAdminNavItems.value.filter((item) => (
+    item.key === 'admin-dashboard'
+    || item.key === 'admin-videos'
+    || item.key === 'admin-danmaku'
+    || item.key === 'admin-users'
+  ))
+})
+
+function goNav(item: { path: string; query?: Record<string, string> }) {
   router.push({ path: item.path, query: item.query || {} })
 }
 
@@ -436,6 +531,12 @@ function isActive(key: string) {
   }
   if (key === 'history') {
     return route.path === '/me/history'
+  }
+  if (key === 'messages') {
+    return route.path.startsWith('/messages')
+  }
+  if (key === 'watchlater') {
+    return route.path === '/me/watchlater'
   }
   if (key === 'tags') {
     return route.path === '/me/tags'
@@ -531,8 +632,9 @@ function logout() {
 
 .topbar-inner {
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(320px, 640px) minmax(92px, 1fr);
+  grid-template-columns: minmax(210px, 280px) minmax(320px, 680px) minmax(180px, 280px);
   align-items: center;
+  justify-content: space-between;
   gap: 24px;
   width: 100%;
   height: 100%;
@@ -584,6 +686,9 @@ function logout() {
 }
 
 .nav button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   flex-shrink: 0;
   height: 40px;
   padding: 0 13px;
@@ -650,6 +755,32 @@ function logout() {
   pointer-events: none;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff);
   content: '';
+}
+
+.search-panel-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px 4px;
+  color: #18191c;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.search-panel-head button {
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: #9499a0;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.search-panel-head button:hover {
+  color: var(--el-color-primary);
 }
 
 .search-history-row {
@@ -1056,6 +1187,12 @@ function logout() {
   padding: 0 0 48px;
 }
 
+@media (min-width: 921px) {
+  .nav {
+    display: none;
+  }
+}
+
 @media (max-width: 920px) {
   .topbar {
     height: auto;
@@ -1079,9 +1216,37 @@ function logout() {
   }
 
   .nav {
-    grid-column: 1 / -1;
-    order: 4;
-    overflow-x: auto;
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 35;
+    display: grid;
+    height: 62px;
+    grid-template-columns: repeat(var(--mobile-nav-count, 4), minmax(0, 1fr));
+    gap: 0;
+    overflow: hidden;
+    border-top: 1px solid #e7e9ed;
+    background: rgb(255 255 255 / 96%);
+    backdrop-filter: blur(14px);
+  }
+
+  .nav button {
+    display: grid;
+    height: 62px;
+    padding: 7px 4px 5px;
+    place-items: center;
+    gap: 2px;
+    border-radius: 0;
+    font-size: 11px;
+  }
+
+  .nav button .el-icon {
+    font-size: 20px;
+  }
+
+  .nav button.active {
+    background: transparent;
   }
 
   .layout-body {
@@ -1090,6 +1255,34 @@ function logout() {
 
   .sidebar {
     display: none;
+  }
+
+  .main {
+    padding-bottom: 78px;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar-inner {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .brand-script {
+    font-size: 24px;
+  }
+
+  .brand-name {
+    font-size: 16px;
+  }
+
+  .actions {
+    gap: 4px;
+  }
+
+  .round-action {
+    width: 32px;
+    height: 32px;
   }
 }
 </style>

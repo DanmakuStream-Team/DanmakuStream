@@ -1,0 +1,279 @@
+# DanmakuStream 单体版 CI（第一阶段）
+#
+# 流水线按测试层组织（不按成员拆分；任一步失败即终止，后续步骤不执行）：
+#   backend-test ─┬─> api-integration（Go 集成 + 全部 API 脚本）─┐
+#                 └─> e2e（全部用例统一入口）─────────────────────┼─> docker-build ─> deploy
+#   frontend-build ─┘
+#
+# 阻断规则（对齐课程任务书）：
+#   - 单元测试失败 → 停止，不构建镜像
+#   - API/集成测试失败 → 停止，不构建镜像
+#   - E2E 测试失败 → 停止，不构建镜像
+#   - 前端构建失败 → 停止，不构建镜像
+#   - 镜像仅在全部通过后构建，带 commit sha 版本号（不使用裸 latest）
+#   - PR 只做构建与测试；镜像仓库和集群凭据就绪后，再由独立 CD 工作流发布、部署
+
+name: ci
+
+on:
+  push:
+    branches: [dev, main, 'whh用户b-test']
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  backend-test:
+    name: 后端编译与单元测试
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Build
+        working-directory: backend
+        run: go build ./...
+      - name: Unit tests (all use cases)
+        working-directory: backend
+        # 显式启用 pipefail，避免 go test 失败被 tee 的成功退出码掩盖。
+        run: |
+          set -o pipefail
+          go test ./... -v | tee unit-test-output.txt
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-output
+          path: backend/unit-test-output.txt
+
+  frontend-build:
+    name: 前端依赖安装与构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Build (type-check + vite build)
+        working-directory: frontend
+        run: npm run build
+
+  api-integration:
+    name: API/集成测试（全部用例 · 单一后端实例）
+    runs-on: ubuntu-latest
+    needs: backend-test
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: danmakustream
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -ppassword"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Install mysql client and FFmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq mysql-client ffmpeg
+      - name: Run MySQL integration tests (UC01/05/07/08/09/10/11)
+        working-directory: backend
+        env:
+          DANMAKU_TEST_ADMIN_DSN: "root:password@tcp(127.0.0.1:3306)/danmakustream?charset=utf8mb4&parseTime=True&loc=Local"
+        run: |
+          set -o pipefail
+          go test -count=1 -tags=integration \
+            ./internal/handler/v1/live \
+            ./internal/logic/danmaku \
+            ./integration -v \
+            | tee integration-output.txt
+      - name: Build backend
+        working-directory: backend
+        run: go build -o /tmp/dms-api ./api/main.go
+      - name: Run backend against service MySQL
+        run: |
+          cat > /tmp/config-ci.yaml <<'EOF'
+          Name: danmakustream-api
+          Host: 0.0.0.0
+          Port: 8080
+          Auth:
+            AccessSecret: "ci-only-secret"
+            AccessExpire: 86400
+          Database:
+            DataSource: "root:password@tcp(127.0.0.1:3306)/danmakustream?charset=utf8mb4&parseTime=True&loc=Local"
+          VideoDir: "/tmp/dms-data"
+          Live:
+            RTMPHost: "localhost:1935"
+            HTTPHost: "localhost:8081"
+          Log:
+            Mode: console
+            Level: info
+          EOF
+          mkdir -p /tmp/dms-data
+          /tmp/dms-api -f /tmp/config-ci.yaml > /tmp/dms-api.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8080/api/v1/health | grep -q '"status":"ok"' && break
+            [ "$i" = 30 ] && { cat /tmp/dms-api.log; exit 1; }
+            sleep 2
+          done
+      - name: Run API test suites (UC02/03/04/06/12/13)
+        env:
+          MYSQL_CMD: "mysql -h127.0.0.1 -P3306 -uroot -ppassword danmakustream"
+          VIDEO_DIR: "/tmp/dms-data"
+        run: |
+          set -o pipefail
+          tests/api/uc13-admin-test.sh        | tee uc13-api-test-output.txt
+          tests/api/member-c-content-test.sh  | tee member-c-api-test-output.txt
+          tests/api/uc06-library-test.sh      | tee uc06-api-test-output.txt
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-integration-output
+          path: |
+            integration-output.txt
+            uc13-api-test-output.txt
+            member-c-api-test-output.txt
+            uc06-api-test-output.txt
+          if-no-files-found: ignore
+      - name: Stop backend
+        if: always()
+        run: pkill -f dms-api || true
+
+  e2e:
+    name: 浏览器 E2E（全部用例 · 统一入口）
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [backend-test, frontend-build]
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: danmakustream
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -ppassword"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install MySQL client, FFmpeg and browser dependencies
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq mysql-client ffmpeg
+      - name: Install frontend and Chromium
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Run unified Playwright E2E (all use cases)
+        working-directory: frontend
+        env:
+          MYSQL_CMD: "mysql -h127.0.0.1 -P3306 -uroot -ppassword danmakustream"
+          E2E_BACKEND_CONFIG: "etc/config.yaml"
+        run: |
+          set -o pipefail
+          npm run test:e2e 2>&1 | tee /tmp/e2e-output.txt
+      - name: Upload E2E evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-evidence
+          if-no-files-found: warn
+          path: |
+            /tmp/e2e-output.txt
+            frontend/test-results/
+            docs/testing/reports/e2e/
+
+  docker-build:
+    name: 构建前后端镜像（版本号 = commit sha）
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-build, api-integration, e2e]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: |
+          docker build -t danmakustream/backend:${GITHUB_SHA::12} ./backend
+          docker tag danmakustream/backend:${GITHUB_SHA::12} danmakustream/backend:monolith
+      - name: Build frontend image
+        run: |
+          docker build -t danmakustream/frontend:${GITHUB_SHA::12} ./frontend
+          docker tag danmakustream/frontend:${GITHUB_SHA::12} danmakustream/frontend:monolith
+      - name: Show images
+        run: docker images "danmakustream/*"
+      # docker-build 验证镜像可构建；推送 GHCR 与 k3s 部署由下方 deploy（CD）完成。
+
+  verify-pr-merge:
+    name: 验证提交来自合并到 dev 的 PR
+    needs: [docker-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      is_merged_pr: ${{ steps.verify.outputs.is_merged_pr }}
+      pr_number: ${{ steps.verify.outputs.pr_number }}
+    steps:
+      - id: verify
+        name: 查找与当前提交关联且已合并到 dev 的 PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pulls = await github.paginate(
+              github.rest.repos.listPullRequestsAssociatedWithCommit,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: context.sha,
+                per_page: 100,
+              },
+            )
+            const mergedPull = pulls.find((pull) =>
+              pull.merged_at &&
+              pull.base.ref === 'dev' &&
+              pull.merge_commit_sha === context.sha
+            )
+            if (!mergedPull) {
+              core.notice(`提交 ${context.sha} 不是合并到 dev 的 PR，跳过 CD`)
+              core.setOutput('is_merged_pr', 'false')
+              core.setOutput('pr_number', '')
+              return
+            }
+            core.notice(`允许部署：PR #${mergedPull.number} 已合并到 dev`)
+            core.setOutput('is_merged_pr', 'true')
+            core.setOutput('pr_number', String(mergedPull.number))
+
+  deploy:
+    # 只有合并到 dev 的 PR 提交才允许进入 CD；直接 push 到 dev 只跑 CI。
+    name: CD 部署到公网 k3s（仅 PR 合并）
+    needs: [docker-build, verify-pr-merge]
+    if: needs.verify-pr-merge.outputs.is_merged_pr == 'true'
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write

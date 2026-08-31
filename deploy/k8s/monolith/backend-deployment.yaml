@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: danmakustream
+spec:
+  # 单体基线使用一个副本和 RWO 视频卷；完成对象存储或 RWX 后再扩副本。
+  replicas: 1
+  selector:
+    matchLabels: { app: backend }
+  template:
+    metadata:
+      labels: { app: backend }
+    spec:
+      containers:
+        - name: backend
+          image: danmakustream/backend:monolith-0.1.0  # deploy.yml 推送 GHCR 后替换为完整镜像地址
+          ports: [{ containerPort: 8080 }]
+          env:
+            - name: DMS_JWT_SECRET
+              valueFrom:
+                secretKeyRef: { name: danmakustream-secrets, key: JWT_SECRET }
+            - name: DMS_DATABASE_DSN
+              valueFrom:
+                secretKeyRef: { name: danmakustream-secrets, key: DATABASE_DSN }
+          volumeMounts:
+            - { name: config, mountPath: /app/etc, readOnly: true }
+            - { name: video-data, mountPath: /app/data }
+          readinessProbe:            # 就绪：DB 连通才接流量
+            httpGet: { path: /api/v1/health, port: 8080 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:             # 存活：进程僵死时自动重启
+            httpGet: { path: /api/v1/livez, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:                 # HPA 扩缩容依赖 requests 定义
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+      volumes:
+        - name: config
+          configMap: { name: backend-config }
+        - name: video-data
+          persistentVolumeClaim: { claimName: video-data }

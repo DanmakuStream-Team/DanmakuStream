@@ -4,10 +4,31 @@ import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/store/auth'
 import type { ApiResponse } from '@/types'
 
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    skipErrorMessage?: boolean
+  }
+}
+
+const GATEWAY_PREFIX: string =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '/api/v1'
+
 const request: AxiosInstance = axios.create({
-  baseURL: '/api/v1',
+  baseURL: GATEWAY_PREFIX,
   timeout: 20000,
 })
+
+let handlingUnauthorized = false
+let lastErrorMessage = ''
+let lastErrorAt = 0
+
+function showErrorOnce(message: string) {
+  const now = Date.now()
+  if (message === lastErrorMessage && now - lastErrorAt < 1500) return
+  lastErrorMessage = message
+  lastErrorAt = now
+  ElMessage.error(message)
+}
 
 request.interceptors.request.use((config) => {
   const authStore = useAuthStore()
@@ -22,7 +43,9 @@ request.interceptors.response.use(
     const body = response.data
     if (body && typeof body.code === 'number') {
       if (body.code !== 0) {
-        ElMessage.error(body.message || '请求失败')
+        if (!response.config.skipErrorMessage) {
+          showErrorOnce(body.message || '请求失败')
+        }
         return Promise.reject(new Error(body.message || '请求失败'))
       }
       return { ...response, data: body.data } as any
@@ -38,13 +61,32 @@ request.interceptors.response.use(
     if (error.response?.status === 401) {
       const authStore = useAuthStore()
       authStore.logout()
-      ElMessage.warning('请先登录')
-    } else {
-      ElMessage.error(message || '请求失败')
+      handleUnauthorizedOnce()
+    } else if (!error.config?.skipErrorMessage) {
+      showErrorOnce(message || '请求失败')
     }
     return Promise.reject(new Error(message))
   }
 )
+
+function handleUnauthorizedOnce() {
+  if (handlingUnauthorized) return
+  handlingUnauthorized = true
+
+  ElMessage.warning('登录状态已失效，请重新登录')
+  const redirect = `${window.location.pathname}${window.location.search}`
+  void import('@/router').then(({ default: router }) => {
+    if (router.currentRoute.value.name === 'Login') return
+    void router.replace({
+      name: 'Login',
+      query: redirect === '/' ? undefined : { redirect },
+    })
+  })
+
+  window.setTimeout(() => {
+    handlingUnauthorized = false
+  }, 2000)
+}
 
 function getErrorMessage(error: any) {
   const data = error.response?.data

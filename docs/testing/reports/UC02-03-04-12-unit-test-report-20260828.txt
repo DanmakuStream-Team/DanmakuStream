@@ -1,0 +1,187 @@
+?   	danmakustream/backend/api	[no test files]
+?   	danmakustream/backend/internal/config	[no test files]
+?   	danmakustream/backend/internal/handler/response	[no test files]
+=== RUN   TestIsValidRole
+--- PASS: TestIsValidRole (0.00s)
+=== RUN   TestUpdateUserRoleHandlerInvalidRole
+--- PASS: TestUpdateUserRoleHandlerInvalidRole (0.00s)
+=== RUN   TestCreateBannerHandlerEmptyTitle
+=== RUN   TestCreateBannerHandlerEmptyTitle/missing_title
+=== RUN   TestCreateBannerHandlerEmptyTitle/empty_title
+=== RUN   TestCreateBannerHandlerEmptyTitle/whitespace_title
+--- PASS: TestCreateBannerHandlerEmptyTitle (0.00s)
+    --- PASS: TestCreateBannerHandlerEmptyTitle/missing_title (0.00s)
+    --- PASS: TestCreateBannerHandlerEmptyTitle/empty_title (0.00s)
+    --- PASS: TestCreateBannerHandlerEmptyTitle/whitespace_title (0.00s)
+=== RUN   TestBuildAnnouncement
+=== RUN   TestBuildAnnouncement/empty_content
+=== RUN   TestBuildAnnouncement/whitespace_content
+=== RUN   TestBuildAnnouncement/invalid_started_at
+=== RUN   TestBuildAnnouncement/invalid_ended_at
+=== RUN   TestBuildAnnouncement/valid_rfc3339
+=== RUN   TestBuildAnnouncement/valid_layout
+=== RUN   TestBuildAnnouncement/no_time_bounds
+--- PASS: TestBuildAnnouncement (0.00s)
+    --- PASS: TestBuildAnnouncement/empty_content (0.00s)
+    --- PASS: TestBuildAnnouncement/whitespace_content (0.00s)
+    --- PASS: TestBuildAnnouncement/invalid_started_at (0.00s)
+    --- PASS: TestBuildAnnouncement/invalid_ended_at (0.00s)
+    --- PASS: TestBuildAnnouncement/valid_rfc3339 (0.00s)
+    --- PASS: TestBuildAnnouncement/valid_layout (0.00s)
+    --- PASS: TestBuildAnnouncement/no_time_bounds (0.00s)
+PASS
+ok  	danmakustream/backend/internal/handler/v1/admin	(cached)
+?   	danmakustream/backend/internal/handler/v1/auth	[no test files]
+?   	danmakustream/backend/internal/handler/v1/collection	[no test files]
+?   	danmakustream/backend/internal/handler/v1/comment	[no test files]
+=== RUN   TestAnalyticsHandlerRejectsInvalidRequests
+=== RUN   TestAnalyticsHandlerRejectsInvalidRequests/not_logged_in
+=== RUN   TestAnalyticsHandlerRejectsInvalidRequests/unsupported_days
+=== RUN   TestAnalyticsHandlerRejectsInvalidRequests/non_numeric_days
+=== RUN   TestAnalyticsHandlerRejectsInvalidRequests/zero_video_id
+=== RUN   TestAnalyticsHandlerRejectsInvalidRequests/invalid_video_id
+--- PASS: TestAnalyticsHandlerRejectsInvalidRequests (0.00s)
+    --- PASS: TestAnalyticsHandlerRejectsInvalidRequests/not_logged_in (0.00s)
+    --- PASS: TestAnalyticsHandlerRejectsInvalidRequests/unsupported_days (0.00s)
+    --- PASS: TestAnalyticsHandlerRejectsInvalidRequests/non_numeric_days (0.00s)
+    --- PASS: TestAnalyticsHandlerRejectsInvalidRequests/zero_video_id (0.00s)
+    --- PASS: TestAnalyticsHandlerRejectsInvalidRequests/invalid_video_id (0.00s)
+=== RUN   TestBeginningOfDay
+--- PASS: TestBeginningOfDay (0.00s)
+PASS
+ok  	danmakustream/backend/internal/handler/v1/creator	(cached)
+?   	danmakustream/backend/internal/handler/v1/danmaku	[no test files]
+?   	danmakustream/backend/internal/handler/v1/dynamic	[no test files]
+=== RUN   TestSuperChatDisplaySeconds
+=== RUN   TestSuperChatDisplaySeconds/below_first_threshold
+=== RUN   TestSuperChatDisplaySeconds/first_threshold
+=== RUN   TestSuperChatDisplaySeconds/two_hundred
+=== RUN   TestSuperChatDisplaySeconds/five_hundred
+=== RUN   TestSuperChatDisplaySeconds/one_thousand
+--- PASS: TestSuperChatDisplaySeconds (0.00s)
+    --- PASS: TestSuperChatDisplaySeconds/below_first_threshold (0.00s)
+    --- PASS: TestSuperChatDisplaySeconds/first_threshold (0.00s)
+    --- PASS: TestSuperChatDisplaySeconds/two_hundred (0.00s)
+    --- PASS: TestSuperChatDisplaySeconds/five_hundred (0.00s)
+    --- PASS: TestSuperChatDisplaySeconds/one_thousand (0.00s)
+=== RUN   TestRoomHeat
+--- PASS: TestRoomHeat (0.00s)
+=== RUN   TestParseScheduleTime
+--- PASS: TestParseScheduleTime (0.00s)
+=== RUN   TestIsValidScheduleStatus
+--- PASS: TestIsValidScheduleStatus (0.00s)
+PASS
+ok  	danmakustream/backend/internal/handler/v1/live	(cached)
+?   	danmakustream/backend/internal/handler/v1/media	[no test files]
+?   	danmakustream/backend/internal/handler/v1/membership	[no test files]
+?   	danmakustream/backend/internal/handler/v1/message	[no test files]
+?   	danmakustream/backend/internal/handler/v1/notification	[no test files]
+?   	danmakustream/backend/internal/handler/v1/user	[no test files]
+=== RUN   TestIsValidVideoStatus
+--- PASS: TestIsValidVideoStatus (0.00s)
+=== RUN   TestIsValidReviewDecision
+--- PASS: TestIsValidReviewDecision (0.00s)
+=== RUN   TestDetailHandlerRejectsInvalidID
+--- PASS: TestDetailHandlerRejectsInvalidID (0.00s)
+=== RUN   TestUploadHandlerRequiredFields
+=== RUN   TestUploadHandlerRequiredFields/missing_title
+=== RUN   TestUploadHandlerRequiredFields/missing_video
+--- PASS: TestUploadHandlerRequiredFields (0.00s)
+    --- PASS: TestUploadHandlerRequiredFields/missing_title (0.00s)
+    --- PASS: TestUploadHandlerRequiredFields/missing_video (0.00s)
+=== RUN   TestSafeDownloadName
+--- PASS: TestSafeDownloadName (0.00s)
+=== RUN   TestMediaPathToLocalPath
+--- PASS: TestMediaPathToLocalPath (0.00s)
+=== RUN   TestHasUploadedVideoSource
+--- PASS: TestHasUploadedVideoSource (0.00s)
+=== RUN   TestAdminUpdateStatusHandlerRejectsInvalidRequest
+=== RUN   TestAdminUpdateStatusHandlerRejectsInvalidRequest/invalid_id
+=== RUN   TestAdminUpdateStatusHandlerRejectsInvalidRequest/malformed_json
+=== RUN   TestAdminUpdateStatusHandlerRejectsInvalidRequest/invalid_status
+--- PASS: TestAdminUpdateStatusHandlerRejectsInvalidRequest (0.00s)
+    --- PASS: TestAdminUpdateStatusHandlerRejectsInvalidRequest/invalid_id (0.00s)
+    --- PASS: TestAdminUpdateStatusHandlerRejectsInvalidRequest/malformed_json (0.00s)
+    --- PASS: TestAdminUpdateStatusHandlerRejectsInvalidRequest/invalid_status (0.00s)
+PASS
+ok  	danmakustream/backend/internal/handler/v1/video	0.009s
+?   	danmakustream/backend/internal/handler/ws	[no test files]
+?   	danmakustream/backend/internal/logic/analytics	[no test files]
+?   	danmakustream/backend/internal/logic/auth	[no test files]
+=== RUN   TestValidateMessageInput
+=== RUN   TestValidateMessageInput/text
+=== RUN   TestValidateMessageInput/empty_text
+=== RUN   TestValidateMessageInput/owned_image
+=== RUN   TestValidateMessageInput/other_user_image
+=== RUN   TestValidateMessageInput/wrong_media_extension
+=== RUN   TestValidateMessageInput/video_share
+=== RUN   TestValidateMessageInput/missing_shared_video
+=== RUN   TestValidateMessageInput/unknown_type
+--- PASS: TestValidateMessageInput (0.00s)
+    --- PASS: TestValidateMessageInput/text (0.00s)
+    --- PASS: TestValidateMessageInput/empty_text (0.00s)
+    --- PASS: TestValidateMessageInput/owned_image (0.00s)
+    --- PASS: TestValidateMessageInput/other_user_image (0.00s)
+    --- PASS: TestValidateMessageInput/wrong_media_extension (0.00s)
+    --- PASS: TestValidateMessageInput/video_share (0.00s)
+    --- PASS: TestValidateMessageInput/missing_shared_video (0.00s)
+    --- PASS: TestValidateMessageInput/unknown_type (0.00s)
+=== RUN   TestNormalizedMessageType
+--- PASS: TestNormalizedMessageType (0.00s)
+PASS
+ok  	danmakustream/backend/internal/logic/chat	(cached)
+=== RUN   TestCountRoomViewersDeduplicatesAuthenticatedUsers
+--- PASS: TestCountRoomViewersDeduplicatesAuthenticatedUsers (0.00s)
+=== RUN   TestBroadcastEventAndSendEvent
+--- PASS: TestBroadcastEventAndSendEvent (0.00s)
+=== RUN   TestSaveDanmakuPropagatesPersistenceFailure
+--- PASS: TestSaveDanmakuPropagatesPersistenceFailure (0.00s)
+PASS
+ok  	danmakustream/backend/internal/logic/danmaku	(cached)
+=== RUN   TestVideoSortExpr
+=== RUN   TestVideoSortExpr/empty_defaults_to_hot
+=== RUN   TestVideoSortExpr/hot
+=== RUN   TestVideoSortExpr/date
+=== RUN   TestVideoSortExpr/like
+=== RUN   TestVideoSortExpr/collect
+=== RUN   TestVideoSortExpr/invalid
+--- PASS: TestVideoSortExpr (0.00s)
+    --- PASS: TestVideoSortExpr/empty_defaults_to_hot (0.00s)
+    --- PASS: TestVideoSortExpr/hot (0.00s)
+    --- PASS: TestVideoSortExpr/date (0.00s)
+    --- PASS: TestVideoSortExpr/like (0.00s)
+    --- PASS: TestVideoSortExpr/collect (0.00s)
+    --- PASS: TestVideoSortExpr/invalid (0.00s)
+=== RUN   TestInvalidVideoSortUsesTypedError
+--- PASS: TestInvalidVideoSortUsesTypedError (0.00s)
+=== RUN   TestMediaPathToLocalPath
+--- PASS: TestMediaPathToLocalPath (0.00s)
+=== RUN   TestEnsureMediaAvailable
+--- PASS: TestEnsureMediaAvailable (0.00s)
+=== RUN   TestEffectiveTranscodeStatusKeepsLegacyRowsCompatible
+--- PASS: TestEffectiveTranscodeStatusKeepsLegacyRowsCompatible (0.00s)
+PASS
+ok  	danmakustream/backend/internal/logic/video	0.005s
+?   	danmakustream/backend/internal/metrics	[no test files]
+=== RUN   TestAdminMiddleware
+=== RUN   TestAdminMiddleware/role_user_returns_403
+=== RUN   TestAdminMiddleware/role_moderator_returns_403
+=== RUN   TestAdminMiddleware/role_admin_passes
+=== RUN   TestAdminMiddleware/missing_role_returns_403
+--- PASS: TestAdminMiddleware (0.00s)
+    --- PASS: TestAdminMiddleware/role_user_returns_403 (0.00s)
+    --- PASS: TestAdminMiddleware/role_moderator_returns_403 (0.00s)
+    --- PASS: TestAdminMiddleware/role_admin_passes (0.00s)
+    --- PASS: TestAdminMiddleware/missing_role_returns_403 (0.00s)
+=== RUN   TestStaffMiddleware
+=== RUN   TestStaffMiddleware/role_user_returns_403
+=== RUN   TestStaffMiddleware/role_moderator_passes
+=== RUN   TestStaffMiddleware/role_admin_passes
+--- PASS: TestStaffMiddleware (0.00s)
+    --- PASS: TestStaffMiddleware/role_user_returns_403 (0.00s)
+    --- PASS: TestStaffMiddleware/role_moderator_passes (0.00s)
+    --- PASS: TestStaffMiddleware/role_admin_passes (0.00s)
+PASS
+ok  	danmakustream/backend/internal/middleware	(cached)
+?   	danmakustream/backend/internal/model/mysql	[no test files]
+?   	danmakustream/backend/internal/svc	[no test files]

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -22,6 +23,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+var errActiveMembership = errors.New("active creator membership")
+
 type profileInfo struct {
 	ID          uint   `json:"id"`
 	Username    string `json:"username"`
@@ -33,6 +36,9 @@ type profileInfo struct {
 	FanCount    int64  `json:"fanCount"`
 	VideoCount  int64  `json:"videoCount"`
 	Followed    bool   `json:"followed"`
+	Special     bool   `json:"special"`
+	GroupID     *uint  `json:"groupId"`
+	Blocked     bool   `json:"blocked"`
 	CreatedAt   string `json:"createdAt"`
 }
 
@@ -174,15 +180,31 @@ func ProfileHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 
 		currentUserID := getOptionalUserID(c, svcCtx)
 		followed := false
+		special := false
+		var groupID *uint
+		blocked := false
 		if currentUserID != 0 && currentUserID != uint(userID) {
-			var count int64
-			if err := svcCtx.DB.Model(&model.Follow{}).
+			var follow model.Follow
+			if err := svcCtx.DB.
 				Where("follower_id = ? AND followee_id = ?", currentUserID, userID).
-				Count(&count).Error; err != nil {
+				First(&follow).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 				response.Fail(c, http.StatusInternalServerError, "关注状态加载失败")
 				return
 			}
-			followed = count > 0
+			if follow.ID != 0 {
+				followed = true
+				special = follow.Special
+				groupID = follow.GroupID
+			}
+
+			var blockCount int64
+			if err := svcCtx.DB.Model(&model.UserBlock{}).
+				Where("blocker_id = ? AND blocked_id = ?", currentUserID, userID).
+				Count(&blockCount).Error; err != nil {
+				response.Fail(c, http.StatusInternalServerError, "拉黑状态加载失败")
+				return
+			}
+			blocked = blockCount > 0
 		}
 
 		response.Ok(c, profileInfo{
@@ -196,6 +218,9 @@ func ProfileHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			FanCount:    u.FanCount,
 			VideoCount:  videoCount,
 			Followed:    followed,
+			Special:     special,
+			GroupID:     groupID,
+			Blocked:     blocked,
 			CreatedAt:   u.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
@@ -239,6 +264,18 @@ func FollowHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			return
 		}
 
+		var blockCount int64
+		if err := svcCtx.DB.Model(&model.UserBlock{}).
+			Where("(blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)", currentUserID, targetUserID, targetUserID, currentUserID).
+			Count(&blockCount).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "关系状态加载失败")
+			return
+		}
+		if blockCount > 0 {
+			response.Fail(c, http.StatusForbidden, "存在拉黑关系，无法关注")
+			return
+		}
+
 		var followed bool
 
 		err = svcCtx.DB.Transaction(func(tx *gorm.DB) error {
@@ -247,6 +284,15 @@ func FollowHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 				First(&follow).Error
 
 			if err == nil {
+				var activeSubscriptionCount int64
+				if err := tx.Model(&model.CreatorSubscription{}).
+					Where("subscriber_id = ? AND creator_id = ? AND status = ? AND expires_at > ?", currentUserID, targetUserID, "active", time.Now()).
+					Count(&activeSubscriptionCount).Error; err != nil {
+					return err
+				}
+				if activeSubscriptionCount > 0 {
+					return errActiveMembership
+				}
 				if err := tx.Unscoped().Delete(&follow).Error; err != nil {
 					return err
 				}
@@ -288,6 +334,10 @@ func FollowHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		})
 
 		if err != nil {
+			if errors.Is(err, errActiveMembership) {
+				response.Fail(c, http.StatusConflict, "付费特别关注有效期内不能取消关注")
+				return
+			}
 			response.Fail(c, http.StatusInternalServerError, "关注操作失败")
 			return
 		}
@@ -357,19 +407,21 @@ func VideosHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		list := make([]videologic.VideoInfo, 0, len(videos))
 		for _, video := range videos {
 			list = append(list, videologic.VideoInfo{
-				ID:           video.ID,
-				Title:        video.Title,
-				Description:  video.Description,
-				CoverURL:     video.CoverURL,
-				VideoURL:     video.VideoURL,
-				Duration:     video.Duration,
-				ViewCount:    video.ViewCount,
-				LikeCount:    video.LikeCount,
-				CollectCount: video.CollectCount,
-				DanmakuCount: video.DanmakuCount,
-				Status:       video.Status,
-				Tags:         video.Tags,
-				CreatedAt:    video.CreatedAt.Format("2006-01-02 15:04:05"),
+				ID:              video.ID,
+				Title:           video.Title,
+				Description:     video.Description,
+				CoverURL:        video.CoverURL,
+				VideoURL:        video.VideoURL,
+				Duration:        video.Duration,
+				ViewCount:       video.ViewCount,
+				LikeCount:       video.LikeCount,
+				CollectCount:    video.CollectCount,
+				DanmakuCount:    video.DanmakuCount,
+				Status:          video.Status,
+				TranscodeStatus: videologic.EffectiveTranscodeStatus(video),
+				TranscodeError:  video.TranscodeError,
+				Tags:            video.Tags,
+				CreatedAt:       video.CreatedAt.Format("2006-01-02 15:04:05"),
 				Author: &model.UserInfo{
 					ID:       video.Author.ID,
 					Username: video.Author.Username,
@@ -428,33 +480,31 @@ func FollowingListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetUint(middleware.CtxKeyUserID)
 
-		var followees []model.User
+		type followeeInfo struct {
+			ID        uint   `json:"id"`
+			Nickname  string `json:"nickname"`
+			Avatar    string `json:"avatar"`
+			Role      string `json:"role"`
+			Special   bool   `json:"special"`
+			GroupID   *uint  `json:"groupId"`
+			GroupName string `json:"groupName"`
+		}
+
+		var list []followeeInfo
 		err := svcCtx.DB.
 			Table("users").
-			Select("users.id, users.nickname, users.avatar, users.role").
+			Select("users.id, users.nickname, users.avatar, users.role, follows.special, follows.group_id, COALESCE(follow_groups.name, '') AS group_name").
 			Joins("INNER JOIN follows ON follows.followee_id = users.id AND follows.deleted_at IS NULL").
+			Joins("LEFT JOIN follow_groups ON follow_groups.id = follows.group_id AND follow_groups.deleted_at IS NULL").
 			Where("follows.follower_id = ?", userID).
-			Find(&followees).Error
+			Order("follows.special DESC, follows.updated_at DESC").
+			Scan(&list).Error
 		if err != nil {
 			response.Fail(c, http.StatusInternalServerError, "关注列表加载失败")
 			return
 		}
-
-		type followeeInfo struct {
-			ID       uint   `json:"id"`
-			Nickname string `json:"nickname"`
-			Avatar   string `json:"avatar"`
-			Role     string `json:"role"`
-		}
-
-		list := make([]followeeInfo, 0, len(followees))
-		for _, u := range followees {
-			list = append(list, followeeInfo{
-				ID:       u.ID,
-				Nickname: u.Nickname,
-				Avatar:   u.Avatar,
-				Role:     u.Role,
-			})
+		if list == nil {
+			list = []followeeInfo{}
 		}
 
 		response.Ok(c, gin.H{
@@ -573,19 +623,21 @@ func MeVideosHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		list := make([]videologic.VideoInfo, 0, len(videos))
 		for _, video := range videos {
 			list = append(list, videologic.VideoInfo{
-				ID:           video.ID,
-				Title:        video.Title,
-				Description:  video.Description,
-				CoverURL:     video.CoverURL,
-				VideoURL:     video.VideoURL,
-				Duration:     video.Duration,
-				ViewCount:    video.ViewCount,
-				LikeCount:    video.LikeCount,
-				CollectCount: video.CollectCount,
-				DanmakuCount: video.DanmakuCount,
-				Status:       video.Status,
-				Tags:         video.Tags,
-				CreatedAt:    video.CreatedAt.Format("2006-01-02 15:04:05"),
+				ID:              video.ID,
+				Title:           video.Title,
+				Description:     video.Description,
+				CoverURL:        video.CoverURL,
+				VideoURL:        video.VideoURL,
+				Duration:        video.Duration,
+				ViewCount:       video.ViewCount,
+				LikeCount:       video.LikeCount,
+				CollectCount:    video.CollectCount,
+				DanmakuCount:    video.DanmakuCount,
+				Status:          video.Status,
+				TranscodeStatus: videologic.EffectiveTranscodeStatus(video),
+				TranscodeError:  video.TranscodeError,
+				Tags:            video.Tags,
+				CreatedAt:       video.CreatedAt.Format("2006-01-02 15:04:05"),
 				Author: &model.UserInfo{
 					ID:       video.Author.ID,
 					Username: video.Author.Username,

@@ -185,7 +185,7 @@ func UpdateUserRoleHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			return
 		}
 
-		if req.Role != "user" && req.Role != "moderator" && req.Role != "admin" {
+		if !isValidRole(req.Role) {
 			response.Fail(c, http.StatusBadRequest, "角色不支持")
 			return
 		}
@@ -357,6 +357,10 @@ func buildAnnouncement(req saveAnnouncementReq) (model.SiteAnnouncement, error) 
 		item.EndedAt = &t
 	}
 	return item, nil
+}
+
+func isValidRole(role string) bool {
+	return role == "user" || role == "moderator" || role == "admin"
 }
 
 func deleteByID(svcCtx *svc.ServiceContext, value any, message string) gin.HandlerFunc {

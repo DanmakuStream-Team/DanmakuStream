@@ -1,0 +1,103 @@
+@startuml DOMAIN-CLASS-D
+!include ../_theme.puml
+title 互动与直播域概念类图
+hide methods
+
+class 用户 {
+  用户编号: uint
+  用户名: string
+  昵称: string
+  角色: string
+}
+class 视频 {
+  视频编号: uint
+  标题: string
+  审核状态: string
+  点赞数: int
+  收藏数: int
+}
+class 弹幕 {
+  弹幕编号: uint
+  场景: string
+  内容: string
+  播放时间点: int
+  是否屏蔽: bool
+}
+class 评论 {
+  评论编号: uint
+  父评论编号: uint
+  内容: string
+  点赞数: int
+}
+class 视频点赞 {
+  用户编号: uint
+  视频编号: uint
+  创建时间: datetime
+}
+class 视频收藏 {
+  用户编号: uint
+  视频编号: uint
+  创建时间: datetime
+}
+class 直播计划 {
+  计划编号: uint
+  标题: string
+  计划时间: datetime
+  状态: string
+  预约人数: int
+}
+class 直播预约 {
+  计划编号: uint
+  用户编号: uint
+  预约时间: datetime
+}
+class 直播间 {
+  房间编号: uint
+  标题: string
+  状态: string
+  在线人数: int
+  点赞数: int
+  礼物价值: int
+  聊天模式: string
+}
+class 直播点赞 {
+  房间编号: uint
+  用户编号: uint
+  创建时间: datetime
+}
+class 直播礼物 {
+  礼物类型: string
+  数量: int
+  价值: int
+  留言: string
+  展示秒数: int
+}
+class 通知 {
+  通知编号: uint
+  接收用户编号: uint
+  通知类型: string
+  标题: string
+  是否已读: bool
+  创建时间: datetime
+}
+
+用户 "1" -- "*" 弹幕 : 发送
+视频 "1" -- "*" 弹幕 : 包含
+用户 "1" -- "*" 评论 : 发表
+视频 "1" -- "*" 评论 : 包含
+用户 "1" -- "*" 视频点赞 : 建立/取消
+视频 "1" -- "*" 视频点赞 : 获得
+用户 "1" -- "*" 视频收藏 : 建立/取消
+视频 "1" -- "*" 视频收藏 : 被收藏
+用户 "1" -- "*" 直播计划 : 发布
+直播计划 "1" -- "*" 直播预约 : 接受
+用户 "1" -- "*" 直播预约 : 提交/取消
+直播计划 "0..1" -- "1" 直播间 : 到时启动
+用户 "1" -- "1" 直播间 : 拥有
+直播间 "1" -- "*" 直播点赞 : 接收
+直播间 "1" -- "*" 直播礼物 : 接收
+用户 "1" -- "*" 直播点赞 : 点赞
+用户 "1" -- "*" 直播礼物 : 赠送
+直播计划 --> 通知 : 产生
+用户 "1" -- "*" 通知 : 接收
+@enduml
