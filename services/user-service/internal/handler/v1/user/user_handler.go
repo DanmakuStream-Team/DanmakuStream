@@ -1,0 +1,459 @@
+package user
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"gorm.io/gorm"
+
+	"danmakustream/user-service/internal/handler/response"
+	"danmakustream/user-service/internal/middleware"
+	model "danmakustream/user-service/internal/model/mysql"
+	"danmakustream/user-service/internal/svc"
+
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+)
+
+var errActiveMembership = errors.New("active creator membership")
+
+type profileInfo struct {
+	ID          uint   `json:"id"`
+	Username    string `json:"username"`
+	Nickname    string `json:"nickname"`
+	Avatar      string `json:"avatar"`
+	Bio         string `json:"bio"`
+	Role        string `json:"role"`
+	FollowCount int64  `json:"followCount"`
+	FanCount    int64  `json:"fanCount"`
+	VideoCount  int64  `json:"videoCount"`
+	Followed    bool   `json:"followed"`
+	Special     bool   `json:"special"`
+	GroupID     *uint  `json:"groupId"`
+	Blocked     bool   `json:"blocked"`
+	CreatedAt   string `json:"createdAt"`
+}
+
+type searchUserReq struct {
+	Q        string `form:"q"`
+	Page     int    `form:"page"`
+	PageSize int    `form:"pageSize"`
+}
+
+type searchUserItem struct {
+	ID          uint   `json:"id"`
+	Username    string `json:"username"`
+	Nickname    string `json:"nickname"`
+	Avatar      string `json:"avatar"`
+	Bio         string `json:"bio"`
+	Role        string `json:"role"`
+	FollowCount int64  `json:"followCount"`
+	FanCount    int64  `json:"fanCount"`
+	CreatedAt   string `json:"createdAt"`
+}
+
+type searchUserResult struct {
+	List     []searchUserItem `json:"list"`
+	Total    int64            `json:"total"`
+	Page     int              `json:"page"`
+	PageSize int              `json:"pageSize"`
+}
+
+type updateMeReq struct {
+	Nickname string `json:"nickname"`
+	Bio      string `json:"bio"`
+}
+
+func SearchHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req searchUserReq
+		if err := c.ShouldBindQuery(&req); err != nil {
+			response.Fail(c, http.StatusBadRequest, "参数错误")
+			return
+		}
+
+		keyword := strings.TrimSpace(req.Q)
+		if keyword == "" {
+			response.Fail(c, http.StatusBadRequest, "搜索关键字不能为空")
+			return
+		}
+
+		if req.Page <= 0 {
+			req.Page = 1
+		}
+		if req.PageSize <= 0 {
+			req.PageSize = 10
+		}
+		if req.PageSize > 50 {
+			req.PageSize = 50
+		}
+
+		likeKeyword := "%" + keyword + "%"
+		db := svcCtx.DB.Model(&model.User{}).
+			Where("username LIKE ? OR nickname LIKE ? OR bio LIKE ?", likeKeyword, likeKeyword, likeKeyword)
+
+		var total int64
+		if err := db.Count(&total).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "用户搜索失败")
+			return
+		}
+
+		var users []model.User
+		if err := db.
+			Select("id", "username", "nickname", "avatar", "bio", "role", "follow_count", "fan_count", "created_at").
+			Order("fan_count DESC, id DESC").
+			Offset((req.Page - 1) * req.PageSize).
+			Limit(req.PageSize).
+			Find(&users).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "用户搜索失败")
+			return
+		}
+
+		list := make([]searchUserItem, 0, len(users))
+		for _, u := range users {
+			list = append(list, searchUserItem{
+				ID:          u.ID,
+				Username:    u.Username,
+				Nickname:    u.Nickname,
+				Avatar:      u.Avatar,
+				Bio:         u.Bio,
+				Role:        u.Role,
+				FollowCount: u.FollowCount,
+				FanCount:    u.FanCount,
+				CreatedAt:   u.CreatedAt.Format("2006-01-02 15:04:05"),
+			})
+		}
+
+		response.Ok(c, searchUserResult{
+			List:     list,
+			Total:    total,
+			Page:     req.Page,
+			PageSize: req.PageSize,
+		})
+	}
+}
+
+func ProfileHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || userID == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的用户 ID")
+			return
+		}
+
+		var u model.User
+		if err := svcCtx.DB.First(&u, userID).Error; err != nil {
+			response.Fail(c, http.StatusNotFound, "用户不存在")
+			return
+		}
+
+		// content-service owns video counts; this field is enriched through its internal API on Day 7.
+		videoCount := int64(0)
+
+		currentUserID := getOptionalUserID(c, svcCtx)
+		followed := false
+		special := false
+		var groupID *uint
+		blocked := false
+		if currentUserID != 0 && currentUserID != uint(userID) {
+			var follow model.Follow
+			if err := svcCtx.DB.
+				Where("follower_id = ? AND followee_id = ?", currentUserID, userID).
+				First(&follow).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				response.Fail(c, http.StatusInternalServerError, "关注状态加载失败")
+				return
+			}
+			if follow.ID != 0 {
+				followed = true
+				special = follow.Special
+				groupID = follow.GroupID
+			}
+
+			var blockCount int64
+			if err := svcCtx.DB.Model(&model.UserBlock{}).
+				Where("blocker_id = ? AND blocked_id = ?", currentUserID, userID).
+				Count(&blockCount).Error; err != nil {
+				response.Fail(c, http.StatusInternalServerError, "拉黑状态加载失败")
+				return
+			}
+			blocked = blockCount > 0
+		}
+
+		response.Ok(c, profileInfo{
+			ID:          u.ID,
+			Username:    u.Username,
+			Nickname:    u.Nickname,
+			Avatar:      u.Avatar,
+			Bio:         u.Bio,
+			Role:        u.Role,
+			FollowCount: u.FollowCount,
+			FanCount:    u.FanCount,
+			VideoCount:  videoCount,
+			Followed:    followed,
+			Special:     special,
+			GroupID:     groupID,
+			Blocked:     blocked,
+			CreatedAt:   u.CreatedAt.Format("2006-01-02 15:04:05"),
+		})
+	}
+}
+
+func getOptionalUserID(c *gin.Context, svcCtx *svc.ServiceContext) uint {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+		return 0
+	}
+
+	tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+	claims := &middleware.Claims{}
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
+		return []byte(svcCtx.Config.Auth.AccessSecret), nil
+	})
+	if err != nil || !token.Valid {
+		return 0
+	}
+	return claims.UserID
+}
+
+func FollowHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		currentUserID := c.GetUint(middleware.CtxKeyUserID)
+
+		targetUserID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || targetUserID == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的用户 ID")
+			return
+		}
+
+		if currentUserID == uint(targetUserID) {
+			response.Fail(c, http.StatusBadRequest, "不能关注自己")
+			return
+		}
+
+		var target model.User
+		if err := svcCtx.DB.Select("id").First(&target, targetUserID).Error; err != nil {
+			response.Fail(c, http.StatusNotFound, "用户不存在")
+			return
+		}
+
+		var blockCount int64
+		if err := svcCtx.DB.Model(&model.UserBlock{}).
+			Where("(blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)", currentUserID, targetUserID, targetUserID, currentUserID).
+			Count(&blockCount).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "关系状态加载失败")
+			return
+		}
+		if blockCount > 0 {
+			response.Fail(c, http.StatusForbidden, "存在拉黑关系，无法关注")
+			return
+		}
+
+		var followed bool
+
+		err = svcCtx.DB.Transaction(func(tx *gorm.DB) error {
+			var follow model.Follow
+			err := tx.Where("follower_id = ? AND followee_id = ?", currentUserID, targetUserID).
+				First(&follow).Error
+
+			if err == nil {
+				var activeSubscriptionCount int64
+				if err := tx.Model(&model.CreatorSubscription{}).
+					Where("subscriber_id = ? AND creator_id = ? AND status = ? AND expires_at > ?", currentUserID, targetUserID, "active", time.Now()).
+					Count(&activeSubscriptionCount).Error; err != nil {
+					return err
+				}
+				if activeSubscriptionCount > 0 {
+					return errActiveMembership
+				}
+				if err := tx.Unscoped().Delete(&follow).Error; err != nil {
+					return err
+				}
+				followed = false
+
+				if err := tx.Model(&model.User{}).
+					Where("id = ? AND follow_count > 0", currentUserID).
+					UpdateColumn("follow_count", gorm.Expr("follow_count - ?", 1)).Error; err != nil {
+					return err
+				}
+
+				return tx.Model(&model.User{}).
+					Where("id = ? AND fan_count > 0", targetUserID).
+					UpdateColumn("fan_count", gorm.Expr("fan_count - ?", 1)).Error
+			}
+
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+
+			if err := tx.Create(&model.Follow{
+				FollowerID: currentUserID,
+				FolloweeID: uint(targetUserID),
+			}).Error; err != nil {
+				return err
+			}
+
+			followed = true
+
+			if err := tx.Model(&model.User{}).
+				Where("id = ?", currentUserID).
+				UpdateColumn("follow_count", gorm.Expr("follow_count + ?", 1)).Error; err != nil {
+				return err
+			}
+
+			return tx.Model(&model.User{}).
+				Where("id = ?", targetUserID).
+				UpdateColumn("fan_count", gorm.Expr("fan_count + ?", 1)).Error
+		})
+
+		if err != nil {
+			if errors.Is(err, errActiveMembership) {
+				response.Fail(c, http.StatusConflict, "付费特别关注有效期内不能取消关注")
+				return
+			}
+			response.Fail(c, http.StatusInternalServerError, "关注操作失败")
+			return
+		}
+
+		response.Ok(c, gin.H{
+			"followed": followed,
+		})
+	}
+}
+
+func UpdateMeHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint(middleware.CtxKeyUserID)
+
+		var req updateMeReq
+		if err := c.ShouldBindJSON(&req); err != nil {
+			response.Fail(c, http.StatusBadRequest, "参数错误")
+			return
+		}
+
+		updates := map[string]interface{}{}
+
+		if req.Nickname != "" {
+			updates["nickname"] = req.Nickname
+		}
+		if req.Bio != "" {
+			updates["bio"] = req.Bio
+		}
+
+		if len(updates) == 0 {
+			response.Fail(c, http.StatusBadRequest, "没有需要更新的内容")
+			return
+		}
+
+		if err := svcCtx.DB.Model(&model.User{}).
+			Where("id = ?", userID).
+			Updates(updates).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "用户资料更新失败")
+			return
+		}
+
+		response.Ok(c, nil)
+	}
+}
+
+func FollowingListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint(middleware.CtxKeyUserID)
+
+		type followeeInfo struct {
+			ID        uint   `json:"id"`
+			Nickname  string `json:"nickname"`
+			Avatar    string `json:"avatar"`
+			Role      string `json:"role"`
+			Special   bool   `json:"special"`
+			GroupID   *uint  `json:"groupId"`
+			GroupName string `json:"groupName"`
+		}
+
+		var list []followeeInfo
+		err := svcCtx.DB.
+			Table("users").
+			Select("users.id, users.nickname, users.avatar, users.role, follows.special, follows.group_id, COALESCE(follow_groups.name, '') AS group_name").
+			Joins("INNER JOIN follows ON follows.followee_id = users.id AND follows.deleted_at IS NULL").
+			Joins("LEFT JOIN follow_groups ON follow_groups.id = follows.group_id AND follow_groups.deleted_at IS NULL").
+			Where("follows.follower_id = ?", userID).
+			Order("follows.special DESC, follows.updated_at DESC").
+			Scan(&list).Error
+		if err != nil {
+			response.Fail(c, http.StatusInternalServerError, "关注列表加载失败")
+			return
+		}
+		if list == nil {
+			list = []followeeInfo{}
+		}
+
+		response.Ok(c, gin.H{
+			"list": list,
+		})
+	}
+}
+
+func UploadAvatarHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint(middleware.CtxKeyUserID)
+
+		avatarFile, err := c.FormFile("avatar")
+		if err != nil {
+			response.Fail(c, http.StatusBadRequest, "请上传头像文件")
+			return
+		}
+
+		fileExt := filepath.Ext(avatarFile.Filename)
+		if fileExt == "" {
+			response.Fail(c, http.StatusBadRequest, "头像文件格式无效")
+			return
+		}
+
+		avatarDir := filepath.Join(svcCtx.VideoDir, "avatars", fmt.Sprintf("%d", userID))
+		if err := os.MkdirAll(avatarDir, 0755); err != nil {
+			response.Fail(c, http.StatusInternalServerError, "创建头像目录失败")
+			return
+		}
+
+		fileName := "avatar" + fileExt
+		avatarPath := filepath.Join(avatarDir, fileName)
+
+		src, err := avatarFile.Open()
+		if err != nil {
+			response.Fail(c, http.StatusInternalServerError, "读取头像文件失败")
+			return
+		}
+		defer src.Close()
+
+		dst, err := os.Create(avatarPath)
+		if err != nil {
+			response.Fail(c, http.StatusInternalServerError, "保存头像文件失败")
+			return
+		}
+		defer dst.Close()
+
+		if _, err := io.Copy(dst, src); err != nil {
+			response.Fail(c, http.StatusInternalServerError, "保存头像文件失败")
+			return
+		}
+
+		avatarURL := fmt.Sprintf("/media/avatars/%d/%s", userID, fileName)
+
+		if err := svcCtx.DB.Model(&model.User{}).
+			Where("id = ?", userID).
+			Update("avatar", avatarURL).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "头像更新失败")
+			return
+		}
+
+		response.Ok(c, gin.H{
+			"avatar": avatarURL,
+		})
+	}
+}
