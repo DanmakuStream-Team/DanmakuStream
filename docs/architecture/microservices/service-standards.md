@@ -12,7 +12,7 @@
 
 | 组件 | 主责 | 用例/职责 | 代码所有权 |
 | --- | --- | --- | --- |
-| API Gateway 与部署平台 | A | 路由、配置、Secret、Compose、K8s、健康与版本规范 | `docker-compose.microservices.yml`、`deploy/k8s/microservices/`、`deploy/nginx-gateway.microservices.conf` |
+| API Gateway 与部署平台 | A | 路由、配置、Secret、Compose、K8s、健康与版本规范 | `docker-compose.microservices.yml`、`deploy/k8s/microservices/`、`deploy/nginx-gateway-microservices.conf` |
 | `user-service` | B | UC01、UC07、UC08、UC11；UC13 用户与角色管理 | `services/user-service/` |
 | `content-service` | C | UC02、UC03、UC04、UC12；UC13 内容运营 | `services/content-service/` |
 | `engagement-service` | D | UC05、UC06、UC09、UC10；UC13 弹幕管理 | `services/engagement-service/` |
@@ -32,7 +32,7 @@ docker-compose.yml                    # 单体 Compose
 docker-compose.microservices.yml      # 微服务 Compose
 deploy/
   nginx-gateway.conf                  # 单体网关
-  nginx-gateway.microservices.conf    # 微服务网关
+  nginx-gateway-microservices.conf    # 微服务网关
   k8s/
     monolith/                         # 单体清单
     microservices/                    # 微服务清单
