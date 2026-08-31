@@ -11,6 +11,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags "-s -w -X main.version=
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates tzdata ffmpeg && addgroup -S app && adduser -S app -G app
 WORKDIR /app
+ENV GIN_MODE=release
 COPY --from=builder /out/engagement-service ./engagement-service
 COPY etc ./etc
 USER app
