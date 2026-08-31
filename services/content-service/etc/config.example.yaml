@@ -1,0 +1,9 @@
+# Documentation-only local defaults. Runtime environment variables take precedence.
+serviceName: content-service
+serviceVersion: microservice-0.1.0
+port: 8080
+logLevel: info
+requestTimeout: 2s
+storageDir: ./data
+maxVideoBytes: 2147483648
+maxImageBytes: 10485760
