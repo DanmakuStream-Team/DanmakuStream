@@ -1,0 +1,30 @@
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "gateway": { "name": "api-gateway", "port": 80, "routes": "/api/v1/*, /ws/*, /media/*" },
+    "services": [
+      {
+        "name": "user-service",
+        "port": 8080,
+        "database": "user_db",
+        "useCases": ["UC01", "UC07", "UC08", "UC11"],
+        "endpoints": ["/api/v1/livez", "/api/v1/health", "/api/v1/version"]
+      },
+      {
+        "name": "content-service",
+        "port": 8080,
+        "database": "content_db",
+        "useCases": ["UC02", "UC03", "UC04", "UC12"],
+        "endpoints": ["/api/v1/livez", "/api/v1/health", "/api/v1/version"]
+      },
+      {
+        "name": "engagement-service",
+        "port": 8080,
+        "database": "engagement_db",
+        "useCases": ["UC05", "UC06", "UC09", "UC10"],
+        "endpoints": ["/api/v1/livez", "/api/v1/health", "/api/v1/version"]
+      }
+    ]
+  }
+}

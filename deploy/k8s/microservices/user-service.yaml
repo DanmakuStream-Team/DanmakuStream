@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-service-config
+  namespace: danmakustream-microservices
+data:
+  config.yaml: |
+    # 与 deploy/configs/user-service.yaml 一致；口令为占位符，部署时替换为 Secret 值
+    Name: user-service
+    Host: 0.0.0.0
+    Port: 8080
+    Auth:
+      AccessSecret: "FROM_SECRET_JWT"
+      AccessExpire: 86400
+    Database:
+      DataSource: "user_app:FROM_SECRET@tcp(mysql:3306)/user?charset=utf8mb4&parseTime=True&loc=Local"
+    VideoDir: data
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  namespace: danmakustream-microservices
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+        - name: user-service
+          image: danmakustream/user-service:microservices-0.1.0
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: config
+              mountPath: /app/etc
+              readOnly: true
+
+          livenessProbe:
+            httpGet:
+              path: /api/v1/livez
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: config
+          configMap:
+            name: user-service-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  namespace: danmakustream-microservices
+spec:
+  selector:
+    app: user-service
+  ports:
+    - port: 8080
+      targetPort: 8080

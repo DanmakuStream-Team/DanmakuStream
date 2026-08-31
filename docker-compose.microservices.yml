@@ -1,0 +1,124 @@
+# 微服务版 Compose（D06）——与单体 docker-compose.yml 并存，用于本地/联调验证拆分形态。
+# 启动：docker compose -f docker-compose.microservices.yml up -d --build
+# 验收：docker compose -f docker-compose.microservices.yml config
+#
+# 形态要求（对应 8.31 任务书 A-4）：
+# - 三个业务服务只在内部网络暴露 8080，宿主机仅暴露网关(8888)与前端(80)；
+# - 每个服务使用独立数据库账号（scripts/microservices-db-init.sql）；
+# - 健康检查与启动依赖齐全；数据卷/媒体卷独立。
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+    volumes:
+      - micro_mysql_data:/var/lib/mysql
+      - ./scripts/microservices-db-init.sql:/docker-entrypoint-initdb.d/01-schemas-accounts.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ppassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  srs:
+    image: ossrs/srs:5
+    restart: unless-stopped
+    command: ["./objs/srs", "-c", "conf/danmakustream.conf"]
+    ports:
+      - "1935:1935"
+      - "8081:8080"
+    volumes:
+      - ./deploy/srs.conf:/usr/local/srs/conf/danmakustream.conf:ro
+      - ./backend/data/live:/usr/local/srs/objs/nginx/html/live
+
+  user-service:
+    build: ./services/user-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./deploy/configs/user-service.yaml:/app/etc/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/livez"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  content-service:
+    # 成员 C 的 content-service 分支合入后即可构建；此前 config 校验与网关路由均已预留
+    build: ./services/content-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./deploy/configs/content-service.yaml:/app/etc/config.yaml:ro
+      - micro_media_data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/livez"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  engagement-service:
+    build: ./services/engagement-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+    volumes:
+      - ./deploy/configs/engagement-service.yaml:/app/etc/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/livez"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  gateway:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      user-service:
+        condition: service_healthy
+      engagement-service:
+        condition: service_healthy
+      content-service:
+        condition: service_started   # content-service 就绪前路由 404/502 由兜底承担
+    ports:
+      - "8888:80"
+    volumes:
+      - ./deploy/nginx-gateway-microservices.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/platform:/usr/share/nginx/html/platform:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/gateway/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # 微服务形态：前端经网关访问 API（构建期注入）
+        VITE_API_BASE_URL: "http://localhost:8888/api/v1"
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+volumes:
+  micro_mysql_data:
+  micro_media_data:
