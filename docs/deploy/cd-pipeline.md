@@ -8,7 +8,7 @@
 功能分支 / 普通 PR            只跑 CI（deploy job 跳过）
 直接 push 到 dev              跑完整 CI，合并来源校验不通过，CD 跳过
 PR 合并到 dev                 CI 全绿 → 校验 merge commit 与 PR → CD：
-                                构建前后端镜像（tag = commit SHA 前 12 位）
+                                构建单体前后端与 user-service 镜像（tag = commit SHA 前 12 位）
                                 → 推送 GHCR（另推 dev 滚动标签）
                                 → SSH 连接公网 k3s
                                 → 应用并等待 nginx-gateway Ready
@@ -23,7 +23,13 @@ main                          暂不自动部署（留给最终稳定版/人工�
 - `concurrency: production-deploy`（排队不取消）保证**同一时间只有一次部署**。
 - 数据库与视频 PVC 不随部署删除；**数据库不做自动回滚**（结构变更遵循向前兼容迁移）。
 - CD 会在应用前自动创建/更新 `nginx-gateway` ConfigMap、Deployment 与 Service，避免 frontend 因网关 DNS 不存在而启动失败。
-- 镜像规则：不使用裸 `latest` 部署；前后端同一 SHA 版本；旧 SHA 镜像保留在 GHCR 供回滚。
+- 镜像规则：不使用裸 `latest`；单体前后端与 `user-service` 使用同一 SHA 版本。当前 CD 仍部署单体镜像，`user-service` 完成网关 upstream 和 per-service K8s 清单后再接入发布部署。
+
+### user-service CI 阻断
+
+`ci.yml` 中的 `user-service-test` 使用 `services/user-service/go.mod` 独立执行 `go build ./...` 和 `go test -count=1 ./...`。`docker-build` 显式依赖该任务，因此用户服务编译或测试失败时，不会构建任何交付镜像。
+
+`docker-build` 会验证 `danmakustream/user-service:<sha12>` 可独立构建。该镜像目前只作为构建证据，不会由单体 CD 自动发布或切换线上流量；网关 upstream、Secret、独立 Schema 与 per-service Deployment 就绪后，再将其加入 `deploy.yml`。
 
 ## 2. 服务器准备（一次性，需要一台公网服务器）
 
@@ -78,7 +84,7 @@ Settings → Environments → 新建 **`production`**，添加 Secrets：
 
 ## 6. 验收演示（对应任务书两条流水线记录）
 
-1. **成功记录**：合并一个全绿 PR 到 dev → Actions 里 `ci` 工作流的 `CD 部署到公网 k3s` job 绿 → 下载 `cd-evidence-<sha>` artifact → 访问 `$PUBLIC_URL` 现场演示。
+1. **成功记录**：合并一个全绿 PR 到 dev → `user-service-test` 与其他测试全部通过 → Actions 里 `ci` 工作流的 `CD 部署到公网 k3s` job 绿 → 下载 `cd-evidence-<sha>` artifact → 访问 `$PUBLIC_URL` 现场演示。
 2. **失败阻断记录**：已有 `docs/testing/reports/ci-red-green-evidence-2026-08-27.md`（红灯时 api-test/docker-build 全部 skipped）——CD 位于 docker-build 之后，同样被阻断；如需 CD 专属记录，可临时推送一个会让集成测试失败的提交到 dev（取证后 revert，注意 dev 部署会停在旧版本）。
 
 ## 7. 尚未自动化 / 后续增强
