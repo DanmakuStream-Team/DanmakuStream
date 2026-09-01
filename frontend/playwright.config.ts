@@ -8,6 +8,7 @@ import { defineConfig, devices } from '@playwright/test'
 // 网关链路约定：默认 Vite proxy 直连本机 backend(8080)；
 // 设 E2E_USE_GATEWAY=1 时走宿主 nginx-gateway(8888)（需先 docker compose up -d）。
 
+const MICRO = process.env.E2E_MICROSERVICES === '1'
 const backendConfig = process.env.E2E_BACKEND_CONFIG ?? 'etc/config.yaml'
 const useGateway = process.env.E2E_USE_GATEWAY === '1'
 const gatewayTarget = useGateway ? 'http://127.0.0.1:8888' : 'http://127.0.0.1:8080'
@@ -27,7 +28,7 @@ export default defineConfig({
     ['html', { outputFolder: '../docs/testing/reports/e2e', open: 'never' }],
   ],
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL: MICRO ? (process.env.E2E_BASE_URL ?? 'http://127.0.0.1') : 'http://127.0.0.1:5173',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -35,7 +36,7 @@ export default defineConfig({
     navigationTimeout: 30_000,
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: [
+  webServer: MICRO ? undefined : [
     {
       command: `go run api/main.go -f "${backendConfig}"`,
       cwd: '../backend',

@@ -8,7 +8,9 @@
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.ts,.tsx --fix",
     "test:e2e": "playwright test",
-    "test:e2e:microservices": "playwright test --config playwright.microservices.config.ts"
+    "test:e2e:micro": "bash ../scripts/run-microservices-e2e.sh",
+    "test:e2e:microservices": "playwright test --config playwright.microservices.config.ts",
+    "test:e2e:microservices:full": "playwright test"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",

@@ -38,3 +38,11 @@ docker compose --project-name danmakustream-e2e -f docker-compose.microservices.
 - PR 和 `dev` push 会运行独立的 `microservices-e2e` 工作流并归档失败证据。
 
 这是微服务运行环境和跨网关冒烟基线。现有 `frontend/e2e/` 全量业务用例仍保留给单体回归；待各服务内部 API 与测试数据工厂齐全后，再逐项迁移到 `frontend/e2e-microservices/`，不得用单体数据库脚本伪造微服务通过结果。
+
+如需在迁移过程中审计全量业务用例，可运行：
+
+```bash
+MICRO_E2E_FULL_SUITE=1 bash scripts/run-microservices-e2e.sh
+```
+
+全量审计失败表示相应用例尚未完成微服务兼容；CI 默认仍执行上述跨网关冒烟基线。

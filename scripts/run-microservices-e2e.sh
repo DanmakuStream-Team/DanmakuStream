@@ -13,6 +13,7 @@ export MICRO_HLS_PORT="${MICRO_HLS_PORT:-18081}"
 export MICRO_E2E_GATEWAY_URL="http://127.0.0.1:${MICRO_GATEWAY_PORT}"
 export MICRO_E2E_FRONTEND_URL="http://127.0.0.1:${MICRO_FRONTEND_PORT}"
 export MICRO_E2E_ARTIFACT_DIR="$artifact_dir"
+export MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-local-dev-root-password}"
 export COMMIT_SHA="${COMMIT_SHA:-$(git -C "$repo_root" rev-parse HEAD 2>/dev/null || printf 'development')}"
 export BUILD_TIME="${BUILD_TIME:-$(date -u '+%Y-%m-%dT%H:%M:%SZ')}"
 
@@ -66,7 +67,19 @@ wait_for_url() {
 wait_for_url gateway "$MICRO_E2E_GATEWAY_URL/gateway/health"
 wait_for_url frontend "$MICRO_E2E_FRONTEND_URL/"
 
+export E2E_MICROSERVICES=1
+export E2E_USE_GATEWAY=1
+export E2E_API_BASE="$MICRO_E2E_GATEWAY_URL/api/v1"
+export E2E_BASE_URL="$MICRO_E2E_FRONTEND_URL"
+export COMPOSE_MICRO="${compose[*]}"
+export MYSQL_ROOT_CMD="${compose[*]} exec -T mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD}"
+
+e2e_npm_script=test:e2e:microservices
+if [[ "${MICRO_E2E_FULL_SUITE:-0}" == "1" ]]; then
+  e2e_npm_script=test:e2e:microservices:full
+fi
+
 (
   cd "$repo_root/frontend"
-  npm run test:e2e:microservices
+  npm run "$e2e_npm_script"
 )
