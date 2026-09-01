@@ -1,0 +1,17 @@
+name: engagement-service-ci
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  engagement-service:
+    uses: ./.github/workflows/service-ci-reusable.yml
+    with:
+      service: engagement-service

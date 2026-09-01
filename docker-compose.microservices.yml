@@ -47,7 +47,7 @@ services:
       INTERNAL_API_TOKEN: ${MICRO_INTERNAL_TOKEN:-local-dev-internal-token-change-me}
       SERVICE_VERSION: ${MICRO_SERVICE_VERSION:-microservice-0.1.0}
       COMMIT_SHA: ${COMMIT_SHA:-development}
-      BUILD_TIME: ${BUILD_TIME:-unknown}
+      BUILD_TIME: ${BUILD_TIME:-1970-01-01T00:00:00Z}
       REQUEST_TIMEOUT: ${REQUEST_TIMEOUT:-2s}
     volumes:
       - ./deploy/configs/user-service.yaml:/app/etc/config.yaml:ro
@@ -60,7 +60,7 @@ services:
       start_period: 20s
 
   content-service:
-    # 成员 C 的 content-service 分支合入后即可构建；此前 config 校验与网关路由均已预留
+    # content-service 已独立构建；公开流量统一由 gateway 转发。
     build: ./services/content-service
     restart: unless-stopped
     depends_on:
@@ -72,9 +72,10 @@ services:
       JWT_SECRET: ${MICRO_JWT_SECRET:-local-dev-jwt-secret-change-me}
       INTERNAL_API_TOKEN: ${MICRO_INTERNAL_TOKEN:-local-dev-internal-token-change-me}
       USER_SERVICE_URL: http://user-service:8080
+      AUTO_MIGRATE: "true"
       SERVICE_VERSION: ${MICRO_SERVICE_VERSION:-microservice-0.1.0}
       COMMIT_SHA: ${COMMIT_SHA:-development}
-      BUILD_TIME: ${BUILD_TIME:-unknown}
+      BUILD_TIME: ${BUILD_TIME:-1970-01-01T00:00:00Z}
       REQUEST_TIMEOUT: ${REQUEST_TIMEOUT:-2s}
     volumes:
       - ./deploy/configs/content-service.yaml:/app/etc/config.yaml:ro
@@ -104,7 +105,7 @@ services:
       SRS_RTMP_HOST: srs:1935
       SERVICE_VERSION: ${MICRO_SERVICE_VERSION:-microservice-0.1.0}
       COMMIT_SHA: ${COMMIT_SHA:-development}
-      BUILD_TIME: ${BUILD_TIME:-unknown}
+      BUILD_TIME: ${BUILD_TIME:-1970-01-01T00:00:00Z}
       REQUEST_TIMEOUT: ${REQUEST_TIMEOUT:-2s}
     volumes:
       - ./deploy/configs/engagement-service.yaml:/app/etc/config.yaml:ro

@@ -26,9 +26,12 @@ data:
     CREATE USER IF NOT EXISTS 'user_app'       @'%' IDENTIFIED BY '${USER_DB_PASSWORD}';
     CREATE USER IF NOT EXISTS 'content_app'    @'%' IDENTIFIED BY '${CONTENT_DB_PASSWORD}';
     CREATE USER IF NOT EXISTS 'engagement_app' @'%' IDENTIFIED BY '${ENGAGEMENT_DB_PASSWORD}';
-    GRANT ALL PRIVILEGES ON user_db.*       TO 'user_app'@'%';
-    GRANT ALL PRIVILEGES ON content_db.*    TO 'content_app'@'%';
-    GRANT ALL PRIVILEGES ON engagement_db.* TO 'engagement_app'@'%';
+    REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'user_app'@'%';
+    REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'content_app'@'%';
+    REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'engagement_app'@'%';
+    GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP, REFERENCES ON user_db.* TO 'user_app'@'%';
+    GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP, REFERENCES ON content_db.* TO 'content_app'@'%';
+    GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP, REFERENCES ON engagement_db.* TO 'engagement_app'@'%';
     SQL
 ---
 apiVersion: apps/v1
