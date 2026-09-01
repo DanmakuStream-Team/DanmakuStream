@@ -98,8 +98,12 @@ GET /api/v1/version 返回 service/version/commit/buildTime
 
 ## 内部依赖和失败语义
 
-- user-service：`/internal/v1/users/:id`、屏蔽关系、会员状态；
+- user-service：`/internal/v1/users?id=...` 批量摘要、双向屏蔽关系、会员状态和关注状态；
 - content-service：`/internal/v1/videos/:id`，返回存在性、可播放状态、时长和创作者 ID；
+
+内部 GET 调用携带 `X-Internal-Token` 与入口请求的 `X-Request-ID`。连接、响应头和总请求超时均受
+`REQUEST_TIMEOUT` 控制，且硬上限为 2 秒。下游 404、502、503、504 分别映射为资源不存在、无效响应、
+暂不可用和调用超时；下游返回 HTTP 200 但业务码非零时也不会被误判为成功。
 - SRS Hook 使用 `POST /internal/v1/live/hooks/srs` 并校验 `X-Internal-Token`，该路径不得暴露到公网网关；
 - 内部请求携带 `X-Internal-Token` 与 `X-Request-ID`；
 - 对象不存在返回 404；无效下游响应返回 502；依赖不可用返回 503；超时返回 504；
