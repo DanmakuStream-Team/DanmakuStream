@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path, { join } from 'node:path'
 import { request as playwrightRequest } from '@playwright/test'
@@ -124,7 +124,7 @@ async function prepareMemberCData(api: ApiContext) {
     `${ffmpeg} -hide_banner -loglevel error -y -f lavfi -i color=c=blue:s=320x180:d=1 -f lavfi -i anullsrc=r=44100:cl=stereo -shortest -c:v libx264 -pix_fmt yuv420p -c:a aac "${fixture}"`,
     { stdio: 'pipe' },
   )
-  execSync(`cp "${fixture}" "${mediaFixture}"`, { stdio: 'pipe' })
+  copyFileSync(fixture, mediaFixture)
 
   runSql(mysqlCommand, `
     UPDATE users SET role='creator'   WHERE nickname='${USERS.memberCCreator.nickname}';
