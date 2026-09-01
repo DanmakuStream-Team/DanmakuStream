@@ -54,7 +54,7 @@ services:
       - ./deploy/configs/user-service.yaml:/app/etc/config.yaml:ro
       - micro_media_data:/app/data
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/livez"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/v1/livez"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -82,7 +82,7 @@ services:
       - ./deploy/configs/content-service.yaml:/app/etc/config.yaml:ro
       - micro_media_data:/app/data
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/livez"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/v1/livez"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -113,7 +113,7 @@ services:
     volumes:
       - ./deploy/configs/engagement-service.yaml:/app/etc/config.yaml:ro
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/livez"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/v1/livez"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -139,7 +139,7 @@ services:
       - ./deploy/nginx-gateway-microservices.conf:/etc/nginx/nginx.conf:ro
       - ./deploy/platform:/usr/share/nginx/html/platform:ro
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/gateway/health"]
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1/gateway/health"]
       interval: 15s
       timeout: 5s
       retries: 5

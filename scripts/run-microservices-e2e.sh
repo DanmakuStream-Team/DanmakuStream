@@ -30,8 +30,10 @@ cleanup() {
   if [[ "$result" != "0" ]]; then
     printf '\nMicroservice E2E failed; container state:\n' >&2
     cat "$artifact_dir/compose-ps.txt" >&2 || true
-    printf '\nLast 200 container log lines:\n' >&2
-    tail -n 200 "$artifact_dir/compose.log" >&2 || true
+    for service in mysql user-service content-service engagement-service gateway frontend srs; do
+      printf '\n===== %s (last 60 lines) =====\n' "$service" >&2
+      "${compose[@]}" logs --no-color --tail 60 "$service" >&2 || true
+    done
   fi
   if [[ "${MICRO_E2E_KEEP_STACK:-0}" != "1" ]]; then
     "${compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
