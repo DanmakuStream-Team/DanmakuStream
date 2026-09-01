@@ -30,8 +30,8 @@ spec:
     spec:
       containers:
         - name: user-service
-          # 发布流水线必须将占位标签替换为 ${GITHUB_SHA::12}。
-          image: danmakustream/user-service:000000000000
+          # 发布流水线必须将占位标签替换为完整 ${GITHUB_SHA}。
+          image: ghcr.io/danmakustream-team/user-service:0000000000000000000000000000000000000000
           env:
             - name: DATABASE_DSN
               valueFrom:
@@ -57,9 +57,9 @@ spec:
             - name: SERVICE_VERSION
               value: microservice-0.1.0
             - name: COMMIT_SHA
-              value: "000000000000"
+              value: "0000000000000000000000000000000000000000"
             - name: BUILD_TIME
-              value: "set-by-ci"
+              value: "1970-01-01T00:00:00Z"
           ports:
             - containerPort: 8080
           volumeMounts:

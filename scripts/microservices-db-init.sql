@@ -7,14 +7,20 @@ CREATE DATABASE IF NOT EXISTS user_db       CHARACTER SET utf8mb4 COLLATE utf8mb
 CREATE DATABASE IF NOT EXISTS content_db    CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE IF NOT EXISTS engagement_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- 账号口令仅限本地/演示环境；正式环境经 Secret 注入后执行 ALTER USER 轮换。
+-- 账号口令仅限本地/演示环境；正式环境由 Secret 注入。
 CREATE USER IF NOT EXISTS 'user_app'       @'%' IDENTIFIED BY 'user_app_pass';
 CREATE USER IF NOT EXISTS 'content_app'    @'%' IDENTIFIED BY 'content_app_pass';
 CREATE USER IF NOT EXISTS 'engagement_app' @'%' IDENTIFIED BY 'engagement_app_pass';
 
-GRANT ALL PRIVILEGES ON user_db.*       TO 'user_app'@'%';
-GRANT ALL PRIVILEGES ON content_db.*    TO 'content_app'@'%';
-GRANT ALL PRIVILEGES ON engagement_db.* TO 'engagement_app'@'%';
+-- 先撤销历史授权，保证脚本重复执行时也收敛到同一权限集。
+REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'user_app'@'%';
+REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'content_app'@'%';
+REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'engagement_app'@'%';
 
--- 跨库访问：默认不授予（MySQL 无授权即拒绝）。上面的 GRANT 逐账号只指向自己的 Schema，
--- 即满足"每个账号只能访问自己的 Schema"；如未来误授权，用 REVOKE 收回。
+-- 运行期 DML + 当前 GORM AutoMigrate 所需 DDL；不授予全局、跨库或授权管理权限。
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP, REFERENCES
+  ON user_db.* TO 'user_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP, REFERENCES
+  ON content_db.* TO 'content_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP, REFERENCES
+  ON engagement_db.* TO 'engagement_app'@'%';
