@@ -27,6 +27,12 @@ collect_evidence() {
 cleanup() {
   result=$?
   collect_evidence
+  if [[ "$result" != "0" ]]; then
+    printf '\nMicroservice E2E failed; container state:\n' >&2
+    cat "$artifact_dir/compose-ps.txt" >&2 || true
+    printf '\nLast 200 container log lines:\n' >&2
+    tail -n 200 "$artifact_dir/compose.log" >&2 || true
+  fi
   if [[ "${MICRO_E2E_KEEP_STACK:-0}" != "1" ]]; then
     "${compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
   else
