@@ -15,6 +15,9 @@ const MICRO = process.env.E2E_MICROSERVICES === '1'
 const COMPOSE_MICRO = process.env.COMPOSE_MICRO ?? 'docker compose -f docker-compose.microservices.yml'
 const USER_TABLE = MICRO ? '`user_db`.users' : 'users'
 const VIDEO_TABLE = MICRO ? '`content_db`.videos' : 'videos'
+const DANMAKU_TABLE = MICRO ? 'danmaku' : 'danmakus'
+const VIDEO_LIKE_TABLE = MICRO ? 'video_likes' : 'likes'
+const VIDEO_COLLECTION_TABLE = MICRO ? 'video_collections' : 'collects'
 const MEDIA_FIXTURE_ROOT = process.env.VIDEO_DIR
   ?? (MICRO ? path.join(tmpdir(), 'danmakustream-micro-e2e') : path.resolve('../backend/data'))
 
@@ -83,9 +86,9 @@ async function prepareEngagementData(api: ApiContext) {
     SET FOREIGN_KEY_CHECKS=0;
     DELETE FROM comment_likes WHERE comment_id IN (SELECT id FROM comments WHERE video_id IN ${VIDEO_ID_SUB});
     DELETE FROM comments WHERE video_id IN ${VIDEO_ID_SUB};
-    DELETE FROM danmakus WHERE video_id IN ${VIDEO_ID_SUB} AND scene='video';
-    DELETE FROM likes WHERE video_id IN ${VIDEO_ID_SUB};
-    DELETE FROM collects WHERE video_id IN ${VIDEO_ID_SUB};
+    DELETE FROM ${DANMAKU_TABLE} WHERE video_id IN ${VIDEO_ID_SUB} AND scene='video';
+    DELETE FROM ${VIDEO_LIKE_TABLE} WHERE video_id IN ${VIDEO_ID_SUB};
+    DELETE FROM ${VIDEO_COLLECTION_TABLE} WHERE video_id IN ${VIDEO_ID_SUB};
     SET FOREIGN_KEY_CHECKS=1;`)
 
   runSql(sql('content_db'), `
@@ -114,7 +117,7 @@ async function prepareUC13Data(api: ApiContext) {
     UPDATE users SET role='user'      WHERE nickname='${USERS.plain.nickname}';`)
 
   runSql(sql('engagement_db'), `
-    DELETE FROM danmakus WHERE content LIKE 'E2E-UC13-%';`)
+    DELETE FROM ${DANMAKU_TABLE} WHERE content LIKE 'E2E-UC13-%';`)
 
   runSql(sql('content_db'), `
     DELETE FROM videos   WHERE title LIKE 'E2E-UC13-%';
@@ -125,7 +128,7 @@ async function prepareUC13Data(api: ApiContext) {
        (SELECT id FROM ${USER_TABLE} WHERE nickname='${USERS.target.nickname}'));`)
 
   runSql(sql('engagement_db'), `
-    INSERT INTO danmakus (created_at,updated_at,video_id,user_id,content,time) VALUES
+    INSERT INTO ${DANMAKU_TABLE} (created_at,updated_at,video_id,user_id,content,time) VALUES
       (NOW(),NOW(),(SELECT id FROM ${VIDEO_TABLE} WHERE title='E2E-UC13-待审视频'),
        (SELECT id FROM ${USER_TABLE} WHERE nickname='${USERS.target.nickname}'),'E2E-UC13-待屏蔽弹幕',5);`)
 
