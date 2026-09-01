@@ -43,6 +43,7 @@ recommendation/data/
 /backend/data
 danmakustream-api
 /frontend/test-results/
+/artifacts/
 /tmp/
 
 # 本地运行产物与真实 Kubernetes Secret
