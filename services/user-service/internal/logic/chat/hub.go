@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"strconv"
@@ -8,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"danmakustream/user-service/internal/client"
 	model "danmakustream/user-service/internal/model/mysql"
 	"danmakustream/user-service/internal/svc"
 
@@ -84,7 +86,10 @@ type Client struct {
 	Hub    *Hub
 	Conn   *websocket.Conn
 	UserID uint
-	Send   chan []byte
+	// RequestID is captured during the HTTP upgrade and reused for messages on
+	// this WebSocket connection so downstream calls remain traceable.
+	RequestID string
+	Send      chan []byte
 }
 
 type Hub struct {
@@ -164,7 +169,7 @@ func (h *Hub) removeClient(client *Client) {
 	}
 }
 
-func (h *Hub) CreateAndBroadcast(senderID uint, input CreateMessageInput) (MessageInfo, error) {
+func (h *Hub) CreateAndBroadcast(ctx context.Context, requestID string, senderID uint, input CreateMessageInput) (MessageInfo, error) {
 	input.Type = strings.TrimSpace(input.Type)
 	if input.Type == "" {
 		input.Type = MessageTypeText
@@ -214,6 +219,17 @@ func (h *Hub) CreateAndBroadcast(senderID uint, input CreateMessageInput) (Messa
 			return MessageInfo{}, err
 		}
 	}
+	var sharedVideo client.VideoSummary
+	if input.Type == MessageTypeVideoShare {
+		video, err := h.svc.Content.Video(ctx, input.VideoID, requestID)
+		if errors.Is(err, client.ErrNotFound) || err == nil && !video.Playable {
+			return MessageInfo{}, ErrVideoMissing
+		}
+		if err != nil {
+			return MessageInfo{}, err
+		}
+		sharedVideo = video
+	}
 
 	message := model.ChatMessage{
 		SenderID: senderID, ReceiverID: input.ReceiverID, MessageType: input.Type,
@@ -245,6 +261,9 @@ func (h *Hub) CreateAndBroadcast(senderID uint, input CreateMessageInput) (Messa
 		return MessageInfo{}, err
 	}
 	info := ToMessageInfo(message)
+	if input.Type == MessageTypeVideoShare {
+		info.Video = sharedVideoInfo(h.svc.DB, sharedVideo)
+	}
 	h.publish([]uint{senderID, input.ReceiverID}, envelope{Type: "message", Payload: info})
 	return info, nil
 }
@@ -282,7 +301,7 @@ func (c *Client) ReadPump() {
 		if incoming.Message.ReceiverID == 0 && incoming.ReceiverID != 0 {
 			incoming.Message = CreateMessageInput{ReceiverID: incoming.ReceiverID, Type: MessageTypeText, Content: incoming.Content}
 		}
-		if _, err := c.Hub.CreateAndBroadcast(c.UserID, incoming.Message); err != nil {
+		if _, err := c.Hub.CreateAndBroadcast(context.Background(), c.RequestID, c.UserID, incoming.Message); err != nil {
 			data, _ := json.Marshal(envelope{Type: "error", Payload: chatErrorMessage(err)})
 			select {
 			case c.Send <- data:
@@ -291,6 +310,54 @@ func (c *Client) ReadPump() {
 			}
 		}
 	}
+}
+
+func sharedVideoInfo(db *gorm.DB, video client.VideoSummary) *SharedVideoInfo {
+	info := &SharedVideoInfo{ID: video.ID, Title: video.Title, CoverURL: video.CoverURL, Duration: video.Duration}
+	if video.CreatorID != 0 && db != nil {
+		var author model.User
+		if db.Select("id", "username", "nickname", "avatar", "role").First(&author, video.CreatorID).Error == nil {
+			info.Author = model.UserInfo{ID: author.ID, Username: author.Username, Nickname: author.Nickname, Avatar: author.Avatar, Role: author.Role}
+		}
+	}
+	return info
+}
+
+// EnrichVideoMessages resolves content-owned fields in one batch without ever
+// querying content tables from user-service. Read paths degrade to the stored
+// external ID when content-service is temporarily unavailable.
+func EnrichVideoMessages(ctx context.Context, requestID string, svcCtx *svc.ServiceContext, messages []MessageInfo) error {
+	ids := make([]uint, 0)
+	seen := make(map[uint]struct{})
+	for _, message := range messages {
+		if message.Video == nil || message.Video.ID == 0 {
+			continue
+		}
+		if _, ok := seen[message.Video.ID]; !ok {
+			seen[message.Video.ID] = struct{}{}
+			ids = append(ids, message.Video.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	videos, err := svcCtx.Content.Videos(ctx, ids, requestID)
+	if err != nil {
+		return err
+	}
+	byID := make(map[uint]client.VideoSummary, len(videos))
+	for _, video := range videos {
+		byID[video.ID] = video
+	}
+	for index := range messages {
+		if messages[index].Video == nil {
+			continue
+		}
+		if video, ok := byID[messages[index].Video.ID]; ok {
+			messages[index].Video = sharedVideoInfo(svcCtx.DB, video)
+		}
+	}
+	return nil
 }
 
 func (c *Client) WritePump() {

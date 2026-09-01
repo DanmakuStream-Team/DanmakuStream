@@ -92,8 +92,10 @@ func main() {
 	internal := r.Group("/internal/v1")
 	internal.Use(middleware.InternalAuth(c.InternalToken))
 	internal.GET("/users", platform.InternalUsers(ctx))
+	internal.GET("/users/:id", platform.InternalUser(ctx))
 	internal.GET("/users/:id/exists", platform.InternalUserExists(ctx))
 	internal.GET("/relationships/blocked", platform.InternalBlocked(ctx))
+	internal.GET("/relationships/following", platform.InternalFollowing(ctx))
 	internal.GET("/memberships/status", platform.InternalMembership(ctx))
 	r.GET("/ws/chat", wshandler.Chat(ctx))
 	server := &http.Server{Addr: fmt.Sprintf("%s:%d", c.Host, c.Port), Handler: r, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}

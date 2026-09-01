@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -44,7 +45,7 @@ func TestValidateMessageInput(t *testing.T) {
 
 func TestCreateAndBroadcastRejectsSelfBeforeDatabase(t *testing.T) {
 	hub := &Hub{}
-	_, err := hub.CreateAndBroadcast(7, CreateMessageInput{ReceiverID: 7, Type: MessageTypeText, Content: "hello"})
+	_, err := hub.CreateAndBroadcast(context.Background(), "", 7, CreateMessageInput{ReceiverID: 7, Type: MessageTypeText, Content: "hello"})
 	if !errors.Is(err, ErrSelfMessage) {
 		t.Fatalf("error = %v, want %v", err, ErrSelfMessage)
 	}
@@ -52,7 +53,7 @@ func TestCreateAndBroadcastRejectsSelfBeforeDatabase(t *testing.T) {
 
 func TestCreateAndBroadcastRejectsLongClientMessageIDBeforeDatabase(t *testing.T) {
 	hub := &Hub{}
-	_, err := hub.CreateAndBroadcast(7, CreateMessageInput{
+	_, err := hub.CreateAndBroadcast(context.Background(), "", 7, CreateMessageInput{
 		ReceiverID: 8, Type: MessageTypeText, Content: "hello", ClientMessageID: strings.Repeat("x", 65),
 	})
 	if !errors.Is(err, ErrInvalidClientMessageID) {

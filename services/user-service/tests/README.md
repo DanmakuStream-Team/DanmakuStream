@@ -7,4 +7,4 @@
 - `internal/logic/**/**_test.go`：UC01 鉴权逻辑和 UC11 会话逻辑。
 - `internal/middleware/auth_test.go`：未认证与权限不足场景。
 
-第 6 天完成独立单元/契约测试；使用真实 `user_db` 的完整 API 集成验证和跨服务 E2E 按计划继续执行，不伪造通过状态。
+第 7 天新增 `internal/client/content_test.go`，验证内部 Token、Request ID、单个/批量视频摘要契约，以及 404、502、503、504 所需的错误分类。`integration/day7_integration_test.go` 使用 `USER_SERVICE_TEST_DSN` 连接真实 `user_db`，验证“内容接口校验 → 仅保存视频 ID → 返回视频及作者摘要”的完整链路；未配置真实数据库时明确跳过，不伪造通过状态。

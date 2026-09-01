@@ -30,7 +30,7 @@ func Chat(ctx *svc.ServiceContext) gin.HandlerFunc {
 		if err != nil {
 			return
 		}
-		client := &chatlogic.Client{Hub: hub, Conn: conn, UserID: claims.UserID, Send: make(chan []byte, 128)}
+		client := &chatlogic.Client{Hub: hub, Conn: conn, UserID: claims.UserID, RequestID: c.GetString(middleware.CtxKeyRequestID), Send: make(chan []byte, 128)}
 		hub.Register(client)
 		go client.WritePump()
 		go client.ReadPump()

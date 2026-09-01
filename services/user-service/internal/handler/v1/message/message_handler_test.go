@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"danmakustream/user-service/internal/client"
 	chatlogic "danmakustream/user-service/internal/logic/chat"
 	"danmakustream/user-service/internal/middleware"
 	"danmakustream/user-service/internal/svc"
@@ -67,6 +68,10 @@ func TestWriteSendErrorStatus(t *testing.T) {
 	}{
 		{err: chatlogic.ErrBlocked, status: http.StatusForbidden},
 		{err: chatlogic.ErrUserNotFound, status: http.StatusNotFound},
+		{err: chatlogic.ErrVideoMissing, status: http.StatusNotFound},
+		{err: client.ErrBadGateway, status: http.StatusBadGateway},
+		{err: client.ErrUnavailable, status: http.StatusServiceUnavailable},
+		{err: client.ErrTimeout, status: http.StatusGatewayTimeout},
 		{err: chatlogic.ErrEmptyContent, status: http.StatusBadRequest},
 		{err: errors.New("database failed"), status: http.StatusBadRequest},
 	}
