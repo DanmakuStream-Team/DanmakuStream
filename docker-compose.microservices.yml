@@ -17,7 +17,8 @@ services:
       - micro_mysql_data:/var/lib/mysql
       - ./scripts/microservices-db-init.sql:/docker-entrypoint-initdb.d/01-schemas-accounts.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD}"]
+      # 强制 TCP；localhost 会走初始化临时实例的 Unix Socket，导致过早判为 healthy。
+      test: ["CMD-SHELL", "mysqladmin ping --protocol=tcp -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 10

@@ -85,12 +85,12 @@ spec:
               readOnly: true
           readinessProbe:
             exec:
-              command: ["sh", "-c", "mysqladmin ping -h localhost -uroot -p$MYSQL_ROOT_PASSWORD"]
+              command: ["sh", "-c", "mysqladmin ping --protocol=tcp -h 127.0.0.1 -uroot -p$MYSQL_ROOT_PASSWORD"]
             initialDelaySeconds: 20
             periodSeconds: 10
           livenessProbe:
             exec:
-              command: ["sh", "-c", "mysqladmin ping -h localhost -uroot -p$MYSQL_ROOT_PASSWORD"]
+              command: ["sh", "-c", "mysqladmin ping --protocol=tcp -h 127.0.0.1 -uroot -p$MYSQL_ROOT_PASSWORD"]
             initialDelaySeconds: 60
             periodSeconds: 20
           resources:
