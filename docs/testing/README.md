@@ -16,3 +16,5 @@
 2. API 测试失败以非零状态退出，并保存原始输出。
 3. E2E 测试使用 Playwright，优先 API 换 token，再注入浏览器会话。
 4. 未执行不能写“通过”；缺陷需要关联 Issue，修复后保留回归报告。
+
+运行真实三服务 Compose、API Gateway 和前端链路的方式见[微服务 E2E 环境](./microservices-e2e.md)。该套件与单体 `frontend/e2e/` 分开，确保微服务测试不会自动启动单体后端。
