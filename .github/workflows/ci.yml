@@ -4,7 +4,8 @@
 #   backend-test ─┬─> api-integration（Go 集成 + 全部 API 脚本）─┐
 #                 └─> e2e（全部用例统一入口）─────────────────────┼─> docker-build ─> deploy
 #   frontend-build ─┘                                               │
-#   user-service-test（独立 Go Module）─────────────────────────────┘
+#   user-service-test（独立 Go Module）─────────────────────────────┤
+#   microservice-platform（Compose + engagement-service）───────────┘
 #
 # 阻断规则（对齐课程任务书）：
 #   - 单元测试失败 → 停止，不构建镜像
@@ -88,6 +89,31 @@ jobs:
       - name: Build (type-check + vite build)
         working-directory: frontend
         run: npm run build
+
+  microservice-platform:
+    name: 微服务平台配置与 engagement-service 验证
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: services/engagement-service/go.mod
+          cache-dependency-path: services/engagement-service/go.sum
+      - name: Validate Compose configuration
+        run: docker compose -f docker-compose.microservices.yml config --quiet
+      - name: Test engagement-service
+        working-directory: services/engagement-service
+        run: go test ./...
+      - name: Build engagement-service image with commit metadata
+        run: |
+          IMAGE_TAG="${GITHUB_SHA::12}"
+          BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          docker build \
+            --build-arg COMMIT_SHA="$IMAGE_TAG" \
+            --build-arg BUILD_TIME="$BUILD_TIME" \
+            --build-arg SERVICE_VERSION=microservice-0.1.0 \
+            -t "danmakustream/engagement-service:$IMAGE_TAG" \
+            ./services/engagement-service
 
   api-integration:
     name: API/集成测试（全部用例 · 单一后端实例）
@@ -236,7 +262,7 @@ jobs:
   docker-build:
     name: 构建单体与 user-service 镜像（版本号 = commit sha）
     runs-on: ubuntu-latest
-    needs: [backend-test, user-service-test, frontend-build, api-integration, e2e]
+    needs: [backend-test, user-service-test, frontend-build, microservice-platform, api-integration, e2e]
     steps:
       - uses: actions/checkout@v4
       - name: Build backend image

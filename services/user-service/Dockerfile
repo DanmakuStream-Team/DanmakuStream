@@ -11,8 +11,9 @@ FROM alpine:3.20
 RUN apk add --no-cache ca-certificates tzdata wget && addgroup -S app && adduser -S app -G app
 WORKDIR /app
 COPY --from=builder /out/user-service /app/user-service
-COPY etc /app/etc
-RUN mkdir -p /app/data/avatars /app/data/messages && chown -R app:app /app
+RUN mkdir -p /app/etc /app/data/avatars /app/data/messages /app/data/images
+COPY etc/config.example.yaml /app/etc/config.yaml
+RUN chown -R app:app /app
 USER app
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=5 CMD wget -qO- http://127.0.0.1:8080/api/v1/health || exit 1

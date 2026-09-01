@@ -1,0 +1,13 @@
+Name: content-service
+Host: 0.0.0.0
+Port: 8080
+Auth:
+  AccessSecret: "your-jwt-secret-key-change-in-production"
+  AccessExpire: 86400
+Database:
+  DataSource: "content_app:content_app_pass@tcp(mysql:3306)/content_db?charset=utf8mb4&parseTime=True&loc=Local"
+VideoDir: data
+Dependencies:
+  UserBaseURL: http://user-service:8080
+  InternalToken: ""
+  TimeoutMS: 1500

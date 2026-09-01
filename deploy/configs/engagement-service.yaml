@@ -1,0 +1,18 @@
+Name: engagement-service
+Host: 0.0.0.0
+Port: 8080
+Database:
+  DataSource: "engagement_app:engagement_app_pass@tcp(mysql:3306)/engagement_db?charset=utf8mb4&parseTime=True&loc=Local"
+Auth:
+  AccessSecret: "your-jwt-secret-key-change-in-production"
+Dependencies:
+  UserBaseURL: http://user-service:8080
+  ContentBaseURL: http://content-service:8080
+  InternalToken: ""
+  TimeoutMS: 1500
+Live:
+  RTMPHost: srs:1935
+Build:
+  Version: microservice-0.1.0
+  GitSHA: "dev"
+  Time: "dev"

@@ -27,7 +27,7 @@ import (
 )
 
 func main() {
-	configFile := flag.String("f", "etc/config.example.yaml", "configuration file")
+	configFile := flag.String("f", "etc/config.yaml", "configuration file")
 	flag.Parse()
 	c, err := config.Load(*configFile)
 	if err != nil {
@@ -43,6 +43,7 @@ func main() {
 	r.MaxMultipartMemory = 8 << 20
 	r.Static("/media/avatars", ctx.VideoDir+"/avatars")
 	r.Static("/media/messages", ctx.VideoDir+"/messages")
+	r.Static("/media/images", ctx.VideoDir+"/images")
 	v1 := r.Group("/api/v1")
 	v1.GET("/livez", platform.Livez)
 	v1.GET("/health", platform.Health(ctx))
@@ -75,6 +76,7 @@ func main() {
 	auth.POST("/subscriptions/orders/:orderNo/demo-pay", membershiphandler.DemoPayHandler(ctx))
 	auth.PUT("/subscriptions/:creatorId/auto-renew", membershiphandler.AutoRenewHandler(ctx))
 	auth.POST("/messages/media", mediahandler.UploadMessageMediaHandler(ctx))
+	auth.POST("/images/upload", mediahandler.UploadImageHandler(ctx))
 	auth.GET("/messages/conversations", messagehandler.ConversationListHandler(ctx))
 	auth.GET("/messages/unread", messagehandler.UnreadHandler(ctx))
 	auth.GET("/messages/:userId", messagehandler.HistoryHandler(ctx))
