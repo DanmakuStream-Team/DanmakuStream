@@ -52,6 +52,11 @@ func Router(ctx *Context, logger *slog.Logger) *gin.Engine {
 	staff.GET("/videos", h.AdminListVideos)
 	staff.PUT("/videos/:id/status", h.ReviewVideo)
 
+	internal := router.Group("/internal/v1")
+	internal.Use(middleware.InternalAuth(ctx.Config.InternalAPIToken))
+	internal.GET("/videos/batch", h.InternalVideos)
+	internal.GET("/videos/:id", h.InternalVideo)
+
 	admin := auth.Group("/admin")
 	admin.Use(middleware.RequireRoles("admin"))
 	admin.GET("/banners", h.AdminBanners)

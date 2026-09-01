@@ -88,6 +88,61 @@ func responseData(t *testing.T, recorder *httptest.ResponseRecorder) map[string]
 	return envelope.Data
 }
 
+func TestInternalVideoEndpoints(t *testing.T) {
+	ctx, router := testService(t)
+	playable := model.Video{Title: "可分享视频", CoverURL: "/media/covers/1.jpg", VideoURL: "/media/videos/1.mp4", Duration: 42, AuthorID: 7, Status: "approved", TranscodeStatus: "ready"}
+	pending := model.Video{Title: "待审核视频", VideoURL: "/media/videos/2.mp4", AuthorID: 8, Status: "pending", TranscodeStatus: "ready"}
+	if err := ctx.DB.Create(&playable).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := ctx.DB.Create(&pending).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	unauthorized := request(t, router, http.MethodGet, "/internal/v1/videos/"+strconv.Itoa(int(playable.ID)), "", nil, "")
+	if unauthorized.Code != http.StatusForbidden {
+		t.Fatalf("unauthorized status = %d, want %d", unauthorized.Code, http.StatusForbidden)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/internal/v1/videos/"+strconv.Itoa(int(playable.ID)), nil)
+	req.Header.Set("X-Internal-Token", "internal-test-token")
+	req.Header.Set("X-Request-ID", "content-contract-test")
+	one := httptest.NewRecorder()
+	router.ServeHTTP(one, req)
+	if one.Code != http.StatusOK {
+		t.Fatalf("single status = %d body=%s", one.Code, one.Body.String())
+	}
+	data := responseData(t, one)
+	if data["creatorId"] != float64(7) || data["playable"] != true || data["status"] != "approved" {
+		t.Fatalf("single data = %#v", data)
+	}
+	if one.Header().Get("X-Request-ID") != "content-contract-test" {
+		t.Fatalf("request ID was not preserved: %q", one.Header().Get("X-Request-ID"))
+	}
+
+	batchReq := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/internal/v1/videos/batch?ids=%d,%d,999", pending.ID, playable.ID), nil)
+	batchReq.Header.Set("X-Internal-Token", "internal-test-token")
+	batch := httptest.NewRecorder()
+	router.ServeHTTP(batch, batchReq)
+	if batch.Code != http.StatusOK {
+		t.Fatalf("batch status = %d body=%s", batch.Code, batch.Body.String())
+	}
+	var result struct {
+		Data struct {
+			Items []struct {
+				ID       uint `json:"id"`
+				Playable bool `json:"playable"`
+			} `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(batch.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Data.Items) != 2 || result.Data.Items[0].ID != pending.ID || result.Data.Items[0].Playable || result.Data.Items[1].ID != playable.ID || !result.Data.Items[1].Playable {
+		t.Fatalf("batch items = %#v", result.Data.Items)
+	}
+}
+
 func TestHealthAndVersionContracts(t *testing.T) {
 	ctx, router := testService(t)
 	for _, path := range []string{"/api/v1/livez", "/api/v1/health", "/api/v1/version"} {

@@ -8,13 +8,19 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"danmakustream/user-service/internal/client"
+	wshandler "danmakustream/user-service/internal/handler/ws"
 	chatlogic "danmakustream/user-service/internal/logic/chat"
+	"danmakustream/user-service/internal/middleware"
 	model "danmakustream/user-service/internal/model/mysql"
 	"danmakustream/user-service/internal/svc"
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/gorilla/websocket"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -44,10 +50,12 @@ func TestVideoShareUsesContentAPIAndUserDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	requestIDs := make(chan string, 2)
 	content := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("X-Internal-Token") != "integration-token" || r.Header.Get("X-Request-ID") != "integration-request" {
+		if r.Header.Get("X-Internal-Token") != "integration-token" || r.Header.Get("X-Request-ID") == "" {
 			t.Error("internal headers not propagated")
 		}
+		requestIDs <- r.Header.Get("X-Request-ID")
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = fmt.Fprintf(w, `{"code":0,"message":"ok","data":{"id":77,"creatorId":%d,"title":"联调视频","coverUrl":"/media/cover.jpg","duration":88,"status":"published","playable":true}}`, receiver.ID)
 	}))
@@ -67,5 +75,38 @@ func TestVideoShareUsesContentAPIAndUserDB(t *testing.T) {
 	}
 	if stored.SharedVideoID == nil || *stored.SharedVideoID != 77 {
 		t.Fatalf("stored=%+v", stored)
+	}
+	if got := <-requestIDs; got != "integration-request" {
+		t.Fatalf("HTTP request ID = %q", got)
+	}
+
+	ctx.Config.Auth.AccessSecret = "websocket-test-secret"
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(middleware.RequestContext("user-service"))
+	router.GET("/ws/chat", wshandler.Chat(ctx))
+	server := httptest.NewServer(router)
+	defer server.Close()
+	claims := middleware.Claims{UserID: sender.ID, RegisteredClaims: jwt.RegisteredClaims{ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute))}}
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(ctx.Config.Auth.AccessSecret))
+	if err != nil {
+		t.Fatal(err)
+	}
+	header := http.Header{"X-Request-ID": []string{"ws-integration-request"}}
+	conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+"/ws/chat?token="+token, header)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if err := conn.WriteJSON(map[string]any{"type": "message", "message": map[string]any{"receiverId": receiver.ID, "type": "video_share", "videoId": 77, "clientMessageId": "day7-websocket-integration"}}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case got := <-requestIDs:
+		if got != "ws-integration-request" {
+			t.Fatalf("WebSocket request ID = %q", got)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("WebSocket video share did not call content-service")
 	}
 }

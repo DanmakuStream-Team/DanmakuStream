@@ -86,7 +86,10 @@ type Client struct {
 	Hub    *Hub
 	Conn   *websocket.Conn
 	UserID uint
-	Send   chan []byte
+	// RequestID is captured during the HTTP upgrade and reused for messages on
+	// this WebSocket connection so downstream calls remain traceable.
+	RequestID string
+	Send      chan []byte
 }
 
 type Hub struct {
@@ -298,7 +301,7 @@ func (c *Client) ReadPump() {
 		if incoming.Message.ReceiverID == 0 && incoming.ReceiverID != 0 {
 			incoming.Message = CreateMessageInput{ReceiverID: incoming.ReceiverID, Type: MessageTypeText, Content: incoming.Content}
 		}
-		if _, err := c.Hub.CreateAndBroadcast(context.Background(), "", c.UserID, incoming.Message); err != nil {
+		if _, err := c.Hub.CreateAndBroadcast(context.Background(), c.RequestID, c.UserID, incoming.Message); err != nil {
 			data, _ := json.Marshal(envelope{Type: "error", Payload: chatErrorMessage(err)})
 			select {
 			case c.Send <- data:

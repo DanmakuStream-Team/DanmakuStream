@@ -13,6 +13,12 @@ on:
         default: microservice-0.1.0
         type: string
 
+      mysql_integration:
+        description: Run the service integration suite against an isolated MySQL
+        required: false
+        default: false
+        type: boolean
+
 permissions:
   contents: read
   packages: write
@@ -21,6 +27,21 @@ jobs:
   test-build-push:
     name: test → image (${{ inputs.service }})
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: user_db
+          MYSQL_USER: user_app
+          MYSQL_PASSWORD: user_app_pass
+          MYSQL_ROOT_PASSWORD: root_test_pass
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_test_pass"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
     steps:
       - uses: actions/checkout@v4
 
@@ -39,12 +60,23 @@ jobs:
           set -o pipefail
           go test -count=1 ./... -v | tee service-test-output.txt
 
+      - name: MySQL integration tests
+        if: inputs.mysql_integration
+        working-directory: services/${{ inputs.service }}
+        env:
+          USER_SERVICE_TEST_DSN: user_app:user_app_pass@tcp(127.0.0.1:3306)/user_db?charset=utf8mb4&parseTime=True&loc=Local
+        run: |
+          set -o pipefail
+          go test -count=1 -tags=integration ./integration -v | tee integration-test-output.txt
+
       - name: Upload test evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.service }}-test-${{ github.sha }}
-          path: services/${{ inputs.service }}/service-test-output.txt
+          path: |
+            services/${{ inputs.service }}/service-test-output.txt
+            services/${{ inputs.service }}/integration-test-output.txt
           if-no-files-found: warn
 
       - name: Compute immutable image name
