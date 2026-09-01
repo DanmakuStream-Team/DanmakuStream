@@ -9,7 +9,11 @@ ARG BUILD_TIME=1970-01-01T00:00:00Z
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/content-service ./cmd/server
 
 FROM alpine:3.22
-RUN addgroup -S app && adduser -S -G app app && mkdir -p /app/data && chown -R app:app /app
+RUN apk add --no-cache ca-certificates tzdata wget \
+    && addgroup -S app \
+    && adduser -S -G app app \
+    && mkdir -p /app/data \
+    && chown -R app:app /app
 WORKDIR /app
 COPY --from=builder /out/content-service /app/content-service
 ARG SERVICE_VERSION=microservice-0.1.0

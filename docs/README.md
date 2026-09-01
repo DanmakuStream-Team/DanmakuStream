@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | `project/` | 课程要求、开发计划、协作规范、完整用例清单 | [项目文档](project/) |
 | `architecture/` | 单体、Kubernetes 与微服务架构规范 | [部署设计](architecture/deployment-design.md) · [微服务统一规范](architecture/microservices/service-standards.md) |
+| `deploy/` | CI/CD、镜像与部署运维说明 | [CD 流水线](deploy/cd-pipeline.md) · [微服务独立 CI](deploy/microservice-ci.md) |
 | `models/` | PlantUML 源文件、SVG/PNG 与检查记录 | [模型索引](models/README.md) |
 | `testing/` | 测试用例和原始测试报告 | [测试用例](testing/test-cases/) |
 | `traceability/` | 需求—设计—代码—测试追溯（总表 + 单用例） | [总追溯表 master.md](traceability/master.md) |
@@ -26,6 +27,7 @@
 
 - [单体与 Kubernetes 部署设计](architecture/deployment-design.md)
 - [微服务统一规范](architecture/microservices/service-standards.md)
+- [微服务独立 CI 与镜像规范](deploy/microservice-ci.md)
 
 ## 当前交付缺口
 
@@ -33,9 +35,9 @@
 
 1. UC01、UC06、UC07、UC08、UC11 缺少系统级、组件级和对象级三层模型，共 15 张图；项目也缺少覆盖 UC01～UC13 的总用例图。
 2. 除 UC13 及成员 D 的 UC05、UC09、UC10 外，其余用例缺少成套的独立说明、测试用例/结果与追溯材料；还缺 UC01～UC13 总追溯表。
-3. 微服务统一规范已建立；仍缺服务划分图、逐接口清单、逐表归属清单，以及三个业务微服务的实际代码、部署和跨服务失败处理验证材料。
+3. 三个业务微服务、网关和独立 CI 已建立；仍缺跨服务失败处理、完整微服务 E2E 与实际集群部署验证材料。
 4. 云原生实验缺少 HPA 扩缩容原始数据、故障注入与降级/超时/熔断结果，以及单体和微服务在相同条件下至少三轮的性能对比原始数据与分析。
-5. CI 当前只完成测试和镜像构建；缺镜像推送、Kubernetes 自动部署、部署后健康检查及失败阻断的实际工作流，也缺部署/回滚脚本和 HPA 清单。
+5. 单体 CD 与微服务 SHA 镜像推送已建立；三个微服务仍缺自动更新 Kubernetes Deployment、部署后健康检查、回滚证据和 HPA 清单。
 6. 项目管理缺每日站会简报、看板/统计截图和汇总证据；最终答辩材料、技术总结、成员权重确认、AI 使用说明尚未归档。
 
 详细提交范围以课程任务书为准。新增文档后请同步更新本索引和对应追溯表。

@@ -1,0 +1,77 @@
+name: reusable-service-ci
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        description: Service directory and image name
+        required: true
+        type: string
+      service_version:
+        description: Version exposed by the service version endpoint
+        required: false
+        default: microservice-0.1.0
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test-build-push:
+    name: test → image (${{ inputs.service }})
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: services/${{ inputs.service }}/go.mod
+          cache-dependency-path: services/${{ inputs.service }}/go.sum
+
+      - name: Build service
+        working-directory: services/${{ inputs.service }}
+        run: go build ./...
+
+      - name: Test service
+        working-directory: services/${{ inputs.service }}
+        run: |
+          set -o pipefail
+          go test -count=1 ./... -v | tee service-test-output.txt
+
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.service }}-test-${{ github.sha }}
+          path: services/${{ inputs.service }}/service-test-output.txt
+          if-no-files-found: warn
+
+      - name: Compute immutable image name
+        id: image
+        shell: bash
+        run: |
+          echo "repository=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${{ inputs.service }}" >> "$GITHUB_OUTPUT"
+          echo "tag=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Build commit-SHA image
+        run: |
+          docker build \
+            --build-arg SERVICE_VERSION="${{ inputs.service_version }}" \
+            --build-arg COMMIT_SHA="${{ steps.image.outputs.tag }}" \
+            --build-arg BUILD_TIME="${{ steps.image.outputs.build_time }}" \
+            -t "${{ steps.image.outputs.repository }}:${{ steps.image.outputs.tag }}" \
+            "services/${{ inputs.service }}"
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push immutable image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        run: docker push "${{ steps.image.outputs.repository }}:${{ steps.image.outputs.tag }}"
