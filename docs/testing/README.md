@@ -19,10 +19,18 @@
 
 ## 微服务 E2E（D06+）
 
-一键在微服务栈（三服务 + 网关，`docker-compose.microservices.yml`）上运行全部 E2E：
+一键启动微服务栈（三服务 + 网关，`docker-compose.microservices.yml`）并运行跨网关烟测门禁：
 
 ```bash
 cd frontend && npm run test:e2e:micro
 ```
 
-内部行为：自动起栈/等网关健康 → `E2E_MICROSERVICES=1` 数据准备按 v1.1 归属拆到 user_db/content_db/engagement_db（root 直连）→ 媒体夹具经 `docker compose cp` 注入 content-service 媒体卷 → 走 compose 前端（:80）与网关（:8888）执行全部 spec。单体模式行为不变（`npm run test:e2e`）。
+默认门禁验证前端、网关、三个服务、独立 Schema、JWT 和内部接口隔离，不回退到单体服务。单体模式行为不变（`npm run test:e2e`）。
+
+需要审计 24 条单体业务用例迁移进度时，可显式运行全量模式：
+
+```bash
+cd frontend && MICRO_E2E_FULL_SUITE=1 npm run test:e2e:micro
+```
+
+全量模式会启用 `E2E_MICROSERVICES=1`，按 v1.1 归属准备三库数据并把媒体夹具复制到 content-service。该命令用于暴露尚未完成的网关路由、服务接口和响应契约，不作为微服务环境 PR 的绿色门禁；用例逐项兼容后再迁入 `frontend/e2e-microservices/`。

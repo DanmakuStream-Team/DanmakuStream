@@ -74,7 +74,12 @@ export E2E_BASE_URL="$MICRO_E2E_FRONTEND_URL"
 export COMPOSE_MICRO="${compose[*]}"
 export MYSQL_ROOT_CMD="${compose[*]} exec -T mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD}"
 
+e2e_npm_script=test:e2e:microservices
+if [[ "${MICRO_E2E_FULL_SUITE:-0}" == "1" ]]; then
+  e2e_npm_script=test:e2e:microservices:full
+fi
+
 (
   cd "$repo_root/frontend"
-  npm run test:e2e:microservices
+  npm run "$e2e_npm_script"
 )
