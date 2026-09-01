@@ -15,6 +15,8 @@ const MICRO = process.env.E2E_MICROSERVICES === '1'
 const COMPOSE_MICRO = process.env.COMPOSE_MICRO ?? 'docker compose -f docker-compose.microservices.yml'
 const USER_TABLE = MICRO ? '`user_db`.users' : 'users'
 const VIDEO_TABLE = MICRO ? '`content_db`.videos' : 'videos'
+const MEDIA_FIXTURE_ROOT = process.env.VIDEO_DIR
+  ?? (MICRO ? path.join(tmpdir(), 'danmakustream-micro-e2e') : path.resolve('../backend/data'))
 
 function sql(db: string): string {
   if (!MICRO) return process.env.MYSQL_CMD as string
@@ -67,8 +69,7 @@ async function prepareEngagementData(api: ApiContext) {
 
   if (!process.env.MYSQL_CMD && !MICRO) return
 
-  const videoDir = process.env.VIDEO_DIR ?? path.resolve('../backend/data')
-  const mediaFixture = path.join(videoDir, 'videos', 'e2e-uc05.mp4')
+  const mediaFixture = path.join(MEDIA_FIXTURE_ROOT, 'videos', 'e2e-uc05.mp4')
   mkdirSync(path.dirname(mediaFixture), { recursive: true })
   writeFileSync(mediaFixture, 'UC05 E2E media fixture', 'utf8')
 
@@ -102,8 +103,7 @@ async function prepareUC13Data(api: ApiContext) {
     await ensureUser(api, user.nickname, user.password)
   }
 
-  const videoDir = process.env.VIDEO_DIR ?? path.resolve('../backend/data')
-  const mediaFixture = path.join(videoDir, 'videos', 'e2e-uc13.mp4')
+  const mediaFixture = path.join(MEDIA_FIXTURE_ROOT, 'videos', 'e2e-uc13.mp4')
   mkdirSync(path.dirname(mediaFixture), { recursive: true })
   writeFileSync(mediaFixture, 'UC13 E2E media fixture', 'utf8')
 
@@ -138,7 +138,7 @@ async function prepareMemberCData(api: ApiContext) {
   }
 
   const fixtureDir = '/tmp/danmakustream-member-c-fixtures'
-  const backendMediaDir = path.resolve('../backend/data/videos/e2e-member-c')
+  const backendMediaDir = path.join(MEDIA_FIXTURE_ROOT, 'videos', 'e2e-member-c')
   mkdirSync(fixtureDir, { recursive: true })
   mkdirSync(backendMediaDir, { recursive: true })
   const fixture = path.join(fixtureDir, 'member-c.mp4')
