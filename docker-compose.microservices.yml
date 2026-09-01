@@ -45,6 +45,7 @@ services:
       DATABASE_DSN: "user_app:user_app_pass@tcp(mysql:3306)/user_db?charset=utf8mb4&parseTime=True&loc=Local"
       JWT_SECRET: ${MICRO_JWT_SECRET:-local-dev-jwt-secret-change-me}
       INTERNAL_API_TOKEN: ${MICRO_INTERNAL_TOKEN:-local-dev-internal-token-change-me}
+      CONTENT_SERVICE_URL: http://content-service:8080
       SERVICE_VERSION: ${MICRO_SERVICE_VERSION:-microservice-0.1.0}
       COMMIT_SHA: ${COMMIT_SHA:-development}
       BUILD_TIME: ${BUILD_TIME:-unknown}

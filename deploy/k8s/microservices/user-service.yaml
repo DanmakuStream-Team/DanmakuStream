@@ -48,6 +48,10 @@ spec:
                 secretKeyRef:
                   name: micro-secrets
                   key: INTERNAL_API_TOKEN
+            - name: CONTENT_SERVICE_URL
+              value: http://content-service:8080
+            - name: REQUEST_TIMEOUT
+              value: 2s
             - name: SERVICE_NAME
               value: user-service
             - name: SERVICE_VERSION

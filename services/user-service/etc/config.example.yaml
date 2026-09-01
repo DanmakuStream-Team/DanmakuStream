@@ -7,3 +7,4 @@ Auth:
 Database:
   DataSource: ""
 VideoDir: data
+ContentServiceURL: http://127.0.0.1:8082

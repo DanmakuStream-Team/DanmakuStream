@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 
+	"danmakustream/user-service/internal/client"
 	"danmakustream/user-service/internal/handler/response"
 	chatlogic "danmakustream/user-service/internal/logic/chat"
 	"danmakustream/user-service/internal/middleware"
@@ -86,6 +87,14 @@ func ConversationListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 		sort.Slice(list, func(i, j int) bool {
 			return list[i].LastMessage.ID > list[j].LastMessage.ID
 		})
+		lastMessages := make([]chatlogic.MessageInfo, len(list))
+		for index := range list {
+			lastMessages[index] = list[index].LastMessage
+		}
+		_ = chatlogic.EnrichVideoMessages(c.Request.Context(), c.GetString(middleware.CtxKeyRequestID), svcCtx, lastMessages)
+		for index := range list {
+			list[index].LastMessage = lastMessages[index]
+		}
 		response.Ok(c, gin.H{"list": list})
 	}
 }
@@ -122,6 +131,7 @@ func HistoryHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			}
 			list = append(list, chatlogic.ToMessageInfo(messages[index]))
 		}
+		_ = chatlogic.EnrichVideoMessages(c.Request.Context(), c.GetString(middleware.CtxKeyRequestID), svcCtx, list)
 		response.Ok(c, gin.H{"list": list, "total": total, "page": page, "pageSize": pageSize})
 	}
 }
@@ -134,7 +144,7 @@ func SendHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
 			response.Fail(c, http.StatusBadRequest, "参数错误")
 			return
 		}
-		message, err := chatlogic.GetHub(svcCtx).CreateAndBroadcast(userID, req)
+		message, err := chatlogic.GetHub(svcCtx).CreateAndBroadcast(c.Request.Context(), c.GetString(middleware.CtxKeyRequestID), userID, req)
 		if err != nil {
 			writeSendError(c, err)
 			return
@@ -203,8 +213,14 @@ func writeSendError(c *gin.Context, err error) {
 	status := http.StatusBadRequest
 	if errors.Is(err, chatlogic.ErrBlocked) {
 		status = http.StatusForbidden
-	} else if errors.Is(err, chatlogic.ErrUserNotFound) {
+	} else if errors.Is(err, chatlogic.ErrUserNotFound) || errors.Is(err, chatlogic.ErrVideoMissing) {
 		status = http.StatusNotFound
+	} else if errors.Is(err, client.ErrTimeout) {
+		status = http.StatusGatewayTimeout
+	} else if errors.Is(err, client.ErrBadGateway) {
+		status = http.StatusBadGateway
+	} else if errors.Is(err, client.ErrUnavailable) {
+		status = http.StatusServiceUnavailable
 	}
 	response.Fail(c, status, chatlogic.ErrorMessage(err))
 }

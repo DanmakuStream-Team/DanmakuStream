@@ -1,11 +1,15 @@
 package handler
 
 import (
+	"errors"
+	"net/http"
+	"strconv"
+
 	"danmakustream/user-service/internal/handler/response"
 	model "danmakustream/user-service/internal/model/mysql"
 	"danmakustream/user-service/internal/svc"
 	"github.com/gin-gonic/gin"
-	"net/http"
+	"gorm.io/gorm"
 )
 
 func Livez(c *gin.Context) { response.Ok(c, gin.H{"status": "up"}) }
@@ -50,22 +54,99 @@ func InternalUsers(ctx *svc.ServiceContext) gin.HandlerFunc {
 }
 func InternalUserExists(ctx *svc.ServiceContext) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		id, ok := positiveID(c.Param("id"))
+		if !ok {
+			response.Fail(c, http.StatusBadRequest, "invalid user id")
+			return
+		}
 		var n int64
-		ctx.DB.Model(&model.User{}).Where("id = ?", c.Param("id")).Count(&n)
+		if err := ctx.DB.Model(&model.User{}).Where("id = ?", id).Count(&n).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "query user failed")
+			return
+		}
 		response.Ok(c, gin.H{"exists": n > 0})
+	}
+}
+func InternalUser(ctx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, ok := positiveID(c.Param("id"))
+		if !ok {
+			response.Fail(c, http.StatusBadRequest, "invalid user id")
+			return
+		}
+		var user model.User
+		if err := ctx.DB.Select("id", "username", "nickname", "avatar", "role").First(&user, id).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				response.Fail(c, http.StatusNotFound, "user not found")
+			} else {
+				response.Fail(c, http.StatusInternalServerError, "query user failed")
+			}
+			return
+		}
+		response.Ok(c, model.UserInfo{ID: user.ID, Username: user.Username, Nickname: user.Nickname, Avatar: user.Avatar, Role: user.Role})
 	}
 }
 func InternalBlocked(ctx *svc.ServiceContext) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		firstID, secondID := c.Query("firstId"), c.Query("secondId")
+		if firstID == "" {
+			firstID = c.Query("blockerId")
+		}
+		if secondID == "" {
+			secondID = c.Query("blockedId")
+		}
+		first, firstOK := positiveID(firstID)
+		second, secondOK := positiveID(secondID)
+		if !firstOK || !secondOK {
+			response.Fail(c, http.StatusBadRequest, "invalid relationship ids")
+			return
+		}
 		var n int64
-		ctx.DB.Model(&model.UserBlock{}).Where("(blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)", c.Query("firstId"), c.Query("secondId"), c.Query("secondId"), c.Query("firstId")).Count(&n)
+		if err := ctx.DB.Model(&model.UserBlock{}).Where("(blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)", first, second, second, first).Count(&n).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "query blocked relationship failed")
+			return
+		}
 		response.Ok(c, gin.H{"blocked": n > 0})
 	}
 }
 func InternalMembership(ctx *svc.ServiceContext) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		subscriberID := c.Query("subscriberId")
+		if subscriberID == "" {
+			subscriberID = c.Query("userId")
+		}
+		subscriber, subscriberOK := positiveID(subscriberID)
+		creator, creatorOK := positiveID(c.Query("creatorId"))
+		if !subscriberOK || !creatorOK {
+			response.Fail(c, http.StatusBadRequest, "invalid membership ids")
+			return
+		}
 		var n int64
-		ctx.DB.Model(&model.CreatorSubscription{}).Where("subscriber_id=? AND creator_id=? AND status='active' AND expires_at > NOW()", c.Query("subscriberId"), c.Query("creatorId")).Count(&n)
+		if err := ctx.DB.Model(&model.CreatorSubscription{}).Where("subscriber_id=? AND creator_id=? AND status='active' AND expires_at > NOW()", subscriber, creator).Count(&n).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "query membership failed")
+			return
+		}
 		response.Ok(c, gin.H{"active": n > 0})
 	}
+}
+func InternalFollowing(ctx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		follower, followerOK := positiveID(c.Query("followerId"))
+		followee, followeeOK := positiveID(c.Query("followeeId"))
+		if !followerOK || !followeeOK {
+			response.Fail(c, http.StatusBadRequest, "invalid following ids")
+			return
+		}
+		var n int64
+		if err := ctx.DB.Model(&model.Follow{}).Where("follower_id=? AND followee_id=?", follower, followee).Count(&n).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "query following relationship failed")
+			return
+		}
+		response.Ok(c, gin.H{"following": n > 0})
+	}
+}
+
+func positiveID(value string) (uint64, bool) {
+	id, err := strconv.ParseUint(value, 10, 64)
+	return id, err == nil && id > 0
 }

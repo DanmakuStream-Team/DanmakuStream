@@ -81,3 +81,27 @@ func TestInternalToken(t *testing.T) {
 		t.Fatalf("status=%d", w.Code)
 	}
 }
+
+func TestInternalHandlersRejectInvalidIDsBeforeDatabase(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tests := []struct {
+		path  string
+		route string
+		fn    gin.HandlerFunc
+	}{
+		{path: "/internal/v1/users/nope", route: "/internal/v1/users/:id", fn: InternalUser(&svc.ServiceContext{})},
+		{path: "/internal/v1/users/0/exists", route: "/internal/v1/users/:id/exists", fn: InternalUserExists(&svc.ServiceContext{})},
+		{path: "/internal/v1/relationships/blocked?blockerId=1", route: "/internal/v1/relationships/blocked", fn: InternalBlocked(&svc.ServiceContext{})},
+		{path: "/internal/v1/relationships/following?followerId=1", route: "/internal/v1/relationships/following", fn: InternalFollowing(&svc.ServiceContext{})},
+		{path: "/internal/v1/memberships/status?userId=1", route: "/internal/v1/memberships/status", fn: InternalMembership(&svc.ServiceContext{})},
+	}
+	for _, test := range tests {
+		r := gin.New()
+		r.GET(test.route, test.fn)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, test.path, nil))
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("path=%s status=%d body=%s", test.path, w.Code, w.Body.String())
+		}
+	}
+}

@@ -20,13 +20,14 @@ type Config struct {
 	Database struct {
 		DataSource string `yaml:"DataSource"`
 	} `yaml:"Database"`
-	VideoDir       string `yaml:"VideoDir"`
-	InternalToken  string
-	Version        string
-	Commit         string
-	BuildTime      string
-	LogLevel       string
-	RequestTimeout time.Duration
+	VideoDir          string `yaml:"VideoDir"`
+	InternalToken     string
+	Version           string
+	Commit            string
+	BuildTime         string
+	LogLevel          string
+	RequestTimeout    time.Duration
+	ContentServiceURL string `yaml:"ContentServiceURL"`
 }
 
 func Load(path string) (Config, error) {
@@ -53,6 +54,7 @@ func Load(path string) (Config, error) {
 	c.Commit = env("COMMIT_SHA", "development")
 	c.BuildTime = env("BUILD_TIME", time.Now().Format(time.RFC3339))
 	c.LogLevel = env("LOG_LEVEL", "info")
+	c.ContentServiceURL = env("CONTENT_SERVICE_URL", c.ContentServiceURL)
 	c.RequestTimeout = 2 * time.Second
 	if value := os.Getenv("REQUEST_TIMEOUT"); value != "" {
 		parsed, parseErr := time.ParseDuration(value)
@@ -61,8 +63,8 @@ func Load(path string) (Config, error) {
 		}
 		c.RequestTimeout = parsed
 	}
-	if c.Database.DataSource == "" || c.Auth.AccessSecret == "" || c.InternalToken == "" {
-		return c, fmt.Errorf("DATABASE_DSN, JWT_SECRET and INTERNAL_API_TOKEN are required")
+	if c.Database.DataSource == "" || c.Auth.AccessSecret == "" || c.InternalToken == "" || c.ContentServiceURL == "" {
+		return c, fmt.Errorf("DATABASE_DSN, JWT_SECRET, INTERNAL_API_TOKEN and CONTENT_SERVICE_URL are required")
 	}
 	return c, nil
 }
