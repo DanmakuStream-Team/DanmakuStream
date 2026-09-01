@@ -70,7 +70,10 @@ func (h *Handler) requirePlayable(c *gin.Context, id uint) (client.VideoSummary,
 		dependencyError(c, err, "视频")
 		return video, false
 	}
-	if !video.Playable && video.Status != "approved" {
+	// Playable is the content-service decision after combining review and
+	// transcode state. Do not fall back to Status here: an approved video can
+	// still be explicitly unplayable while its media is missing or transcoding.
+	if !video.Playable {
 		response.Error(c, http.StatusConflict, "视频当前不可互动")
 		return video, false
 	}
@@ -535,6 +538,10 @@ func (h *Handler) LiveWebSocket(c *gin.Context) {
 	monitor := c.Query("monitor") == "1"
 	if monitor && (!authenticated || uid != room.OwnerID) {
 		response.Error(c, 403, "仅主播可连接监控")
+		return
+	}
+	if !monitor && room.ChatMode != "everyone" && !authenticated {
+		response.Error(c, http.StatusUnauthorized, "登录后才能参与受限直播聊天")
 		return
 	}
 	if !monitor && room.ChatMode == "members" && uid != room.OwnerID {
