@@ -376,3 +376,7 @@ resources:
 - 修改公开 API、路由归属、Schema 归属或公共错误格式时，PR 必须同步修改本文。
 - PR 描述必须列出对应 UC、测试命令和部署验证结果。
 - 任何 Secret 泄漏、跨 Schema 查询、绕过网关的前端请求或使用 `latest` 的正式部署均视为阻断项。
+
+## 11. 数据表归属与服务划分（权威版本）
+
+服务边界、接口清单与数据表归属以 [service-division.md](./service-division.md)（v1.1）为唯一权威来源；`dynamic_posts` 归属已在 v1.1 中调整为 content_db。
