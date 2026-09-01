@@ -13,14 +13,17 @@ type ApiContext = Awaited<ReturnType<typeof playwrightRequest.newContext>>
 // 单体模式（默认）：行为与历史版本完全一致（单库 danmakustream、本地媒体目录）。
 const MICRO = process.env.E2E_MICROSERVICES === '1'
 const COMPOSE_MICRO = process.env.COMPOSE_MICRO ?? 'docker compose -f docker-compose.microservices.yml'
+const USER_TABLE = MICRO ? '`user_db`.users' : 'users'
+const VIDEO_TABLE = MICRO ? '`content_db`.videos' : 'videos'
 
 function sql(db: string): string {
   if (!MICRO) return process.env.MYSQL_CMD as string
   return `${process.env.MYSQL_ROOT_CMD ?? 'mysql -h127.0.0.1 -P3306 -uroot -ppassword'} ${db}`
 }
 
-function composeCp(src: string, dst: string) {
-  execSync(`${COMPOSE_MICRO} cp "${src}" "${dst}"`, { stdio: 'pipe' })
+function copyContentFixture(src: string, dst: string) {
+  execSync(`${COMPOSE_MICRO} exec -T content-service mkdir -p "${path.posix.dirname(dst)}"`, { stdio: 'pipe' })
+  execSync(`${COMPOSE_MICRO} cp "${src}" "content-service:${dst}"`, { stdio: 'pipe' })
 }
 
 function runSql(mysqlCommand: string, statement: string) {
@@ -69,11 +72,11 @@ async function prepareEngagementData(api: ApiContext) {
   mkdirSync(path.dirname(mediaFixture), { recursive: true })
   writeFileSync(mediaFixture, 'UC05 E2E media fixture', 'utf8')
 
-  const VIDEO_SUB = `(SELECT id FROM ${MICRO ? '\\`user_db\\`.users' : 'users'} WHERE nickname='${USERS.owner.nickname}')`
-  const VIDEO_ID_SUB = `(SELECT id FROM ${MICRO ? '\\`content_db\\`.videos' : 'videos'} WHERE title='${ENGAGEMENT_VIDEO_TITLE}')`
+  const VIDEO_SUB = `(SELECT id FROM ${USER_TABLE} WHERE nickname='${USERS.owner.nickname}')`
+  const VIDEO_ID_SUB = `(SELECT id FROM ${VIDEO_TABLE} WHERE title='${ENGAGEMENT_VIDEO_TITLE}')`
 
   runSql(sql('user_db'), `
-    UPDATE ${MICRO ? '\\`user_db\\`.' : ''}users SET role='creator' WHERE nickname='${USERS.owner.nickname}';`)
+    UPDATE ${USER_TABLE} SET role='creator' WHERE nickname='${USERS.owner.nickname}';`)
 
   runSql(sql('engagement_db'), `
     SET FOREIGN_KEY_CHECKS=0;
@@ -90,7 +93,7 @@ async function prepareEngagementData(api: ApiContext) {
     VALUES (NOW(),NOW(),'${ENGAGEMENT_VIDEO_TITLE}','UC05 自动化测试数据','/media/videos/e2e-uc05.mp4','approved',${VIDEO_SUB});`)
 
   if (MICRO) {
-    composeCp(mediaFixture, 'content-service:/app/data/videos/e2e-uc05.mp4')
+    copyContentFixture(mediaFixture, '/app/data/videos/e2e-uc05.mp4')
   }
 }
 
@@ -103,9 +106,6 @@ async function prepareUC13Data(api: ApiContext) {
   const mediaFixture = path.join(videoDir, 'videos', 'e2e-uc13.mp4')
   mkdirSync(path.dirname(mediaFixture), { recursive: true })
   writeFileSync(mediaFixture, 'UC13 E2E media fixture', 'utf8')
-
-  const U = `${MICRO ? '\\`user_db\\`.' : ''}users`
-  const V = `${MICRO ? '\\`content_db\\`.' : ''}videos`
 
   runSql(sql('user_db'), `
     UPDATE users SET role='user'      WHERE nickname='${USERS.target.nickname}';
@@ -122,14 +122,14 @@ async function prepareUC13Data(api: ApiContext) {
     DELETE FROM site_announcements  WHERE content LIKE 'E2E-UC13-%';
     INSERT INTO videos (created_at,updated_at,title,video_url,status,transcode_status,author_id) VALUES
       (NOW(),NOW(),'E2E-UC13-待审视频','/media/videos/e2e-uc13.mp4','pending','ready',
-       (SELECT id FROM ${U} WHERE nickname='${USERS.target.nickname}'));`)
+       (SELECT id FROM ${USER_TABLE} WHERE nickname='${USERS.target.nickname}'));`)
 
   runSql(sql('engagement_db'), `
     INSERT INTO danmakus (created_at,updated_at,video_id,user_id,content,time) VALUES
-      (NOW(),NOW(),(SELECT id FROM ${V} WHERE title='E2E-UC13-待审视频'),
-       (SELECT id FROM ${U} WHERE nickname='${USERS.target.nickname}'),'E2E-UC13-待屏蔽弹幕',5);`)
+      (NOW(),NOW(),(SELECT id FROM ${VIDEO_TABLE} WHERE title='E2E-UC13-待审视频'),
+       (SELECT id FROM ${USER_TABLE} WHERE nickname='${USERS.target.nickname}'),'E2E-UC13-待屏蔽弹幕',5);`)
 
-  if (MICRO) composeCp(mediaFixture, 'content-service:/app/data/videos/e2e-uc13.mp4')
+  if (MICRO) copyContentFixture(mediaFixture, '/app/data/videos/e2e-uc13.mp4')
 }
 
 async function prepareMemberCData(api: ApiContext) {
@@ -156,27 +156,28 @@ async function prepareMemberCData(api: ApiContext) {
     UPDATE users SET role='user'      WHERE nickname='${USERS.memberCPlain.nickname}';`)
 
   runSql(sql('content_db'), `
-    DELETE FROM video_daily_stats WHERE creator_id=(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}');
-    DELETE FROM creator_daily_stats WHERE creator_id=(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}');
+    DELETE FROM video_daily_stats WHERE creator_id=(SELECT id FROM ${USER_TABLE} WHERE nickname='${USERS.memberCCreator.nickname}');
+    DELETE FROM creator_daily_stats WHERE creator_id=(SELECT id FROM ${USER_TABLE} WHERE nickname='${USERS.memberCCreator.nickname}');
     DELETE FROM videos WHERE title LIKE 'E2E-MC-%';
     INSERT INTO videos (created_at,updated_at,title,description,video_url,status,transcode_status,author_id,view_count,collect_count,category,tags) VALUES
-      (NOW(),NOW(),'E2E-MC-公开视频','成员 C 搜索播放用例','/media/videos/e2e-member-c/fixture.mp4','approved','ready',(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}'),20,4,'tech','e2e,member-c'),
-      (NOW(),NOW(),'E2E-MC-待审核通过','成员 C 审核通过用例','/media/videos/e2e-member-c/fixture.mp4','pending','ready',(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}'),3,1,'tech','e2e'),
-      (NOW(),NOW(),'E2E-MC-待审核拒绝','成员 C 审核拒绝用例','/media/videos/e2e-member-c/fixture.mp4','pending','ready',(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}'),2,0,'life','e2e');
-    INSERT INTO creator_daily_stats (created_at,updated_at,creator_id,date,view_delta,collect_delta,stream_count) VALUES
-      (NOW(),NOW(),(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}'),DATE_FORMAT(CURDATE(),'%Y-%m-%d'),10,2,1),
-      (NOW(),NOW(),(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}'),DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'%Y-%m-%d'),5,1,0);
+      (NOW(),NOW(),'E2E-MC-公开视频','成员 C 搜索播放用例','/media/videos/e2e-member-c/fixture.mp4','approved','ready',(SELECT id FROM ${USER_TABLE} WHERE nickname='${USERS.memberCCreator.nickname}'),20,4,'tech','e2e,member-c'),
+      (NOW(),NOW(),'E2E-MC-待审核通过','成员 C 审核通过用例','/media/videos/e2e-member-c/fixture.mp4','pending','ready',(SELECT id FROM ${USER_TABLE} WHERE nickname='${USERS.memberCCreator.nickname}'),3,1,'tech','e2e'),
+      (NOW(),NOW(),'E2E-MC-待审核拒绝','成员 C 审核拒绝用例','/media/videos/e2e-member-c/fixture.mp4','pending','ready',(SELECT id FROM ${USER_TABLE} WHERE nickname='${USERS.memberCCreator.nickname}'),2,0,'life','e2e');
+    INSERT INTO creator_daily_stats (created_at,updated_at,creator_id,date,view_delta,collect_delta) VALUES
+      (NOW(),NOW(),(SELECT id FROM ${USER_TABLE} WHERE nickname='${USERS.memberCCreator.nickname}'),DATE_FORMAT(CURDATE(),'%Y-%m-%d'),10,2),
+      (NOW(),NOW(),(SELECT id FROM ${USER_TABLE} WHERE nickname='${USERS.memberCCreator.nickname}'),DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'%Y-%m-%d'),5,1);
     INSERT INTO video_daily_stats (created_at,updated_at,creator_id,video_id,date,view_delta,collect_delta) VALUES
-      (NOW(),NOW(),(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}'),(SELECT id FROM videos WHERE title='E2E-MC-公开视频'),DATE_FORMAT(CURDATE(),'%Y-%m-%d'),6,1),
-      (NOW(),NOW(),(SELECT id FROM users WHERE nickname='${USERS.memberCCreator.nickname}'),(SELECT id FROM videos WHERE title='E2E-MC-公开视频'),DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'%Y-%m-%d'),3,1);
+      (NOW(),NOW(),(SELECT id FROM ${USER_TABLE} WHERE nickname='${USERS.memberCCreator.nickname}'),(SELECT id FROM videos WHERE title='E2E-MC-公开视频'),DATE_FORMAT(CURDATE(),'%Y-%m-%d'),6,1),
+      (NOW(),NOW(),(SELECT id FROM ${USER_TABLE} WHERE nickname='${USERS.memberCCreator.nickname}'),(SELECT id FROM videos WHERE title='E2E-MC-公开视频'),DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'%Y-%m-%d'),3,1);
   `)
+
+  if (MICRO) copyContentFixture(mediaFixture, '/app/data/videos/e2e-member-c/fixture.mp4')
 }
 
 async function prepareMemberBData(api: ApiContext) {
   const owner = await ensureUser(api, USERS.owner.nickname, USERS.owner.password)
   const viewer = await ensureUser(api, USERS.viewer.nickname, USERS.viewer.password)
-  const mysqlCommand = process.env.MYSQL_CMD
-  if (!mysqlCommand) throw new Error('member B E2E setup requires MYSQL_CMD')
+  if (!MICRO && !process.env.MYSQL_CMD) throw new Error('member B E2E setup requires MYSQL_CMD')
 
   runSql(sql('user_db'), `
     SET FOREIGN_KEY_CHECKS=0;
@@ -190,11 +191,13 @@ async function prepareMemberBData(api: ApiContext) {
     DELETE FROM follows WHERE follower_id IN (${owner.userInfo.id},${viewer.userInfo.id}) OR followee_id IN (${owner.userInfo.id},${viewer.userInfo.id});
     DELETE FROM follow_groups WHERE owner_id=${viewer.userInfo.id};
     DELETE FROM user_blocks WHERE blocker_id IN (${owner.userInfo.id},${viewer.userInfo.id}) OR blocked_id IN (${owner.userInfo.id},${viewer.userInfo.id});
+    SET FOREIGN_KEY_CHECKS=1;`)
+
+  runSql(sql('content_db'), `
     DELETE FROM dynamic_posts WHERE user_id IN (${owner.userInfo.id},${viewer.userInfo.id});
     DELETE FROM videos WHERE title LIKE 'E2E-MEMBER-B-%';
     INSERT INTO videos (created_at,updated_at,title,description,video_url,status,transcode_status,author_id)
     VALUES (NOW(),NOW(),'E2E-MEMBER-B-分享视频','UC11 视频分享夹具','/media/videos/e2e-member-b.mp4','approved','ready',${owner.userInfo.id});
-    SET FOREIGN_KEY_CHECKS=1;
   `)
 }
 
