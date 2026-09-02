@@ -1,0 +1,148 @@
+name: release-freeze
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Final immutable tag, for example microservices-v1.0.0
+        required: true
+        type: string
+      expected_sha:
+        description: Full 40-character main commit SHA to freeze
+        required: true
+        type: string
+      confirm_freeze:
+        description: Type FREEZE to create and push the immutable tag
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  verify-release:
+    name: Verify main SHA and green CI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate immutable release inputs
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          CONFIRM_FREEZE: ${{ inputs.confirm_freeze }}
+        run: |
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo 'Run release-freeze from the main branch' >&2
+            exit 2
+          fi
+          if ! printf '%s' "$RELEASE_TAG" | grep -Eq '^(microservices-)?v[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
+            echo 'release_tag must look like v2.0 or microservices-v1.0.0' >&2
+            exit 2
+          fi
+          if ! printf '%s' "$EXPECTED_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo 'expected_sha must be a full lowercase commit SHA' >&2
+            exit 2
+          fi
+          if [ "$CONFIRM_FREEZE" != FREEZE ]; then
+            echo 'confirm_freeze must equal FREEZE' >&2
+            exit 2
+          fi
+          if [ "$(git rev-parse HEAD)" != "$EXPECTED_SHA" ]; then
+            echo "main HEAD $(git rev-parse HEAD) does not match $EXPECTED_SHA" >&2
+            exit 1
+          fi
+
+      - name: Require successful main CI for the exact SHA
+        uses: actions/github-script@v7
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        with:
+          script: |
+            const response = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'ci.yml',
+              branch: 'main',
+              event: 'push',
+              per_page: 30,
+            })
+            const run = response.data.workflow_runs.find(
+              (candidate) => candidate.head_sha === process.env.EXPECTED_SHA,
+            )
+            if (!run || run.status !== 'completed' || run.conclusion !== 'success') {
+              throw new Error(`main CI is not successful for ${process.env.EXPECTED_SHA}`)
+            }
+            core.notice(`Verified main CI: ${run.html_url}`)
+
+      - name: Validate deployable configuration
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          docker compose -f docker-compose.microservices.yml config --quiet
+          bash scripts/check-microservice-db-grants.sh
+          bash scripts/render-microservice-manifests.sh \
+            "$EXPECTED_SHA" "$GITHUB_REPOSITORY_OWNER" \
+            > /tmp/release-microservices.yaml
+          if grep -q '0000000000000000000000000000000000000000' \
+            /tmp/release-microservices.yaml; then
+            echo 'release manifests still contain an image placeholder' >&2
+            exit 1
+          fi
+
+  service-tests:
+    name: Final test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [user-service, content-service, engagement-service]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_sha }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: services/${{ matrix.service }}/go.mod
+          cache-dependency-path: services/${{ matrix.service }}/go.sum
+      - name: Run final service tests
+        working-directory: services/${{ matrix.service }}
+        run: go test -count=1 ./...
+
+  freeze:
+    name: Create immutable release tag
+    needs: [verify-release, service-tests]
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_sha }}
+          fetch-depth: 0
+
+      - name: Create or verify annotated tag
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          git fetch --tags --force
+          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            existing=$(git rev-list -n 1 "$RELEASE_TAG")
+            if [ "$existing" != "$EXPECTED_SHA" ]; then
+              echo "$RELEASE_TAG already points to $existing" >&2
+              exit 1
+            fi
+            echo "$RELEASE_TAG already freezes $EXPECTED_SHA"
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git tag -a "$RELEASE_TAG" "$EXPECTED_SHA" \
+            -m "DanmakuStream final microservice release $RELEASE_TAG"
+          git push origin "refs/tags/$RELEASE_TAG"

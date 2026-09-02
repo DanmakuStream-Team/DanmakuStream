@@ -14,8 +14,11 @@ on:
       - 'scripts/run-microservices-e2e.sh'
       - 'scripts/render-microservice-manifests.sh'
       - 'scripts/k3s-microservice-deploy.sh'
+      - 'scripts/k3s-hpa-chaos.sh'
+      - 'scripts/render-hpa-timeline.py'
       - '.github/workflows/microservices-e2e.yml'
       - '.github/workflows/microservice-cd.yml'
+      - '.github/workflows/microservice-resilience.yml'
   push:
     branches: [dev]
     paths:
@@ -29,8 +32,11 @@ on:
       - 'scripts/run-microservices-e2e.sh'
       - 'scripts/render-microservice-manifests.sh'
       - 'scripts/k3s-microservice-deploy.sh'
+      - 'scripts/k3s-hpa-chaos.sh'
+      - 'scripts/render-hpa-timeline.py'
       - '.github/workflows/microservices-e2e.yml'
       - '.github/workflows/microservice-cd.yml'
+      - '.github/workflows/microservice-resilience.yml'
 
 permissions:
   contents: read

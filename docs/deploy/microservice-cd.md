@@ -54,6 +54,7 @@ CD 的 precheck 会验证 Node Ready，并逐项检查 `micro-secrets` 的九个
 | 版本 | 每个 `/api/v1/version` 响应必须包含目标 commit SHA |
 | 日志 | 保存 user/content/engagement/gateway 各 150 行日志 |
 | 集群快照 | 保存 Deployment、Pod、Service、PVC、镜像和最近 50 条 Event |
+| HPA 策略 | 为三个服务应用 `autoscaling/v2`、1～4 副本、CPU 60% 的规范策略 |
 
 每次运行都会上传 `microservice-cd-<sha>` artifact，保留 30 天。内容包括渲染后的非敏感清单、部署输出、可能的回滚输出和运行时证据。
 
@@ -80,3 +81,5 @@ sudo k3s kubectl -n "$NS" exec deploy/engagement-service -- wget -qO- http://127
 6. version 不含目标 SHA，检查是否误用浮动标签或清单是否用环境变量覆盖了镜像内构建元数据。
 
 自动回滚只回滚 Deployment revision，不回滚数据库结构和 PVC。数据库迁移必须保持向前、向后兼容。
+
+HPA 的实际扩容/缩容与依赖故障验证不在普通 push CD 中执行，避免自动制造生产压力或中断；必须使用带人工确认的 `microservice-resilience` 工作流，见 [HPA 扩缩容与依赖故障演练](hpa-chaos.md)。
