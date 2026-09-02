@@ -34,6 +34,17 @@ ghcr.io/danmakustream-team/engagement-service:<40位commit-sha>
 
 `.github/workflows/ci.yml` 的 `platform-config` 负责验证 Compose 展开结果和 Nginx 网关语法。它不重复执行三个服务的测试；单体系统测试和三个微服务流水线作为独立检查共同构成合并门禁。
 
+## 自动部署门禁
+
+`dev` push 还会触发 `.github/workflows/microservice-cd.yml`。它不会直接相信单条流水线的结果，而是按同一个完整 commit SHA 等待以下四项全部完成：
+
+1. `user-service-ci`；
+2. `content-service-ci`；
+3. `engagement-service-ci`；
+4. `microservices-e2e`。
+
+任何一项失败，部署 job 都不会启动；全部成功后才把三条流水线已推送的同 SHA 镜像部署到 k3s。部署、验证、回滚和证据格式见 [微服务 CD 运维手册](microservice-cd.md)。
+
 ## 数据库账号边界
 
 三个应用账号只能访问各自 Schema：

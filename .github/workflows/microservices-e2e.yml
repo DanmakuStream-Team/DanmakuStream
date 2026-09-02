@@ -7,22 +7,30 @@ on:
       - 'services/**'
       - 'frontend/**'
       - 'deploy/nginx-gateway-microservices.conf'
+      - 'deploy/k8s/microservices/**'
       - 'deploy/platform/**'
       - 'docker-compose.microservices.yml'
       - 'scripts/microservices-db-init.sql'
       - 'scripts/run-microservices-e2e.sh'
+      - 'scripts/render-microservice-manifests.sh'
+      - 'scripts/k3s-microservice-deploy.sh'
       - '.github/workflows/microservices-e2e.yml'
+      - '.github/workflows/microservice-cd.yml'
   push:
     branches: [dev]
     paths:
       - 'services/**'
       - 'frontend/**'
       - 'deploy/nginx-gateway-microservices.conf'
+      - 'deploy/k8s/microservices/**'
       - 'deploy/platform/**'
       - 'docker-compose.microservices.yml'
       - 'scripts/microservices-db-init.sql'
       - 'scripts/run-microservices-e2e.sh'
+      - 'scripts/render-microservice-manifests.sh'
+      - 'scripts/k3s-microservice-deploy.sh'
       - '.github/workflows/microservices-e2e.yml'
+      - '.github/workflows/microservice-cd.yml'
 
 permissions:
   contents: read
