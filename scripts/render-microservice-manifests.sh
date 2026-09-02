@@ -35,7 +35,7 @@ manifests=(
   content-service.yaml
   engagement-service.yaml
   gateway.yaml
-  hpa.yaml
+  autoscaling.yaml
 )
 
 for index in "${!manifests[@]}"; do
