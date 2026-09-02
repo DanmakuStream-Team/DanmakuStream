@@ -5,11 +5,42 @@ import { API, USERS } from './test-data'
 const runTag = Date.now()
 const VIDEO_TITLE = 'E2E-MC-公开视频'
 
+function extractVideoList(payload: any): Array<{ id?: number; title?: string; status?: string }> {
+  const candidates: unknown[] = []
+  if (Array.isArray(payload)) candidates.push(payload)
+  if (payload && typeof payload === 'object') {
+    const d = (payload as any).data
+    if (Array.isArray(d)) candidates.push(d)
+    if (d && typeof d === 'object') {
+      if (Array.isArray((d as any).list)) candidates.push((d as any).list)
+      if (Array.isArray((d as any).items)) candidates.push((d as any).items)
+      if (Array.isArray((d as any).records)) candidates.push((d as any).records)
+    }
+    if (Array.isArray((payload as any).list)) candidates.push((payload as any).list)
+    if (Array.isArray((payload as any).items)) candidates.push((payload as any).items)
+  }
+  for (const c of candidates) {
+    if (Array.isArray(c) && c.length > 0) return c as Array<{ id?: number; title?: string }>
+  }
+  return []
+}
+
 async function findVideoId(request: import('@playwright/test').APIRequestContext): Promise<number> {
-  const list = await request.get(`${API}/videos?page=1&pageSize=50&keyword=${encodeURIComponent(VIDEO_TITLE)}`)
-  const payload = await list.json()
-  const match = payload.data?.list?.find((v: { title: string }) => v.title === VIDEO_TITLE)
-  return match?.id ?? 0
+  const byKeyword = await request.get(`${API}/videos?page=1&pageSize=100&keyword=${encodeURIComponent(VIDEO_TITLE)}`)
+  const byKeywordBody = await byKeyword.json().catch(() => ({}))
+  const list1 = extractVideoList(byKeywordBody)
+  const exactTitle = list1.find((v) => v.title === VIDEO_TITLE && (!v.status || v.status === 'approved'))
+  if (exactTitle?.id) return Number(exactTitle.id)
+
+  const all = await request.get(`${API}/videos?page=1&pageSize=100`)
+  const allBody = await all.json().catch(() => ({}))
+  const list2 = extractVideoList(allBody)
+  const byTitle2 = list2.find((v) => v.title === VIDEO_TITLE && (!v.status || v.status === 'approved'))
+  if (byTitle2?.id) return Number(byTitle2.id)
+
+  const fallback = list2.find((v) => v.id && (!v.status || v.status === 'approved'))
+  if (fallback?.id) return Number(fallback.id)
+  return 0
 }
 
 test.describe('UC06 个人资料库（观看历史/进度/稍后再看）（微服务版）', () => {

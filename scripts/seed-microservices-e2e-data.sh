@@ -141,6 +141,11 @@ CREATOR_ID=$(printf '%s\n' "$CREATOR_ID_RAW" | grep -Eo '^[0-9]+' | head -n1)
 CREATOR_ID="${CREATOR_ID:-}"
 log "  creator(e2e-mc-creator) id=$CREATOR_ID"
 
+MODERATOR_RAW=$(mysql_exec "SELECT id, nickname, role FROM user_db.users WHERE nickname='e2e-mc-moderator' LIMIT 1;" "查 moderator(e2e-mc-moderator)" || true)
+MODERATOR_ID=$(printf '%s\n' "$MODERATOR_RAW" | grep -Eo '^[0-9]+' | head -n1)
+MODERATOR_ID="${MODERATOR_ID:-}"
+[ -n "$MODERATOR_ID" ] && log "  moderator(e2e-mc-moderator) id=$MODERATOR_ID"
+
 sql_escape() {
   local s="${1:-}"
   printf '%s' "$s" | sed "s/'/\\\\'/g"
@@ -210,6 +215,44 @@ log "  E2E-UC05-互动测试视频 id=$VID_UC05"
 set +e
 mysql_exec "SELECT id, author_id, status, title, video_url FROM content_db.videos WHERE author_id=$CREATOR_ID AND deleted_at IS NULL ORDER BY id DESC LIMIT 6;" "播种后 content_db 回查（6条）" >/dev/null
 set -e
+
+log "===== [HTTP 自检] content-service 通过网关的 7 个真实接口响应（直接判断接口认不认 DB 里的数据） ====="
+do_http_check() {
+  local label="$1" url="$2" auth_header="${3:-}"
+  local body_file code
+  body_file=$(mktemp)
+  if [ -n "$auth_header" ]; then
+    code=$(curl -sS -o "$body_file" -w '%{http_code}' --max-time 10 "$url" -H "$auth_header" 2>/dev/null || echo 000)
+  else
+    code=$(curl -sS -o "$body_file" -w '%{http_code}' --max-time 10 "$url" 2>/dev/null || echo 000)
+  fi
+  local body
+  body=$(head -c 800 "$body_file" 2>/dev/null | tr -d '\r' | tr '\n' ' ' || echo "")
+  rm -f "$body_file"
+  log "  HTTP [$label] HTTP=$code url=$url"
+  log "    body=$body"
+}
+GW="${MICRO_E2E_GATEWAY_URL:-http://127.0.0.1:18888}"
+API="$GW/api/v1"
+
+CREATOR_TOKEN_HTTP=""
+if [ -n "$CREATOR_TOKEN" ]; then CREATOR_TOKEN_HTTP="Authorization: Bearer $CREATOR_TOKEN"; fi
+MODERATOR_TOKEN_HTTP=""
+if [ -n "$MODERATOR_TOKEN" ]; then MODERATOR_TOKEN_HTTP="Authorization: Bearer $MODERATOR_TOKEN"; fi
+
+do_http_check "C1 GET /videos (公开 无关键字 approved+ready)" "$API/videos?page=1&pageSize=50"
+do_http_check "C2 GET /videos keyword=公开" "$API/videos?page=1&pageSize=50&keyword=$(printf '公开' | python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read().strip()))' 2>/dev/null || printf '%%E5%%85%%AC%%E5%%BC%%80')"
+if [ -n "$VID_APPROVED" ]; then do_http_check "C3 GET /videos/$VID_APPROVED （单条详情）" "$API/videos/$VID_APPROVED"; fi
+if [ -n "$CREATOR_TOKEN_HTTP" ]; then
+  do_http_check "C4 GET /creator/mine/videos （作者后台含 pending）" "$API/creator/mine/videos?page=1&pageSize=20" "$CREATOR_TOKEN_HTTP"
+fi
+if [ -n "$MODERATOR_TOKEN_HTTP" ]; then
+  do_http_check "C5 GET /admin/videos （审核后台含全部状态）" "$API/admin/videos?page=1&pageSize=20" "$MODERATOR_TOKEN_HTTP"
+  do_http_check "C6 GET /admin/videos status=pending" "$API/admin/videos?page=1&pageSize=20&status=pending" "$MODERATOR_TOKEN_HTTP"
+fi
+if [ -n "$CREATOR_ID" ]; then
+  do_http_check "C7 GET /creator/$CREATOR_ID/videos （他人创作者主页 只看 approved）" "$API/creator/$CREATOR_ID/videos?page=1&pageSize=20"
+fi
 
 if [ -n "$OWNER_TOKEN" ] && [ -n "${VID_UC05:-}" ]; then
   log "互动域测试数据：为 UC05 视频预埋 0 弹幕/评论/点赞/收藏（E2E脚本自行验证从0起步）"
