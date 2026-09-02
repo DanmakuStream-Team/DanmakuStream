@@ -17,7 +17,7 @@ on:
       - '.github/workflows/microservices-e2e.yml'
       - '.github/workflows/microservice-cd.yml'
   push:
-    branches: [dev]
+    branches: [dev, codex/engagement-coverage]
     paths:
       - 'services/**'
       - 'frontend/**'
