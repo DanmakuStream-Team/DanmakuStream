@@ -12,7 +12,7 @@ gateway_url="${MICRO_E2E_GATEWAY_URL:-http://127.0.0.1:18888}"
 PASSWORD='Test1234!'
 MARK='MICRO-E2E-SEED'
 
-log() { printf '[micro-seed] %s\n' "$*"; }
+log() { printf '[micro-seed] %s\n' "$*" >&2; }
 
 wait_for_gateway() {
   for i in $(seq 1 60); do
@@ -70,16 +70,32 @@ mysql_exec() {
   rc=$?
   set -e
   local stdout_text stderr_text
-  stdout_text=$(tr -d '\r' < "$stdout_tmp" | sed '/^$/d' || true)
-  stderr_text=$(tr -d '\r' < "$stderr_tmp" | sed '/^$/d' || true)
+  stdout_text=$(tr -d '\r' < "$stdout_tmp" || true)
+  stderr_text=$(tr -d '\r' < "$stderr_tmp" || true)
   rm -f "$stdout_tmp" "$stderr_tmp"
+
   if [ "$rc" -ne 0 ] || [ -n "$stderr_text" ]; then
     log "  MySQL [$label] rc=$rc"
-    [ -n "$stdout_text" ] && printf '%s\n' "$stdout_text" | while IFS= read -r line; do log "    [stdout] $line"; done
-    [ -n "$stderr_text" ] && printf '%s\n' "$stderr_text" | while IFS= read -r line; do log "    [stderr] $line"; done
+    if [ -n "$stdout_text" ]; then
+      local IFS=$'\n'
+      local line
+      for line in $stdout_text; do
+        [ -n "$line" ] && log "    [stdout] $line"
+      done
+    fi
+    if [ -n "$stderr_text" ]; then
+      local IFS=$'\n'
+      local line
+      for line in $stderr_text; do
+        [ -n "$line" ] && log "    [stderr] $line"
+      done
+    fi
     log "  MySQL [$label] sql>>> $sql"
   fi
-  [ -n "$stdout_text" ] && printf '%s\n' "$stdout_text"
+
+  if [ -n "$stdout_text" ]; then
+    printf '%s\n' "$stdout_text"
+  fi
   return $rc
 }
 
@@ -120,7 +136,8 @@ if [ ! -f "$SEED_VIDEO_FILE" ]; then
 fi
 log "  占位视频源文件：$SEED_VIDEO_FILE （大小=$(du -b "$SEED_VIDEO_FILE" 2>/dev/null | awk '{print $1}' || echo unknown) 字节）"
 
-CREATOR_ID=$(mysql_exec "SELECT id, nickname, role FROM user_db.users WHERE nickname='e2e-mc-creator' LIMIT 1;" "查 creator(e2e-mc-creator) 完整行" | awk '{print $1; exit}' || echo "")
+CREATOR_ID_RAW=$(mysql_exec "SELECT id, nickname, role FROM user_db.users WHERE nickname='e2e-mc-creator' LIMIT 1;" "查 creator(e2e-mc-creator) 完整行" || true)
+CREATOR_ID=$(printf '%s\n' "$CREATOR_ID_RAW" | grep -Eo '^[0-9]+' | head -n1)
 CREATOR_ID="${CREATOR_ID:-}"
 log "  creator(e2e-mc-creator) id=$CREATOR_ID"
 
@@ -190,6 +207,9 @@ log "  E2E-MC-待审核通过     id=$VID_PENDING1"
 log "  E2E-MC-待审核拒绝     id=$VID_PENDING2"
 log "  E2E-MEMBER-B-分享视频 id=$VID_SHARED_B"
 log "  E2E-UC05-互动测试视频 id=$VID_UC05"
+set +e
+mysql_exec "SELECT id, author_id, status, title, video_url FROM content_db.videos WHERE author_id=$CREATOR_ID AND deleted_at IS NULL ORDER BY id DESC LIMIT 6;" "播种后 content_db 回查（6条）" >/dev/null
+set -e
 
 if [ -n "$OWNER_TOKEN" ] && [ -n "${VID_UC05:-}" ]; then
   log "互动域测试数据：为 UC05 视频预埋 0 弹幕/评论/点赞/收藏（E2E脚本自行验证从0起步）"
