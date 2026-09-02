@@ -1,5 +1,5 @@
 import type { APIRequestContext, Page } from '@playwright/test'
-import { API } from './test-data'
+import { API } from '../test-data'
 
 export interface Session {
   token: string
