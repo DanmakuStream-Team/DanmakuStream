@@ -38,5 +38,3 @@ cd frontend && MICRO_E2E_FULL_SUITE=1 npm run test:e2e:micro
 真实失败、定位和修复时间线见 [微服务 E2E 失败排查记录](reports/microservice-e2e-failure-investigation-2026-09-01.md)。自动部署后的三服务日志、探针和版本响应由 `microservice-cd-<sha>` Actions artifact 保存。
 
 成员 B 第 8 天 user-service 公开/内部 API 回归范围、命令与真实执行状态见 [user-service 回归报告（2026-09-02）](reports/user-service-regression-2026-09-02.md)。
-
-成员 C 第 8 天 content-service 公开/内部 API 路由清单、真实 MySQL 回归范围与执行状态见 [content-service 回归报告（2026-09-02）](reports/content-service-regression-2026-09-02.md)。

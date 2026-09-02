@@ -15,4 +15,3 @@ jobs:
     uses: ./.github/workflows/service-ci-reusable.yml
     with:
       service: content-service
-      mysql_integration: true

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"danmakustream/content-service/internal/config"
-	"danmakustream/content-service/internal/server"
 	"danmakustream/content-service/internal/svc"
 )
 
@@ -30,7 +29,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:              "0.0.0.0:" + cfg.Port,
-		Handler:           server.Router(serviceContext, logger),
+		Handler:           svc.Router(serviceContext, logger),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,

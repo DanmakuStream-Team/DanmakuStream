@@ -65,7 +65,6 @@ jobs:
         working-directory: services/${{ inputs.service }}
         env:
           USER_SERVICE_TEST_DSN: user_app:user_app_pass@tcp(127.0.0.1:3306)/user_db?charset=utf8mb4&parseTime=True&loc=Local
-          CONTENT_SERVICE_TEST_DSN: user_app:user_app_pass@tcp(127.0.0.1:3306)/user_db?charset=utf8mb4&parseTime=True&loc=Local
         run: |
           set -o pipefail
           go test -count=1 -tags=integration ./integration -v | tee integration-test-output.txt
