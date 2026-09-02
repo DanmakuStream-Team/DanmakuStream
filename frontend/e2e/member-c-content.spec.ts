@@ -1,3 +1,17 @@
+/**
+ * ============================================================
+ *  LEGACY FILE — 内容已迁移为独立骨架文件（Day4 任务）
+ * ============================================================
+ *  本文件内的 UC 用例已按 UC 编号拆分到以下独立骨架文件，
+ *  各自带 test.skip 占位并标注了对应领域负责人。
+ *  待领域负责人补全断言后，可删除本文件。
+ *
+ *   UC02  →  uc02-video-search.spec.ts          (成员C)
+ *   UC03  →  uc03-video-upload.spec.ts          (成员C)
+ *   UC04  →  uc04-video-review.spec.ts          (成员C)
+ *   UC12  →  uc12-creator-analytics.spec.ts     (成员C)
+ * ============================================================
+ */
 import { expect, test, type Locator } from '@playwright/test'
 import { loginViaApi, openAs } from './fixtures/auth'
 import { API, USERS } from './test-data'
@@ -6,7 +20,7 @@ function dropdownOption(page: import('@playwright/test').Page, text: string): Lo
   return page.locator('.el-select-dropdown:visible .el-select-dropdown__item', { hasText: text })
 }
 
-test.describe.serial('成员 C 内容域', () => {
+test.describe.serial('成员 C 内容域 [LEGACY — 见上方注释]', () => {
   // E2E-TC02-01 搜索 → 详情 → 播放器，并验证空搜索结果。
   test('UC02 用户搜索公开视频并进入播放页', async ({ page }) => {
     const initialVideosResponse = page.waitForResponse((response) =>

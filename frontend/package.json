@@ -10,7 +10,7 @@
     "test:e2e": "playwright test",
     "test:e2e:micro": "bash ../scripts/run-microservices-e2e.sh",
     "test:e2e:microservices": "playwright test --config playwright.microservices.config.ts",
-    "test:e2e:microservices:full": "playwright test"
+    "test:e2e:microservices:full": "playwright test --config playwright.microservices-full.config.ts"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",

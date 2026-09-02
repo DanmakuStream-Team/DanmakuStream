@@ -74,9 +74,22 @@ export E2E_BASE_URL="$MICRO_E2E_FRONTEND_URL"
 export COMPOSE_MICRO="${compose[*]}"
 export MYSQL_ROOT_CMD="${compose[*]} exec -T mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD}"
 
+log_step() { printf '\n===== [microservices-e2e] %s =====\n' "$*"; }
+
+log_step "播种微服务 E2E 数据"
+(
+  cd "$repo_root"
+  bash scripts/seed-microservices-e2e-data.sh
+) || {
+  printf '[WARN] 数据播种失败，尝试继续执行 E2E（部分用例可能因缺数据跳过）\n' >&2
+}
+
 e2e_npm_script=test:e2e:microservices
 if [[ "${MICRO_E2E_FULL_SUITE:-0}" == "1" ]]; then
+  log_step "运行 13/13 全量微服务 E2E（FULL SUITE）"
   e2e_npm_script=test:e2e:microservices:full
+else
+  log_step "运行微服务 E2E 冒烟基线（网关+JWT 三服务连通，2/13）"
 fi
 
 (

@@ -1,3 +1,16 @@
+/**
+ * ============================================================
+ *  LEGACY FILE — 内容已迁移为独立骨架文件（Day4 任务）
+ * ============================================================
+ *  本文件内的 UC 用例已按 UC 编号拆分到以下独立骨架文件，
+ *  各自带 test.skip 占位并标注了对应领域负责人。
+ *  待领域负责人补全断言后，可删除本文件。
+ *
+ *   UC05  →  uc05-danmaku-comment.spec.ts     (成员D)
+ *   UC09  →  uc09-live-schedule.spec.ts       (成员D)
+ *   UC10  →  uc10-live-streaming.spec.ts      (成员D)
+ * ============================================================
+ */
 import { expect, test } from '@playwright/test'
 import { loginViaApi, openAs } from './fixtures/auth'
 import { API, ENGAGEMENT_VIDEO_TITLE, USERS } from './test-data'

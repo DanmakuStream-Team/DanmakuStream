@@ -27,7 +27,12 @@ DanmakuStream 是一个面向创作者与社区的弹幕视频 + 直播平台，
 | 用例说明 | UC06 详细文档 | ✅ 交付 | [UC06-personal-library.md](../usecase/UC06-personal-library.md) |
 | 需求追溯 | 13 用例追溯矩阵 | ✅ 交付 | [traceability-matrix.md](../traceability/traceability-matrix.md) |
 | 测试 | E2E 测试计划 | ✅ 交付 | [e2e-test-plan.md](../testing/e2e-test-plan.md) |
-| 测试 | E2E 测试报告 | ✅ 交付（骨架，执行时填实） | [e2e-test-report.md](../testing/e2e-test-report.md) |
+| 测试 | E2E 测试报告（单体 13/13） | ✅ 交付（骨架，执行时填实） | [e2e-test-report.md](../testing/e2e-test-report.md) |
+| 测试 | 微服务 E2E 报告（Day 8） | ✅ 交付（骨架，执行时填实） | [microservices-e2e-full-report.md](../testing/microservices-e2e-full-report.md) |
+| 测试 | Day 4 E2E 12UC 独立骨架（成员 E） | ✅ 交付 | `frontend/e2e/uc02-video-search.spec.ts` 等 10 个新文件 + 原混合文件 LEGACY 标注 |
+| 压测（Day 9） | k6 脚本 × 3 核心接口 | ✅ 交付 | `benchmarks/k6/01-public-video-search.js`、`02-auth-login.js`、`03-library-history.js` |
+| 压测（Day 9） | 一键对比脚本（单体 vs 微服务各 3 轮，自动数据播种+资源采样+聚合） | ✅ 交付 | [run-benchmark-comparison.sh](../../scripts/run-benchmark-comparison.sh) |
+| 压测（Day 9） | 对比报告模板（吞吐/Avg/P95/错误率/CPU/内存 对比表+行动项） | ✅ 交付（骨架，执行时填实） | [benchmark-comparison-template.md](../testing/benchmark-comparison-template.md) |
 | 部署 | Docker Compose 单体 → K8s 设计 | ✅ 交付 | §4 详述 + 部署图 |
 
 ### 1.3 关键技术栈（实际版本填实）
@@ -179,6 +184,10 @@ AI 生成骨架/代码/图档/文档
 | MySQL StatefulSet 备份恢复 | kill pod / 恢复快照 | |
 | PV 扩容不丢文件 | 扩容后 `ls` 文件数一致 | |
 | HPA 阈值触发 | 模拟高 CPU/连接；副本数升+降 | |
+| **单体 vs 微服务吞吐差（BM01/BM02/BM03）** | Day9 脚本：`bash scripts/run-benchmark-comparison.sh` 各 3 轮（见 `artifacts/benchmarks/comparison.md`） | |
+| **单体 vs 微服务 P95（BM01/02/03）** | 同上，k6 p(95) 指标对比，阈值见 §5.1 | |
+| **单体 vs 微服务错误率** | 同上，`http_req_failed` 阈值 <2%/单接口 <5%/合计 | |
+| **单体后端进程 vs 三服务总内存 RSS** | `docker stats` 20s 采样（`*-stats.csv`），见压测报告 §2 | |
 
 ---
 
@@ -192,9 +201,14 @@ AI 生成骨架/代码/图档/文档
 | E2E（UC13 5 条先落地） | 100%（阻塞单独标注） | | |
 | 后端单测覆盖率 | ≥ 60% | | |
 | E2E 条目总数 | ≥ 39 条 | | |
-| 关键 API P95 | ≤ 1s | | |
+| 关键 API P95（单体 3 轮平均） | BM01≤800ms / BM02≤1500ms / BM03≤1200ms | BM01: __ms / BM02: __ms / BM03: __ms | |
+| 关键 API P95（微服务 3 轮平均） | 同单体阈值 | BM01: __ms / BM02: __ms / BM03: __ms | |
+| 压测错误率（两轮合计） | < 5% | % | |
 | WS 断连恢复 | 3s 重试、计数不重复 | | |
 | P0/P1 严重缺陷 | 0 | | |
+
+> 压测脚本：`bash scripts/run-benchmark-comparison.sh`；报告模板：`docs/testing/benchmark-comparison-template.md`；
+> 原始产物：`artifacts/benchmarks/{monolith,microservices}-bm{01,02,03}-r{1,2,3}.json/.txt`、`comparison.csv/.md`。
 
 ### 5.2 风险清单
 

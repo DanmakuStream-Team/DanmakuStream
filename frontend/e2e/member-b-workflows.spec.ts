@@ -1,8 +1,21 @@
+/**
+ * ============================================================
+ *  LEGACY FILE — 内容已迁移为独立骨架文件（Day4 任务）
+ * ============================================================
+ *  本文件内的 UC 用例已按 UC 编号拆分到以下独立骨架文件，
+ *  各自带 test.skip 占位并标注了对应领域负责人。
+ *  待领域负责人补全断言后，可删除本文件。
+ *
+ *   UC07  →  uc07-follow-group-block.spec.ts        (成员B)
+ *   UC08  →  uc08-membership-subscription.spec.ts   (成员B)
+ *   UC11  →  uc11-chat-message.spec.ts              (成员B)
+ * ============================================================
+ */
 import { expect, test } from '@playwright/test'
 import { loginViaApi, openAs } from './fixtures/auth'
 import { API, USERS } from './test-data'
 
-test.describe.serial('UC07 / UC08 / UC11 完整业务流程', () => {
+test.describe.serial('UC07 / UC08 / UC11 完整业务流程 [LEGACY — 见上方注释]', () => {
   test('E2E-TC07 关注、分组与黑名单状态在页面可验证', async ({ page, request }) => {
     const owner = await loginViaApi(request, USERS.owner.nickname, USERS.owner.password)
     const viewer = await loginViaApi(request, USERS.viewer.nickname, USERS.viewer.password)
