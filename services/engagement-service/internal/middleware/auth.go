@@ -41,6 +41,29 @@ func Auth(secret string) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// OptionalAuth enriches public list endpoints when a valid bearer token is
+// present, while retaining anonymous access and never turning a public read
+// into an authentication failure.
+func OptionalAuth(secret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		raw := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+		if raw != "" {
+			claims := &Claims{}
+			token, err := jwt.ParseWithClaims(raw, claims, func(t *jwt.Token) (any, error) {
+				if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
+					return nil, jwt.ErrSignatureInvalid
+				}
+				return []byte(secret), nil
+			})
+			if err == nil && token.Valid && claims.UserID > 0 {
+				c.Set(UserIDKey, claims.UserID)
+				c.Set("role", claims.Role)
+			}
+		}
+		c.Next()
+	}
+}
 func UserID(c *gin.Context) uint { value, _ := c.Get(UserIDKey); id, _ := value.(uint); return id }
 func Staff(c *gin.Context) {
 	role, _ := c.Get("role")

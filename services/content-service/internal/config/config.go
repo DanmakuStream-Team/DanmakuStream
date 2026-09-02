@@ -23,6 +23,7 @@ type Config struct {
 	AutoMigrate      bool
 	MaxVideoBytes    int64
 	MaxImageBytes    int64
+	UserServiceURL   string
 }
 
 func Load() (Config, error) {
@@ -40,6 +41,7 @@ func Load() (Config, error) {
 		AutoMigrate:      envBool("AUTO_MIGRATE", false),
 		MaxVideoBytes:    envInt64("MAX_VIDEO_BYTES", 2<<30),
 		MaxImageBytes:    envInt64("MAX_IMAGE_BYTES", 10<<20),
+		UserServiceURL:   env("USER_SERVICE_URL", "http://user-service:8080"),
 	}
 	timeout, err := time.ParseDuration(env("REQUEST_TIMEOUT", "2s"))
 	if err != nil || timeout <= 0 || timeout > 2*time.Second {

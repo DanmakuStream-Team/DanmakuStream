@@ -70,6 +70,7 @@ func Router(ctx *svc.ServiceContext) *gin.Engine {
 	admin.Use(middleware.AuthMiddleware(c.Auth.AccessSecret), middleware.AdminMiddleware)
 	admin.GET("/users", adminhandler.UserList(ctx))
 	admin.PUT("/users/:id/role", adminhandler.UpdateRole(ctx))
+	admin.GET("/infrastructure", adminhandler.Infrastructure(ctx))
 	internal := r.Group("/internal/v1")
 	internal.Use(middleware.InternalAuth(c.InternalToken))
 	internal.GET("/users", platform.InternalUsers(ctx))
@@ -78,6 +79,7 @@ func Router(ctx *svc.ServiceContext) *gin.Engine {
 	internal.GET("/relationships/blocked", platform.InternalBlocked(ctx))
 	internal.GET("/relationships/following", platform.InternalFollowing(ctx))
 	internal.GET("/memberships/status", platform.InternalMembership(ctx))
+	internal.POST("/users/:id/followers/notifications", notificationhandler.FollowersHandler(ctx))
 	r.GET("/ws/chat", wshandler.Chat(ctx))
 	return r
 }

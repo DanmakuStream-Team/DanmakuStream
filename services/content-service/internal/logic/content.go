@@ -324,27 +324,98 @@ func (s *Service) DeleteDynamic(id, userID uint, isAdmin bool) error {
 	return nil
 }
 
+type AnalyticsPoint struct {
+	Date        string `json:"date"`
+	Views       int64  `json:"views"`
+	Collects    int64  `json:"collects"`
+	GrowthSpeed int64  `json:"growthSpeed"`
+	Streams     int64  `json:"streams"`
+}
+type AnalyticsSummary struct {
+	TotalViews        int64   `json:"totalViews"`
+	TotalCollects     int64   `json:"totalCollects"`
+	TotalStreams      int64   `json:"totalStreams"`
+	RangeViews        int64   `json:"rangeViews"`
+	RangeCollects     int64   `json:"rangeCollects"`
+	RangeStreams      int64   `json:"rangeStreams"`
+	AverageDailyViews float64 `json:"averageDailyViews"`
+}
 type Analytics struct {
-	VideoCount   int64                  `json:"videoCount"`
-	ViewCount    int64                  `json:"viewCount"`
-	CollectCount int64                  `json:"collectCount"`
-	Daily        []model.VideoDailyStat `json:"daily"`
+	Days            int              `json:"days"`
+	SelectedVideoID uint             `json:"selectedVideoId"`
+	Summary         AnalyticsSummary `json:"summary"`
+	Points          []AnalyticsPoint `json:"points"`
+	TopVideos       []VideoDTO       `json:"topVideos"`
 }
 
-func (s *Service) CreatorAnalytics(userID uint) (Analytics, error) {
-	var result struct {
-		VideoCount   int64
-		ViewCount    int64
-		CollectCount int64
+func (s *Service) CreatorAnalytics(userID uint, days int, videoID uint) (Analytics, error) {
+	if days != 7 && days != 30 && days != 90 {
+		return Analytics{}, ErrInvalid
 	}
-	if err := s.DB.Model(&model.Video{}).Where("author_id = ?", userID).
-		Select("COUNT(*) AS video_count, COALESCE(SUM(view_count), 0) AS view_count, COALESCE(SUM(collect_count), 0) AS collect_count").Scan(&result).Error; err != nil {
+	videoScope := func() *gorm.DB {
+		query := s.DB.Model(&model.Video{}).Where("author_id = ?", userID)
+		if videoID > 0 {
+			query = query.Where("id = ?", videoID)
+		}
+		return query
+	}
+	if videoID > 0 {
+		var count int64
+		if err := videoScope().Count(&count).Error; err != nil {
+			return Analytics{}, err
+		}
+		if count == 0 {
+			return Analytics{}, ErrNotFound
+		}
+	}
+	var totals struct {
+		Views    int64
+		Collects int64
+	}
+	if err := videoScope().Select("COALESCE(SUM(view_count), 0) AS views, COALESCE(SUM(collect_count), 0) AS collects").Scan(&totals).Error; err != nil {
 		return Analytics{}, err
 	}
-	var daily []model.VideoDailyStat
-	cutoff := time.Now().AddDate(0, 0, -30).Format("2006-01-02")
-	if err := s.DB.Where("creator_id = ? AND date >= ?", userID, cutoff).Order("date ASC").Find(&daily).Error; err != nil {
+	startDate := time.Now().AddDate(0, 0, -(days - 1)).Format("2006-01-02")
+	stats := s.DB.Model(&model.CreatorDailyStat{}).Where("creator_id = ? AND date >= ?", userID, startDate)
+	if videoID > 0 {
+		stats = s.DB.Model(&model.VideoDailyStat{}).Where("creator_id = ? AND video_id = ? AND date >= ?", userID, videoID, startDate)
+	}
+	var rows []struct {
+		Date     string
+		Views    int64
+		Collects int64
+	}
+	if err := stats.Select("date, COALESCE(SUM(view_delta), 0) AS views, COALESCE(SUM(collect_delta), 0) AS collects").Group("date").Order("date ASC").Scan(&rows).Error; err != nil {
 		return Analytics{}, err
 	}
-	return Analytics{VideoCount: result.VideoCount, ViewCount: result.ViewCount, CollectCount: result.CollectCount, Daily: daily}, nil
+	byDate := map[string]AnalyticsPoint{}
+	for _, row := range rows {
+		byDate[row.Date] = AnalyticsPoint{Date: row.Date, Views: row.Views, Collects: row.Collects, GrowthSpeed: row.Views + max64(row.Collects, 0)}
+	}
+	points := make([]AnalyticsPoint, 0, days)
+	var rangeViews, rangeCollects int64
+	for offset := days - 1; offset >= 0; offset-- {
+		date := time.Now().AddDate(0, 0, -offset).Format("2006-01-02")
+		point := byDate[date]
+		point.Date = date
+		points = append(points, point)
+		rangeViews += point.Views
+		rangeCollects += point.Collects
+	}
+	var videos []model.Video
+	if err := videoScope().Order("view_count DESC, collect_count DESC, created_at DESC").Limit(5).Find(&videos).Error; err != nil {
+		return Analytics{}, err
+	}
+	top := make([]VideoDTO, 0, len(videos))
+	for _, video := range videos {
+		top = append(top, VideoView(video))
+	}
+	return Analytics{Days: days, SelectedVideoID: videoID, Summary: AnalyticsSummary{TotalViews: totals.Views, TotalCollects: totals.Collects, RangeViews: rangeViews, RangeCollects: rangeCollects, AverageDailyViews: float64(rangeViews) / float64(days)}, Points: points, TopVideos: top}, nil
+}
+
+func max64(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
 }

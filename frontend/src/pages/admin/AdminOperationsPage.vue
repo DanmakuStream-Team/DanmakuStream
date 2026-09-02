@@ -175,7 +175,15 @@ function openAnnouncement(item?: SiteAnnouncement) {
 }
 
 async function saveAnnouncement() {
-  const payload = { ...announcementForm }
+  const toRFC3339 = (value: string) => value
+    ? new Date(value.replace(' ', 'T')).toISOString()
+    : undefined
+  const payload = {
+    content: announcementForm.content,
+    enabled: announcementForm.enabled,
+    startedAt: toRFC3339(announcementForm.startedAt),
+    endedAt: toRFC3339(announcementForm.endedAt),
+  }
   if (editingAnnouncementId.value) await adminApi.updateAnnouncement(editingAnnouncementId.value, payload)
   else await adminApi.createAnnouncement(payload)
   announcementVisible.value = false

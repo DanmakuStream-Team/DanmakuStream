@@ -71,7 +71,7 @@ test.describe.serial('成员 C 内容域', () => {
         video: { name: 'invalid.mp4', mimeType: 'video/mp4', buffer: Buffer.from('not a media file') },
       },
     })
-    expect(failedUpload.status()).toBe(200)
+    expect(failedUpload.ok(), await failedUpload.text()).toBeTruthy()
     await expect.poll(async () => {
       const response = await request.get(`${API}/users/me/videos?page=1&pageSize=100`, {
         headers: { Authorization: `Bearer ${creator.token}` },

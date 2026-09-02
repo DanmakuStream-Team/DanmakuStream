@@ -56,6 +56,7 @@ func Router(ctx *Context, logger *slog.Logger) *gin.Engine {
 	internal.Use(middleware.InternalAuth(ctx.Config.InternalAPIToken))
 	internal.GET("/videos/batch", h.InternalVideos)
 	internal.GET("/videos/:id", h.InternalVideo)
+	internal.PUT("/videos/:id/engagement", h.InternalUpdateEngagement)
 
 	admin := auth.Group("/admin")
 	admin.Use(middleware.RequireRoles("admin"))
