@@ -95,12 +95,12 @@ func TestEngagementAPIAndWebSocketRegression(t *testing.T) {
 		assertBool(t, collected, "collected", true)
 
 		comment := callData(t, http.MethodPost, server.URL+"/api/v1/comments", viewerToken, map[string]any{"videoId": videoID, "content": "integration comment"}, http.StatusOK)
-		commentID := uint(number(t, comment, "ID"))
+		commentID := uint(number(t, comment, "id"))
 		callAPI(t, http.MethodGet, fmt.Sprintf("%s/api/v1/comments/%d", server.URL, videoID), "", nil, http.StatusOK)
 		callAPI(t, http.MethodPost, fmt.Sprintf("%s/api/v1/comments/%d/like", server.URL, commentID), viewerToken, nil, http.StatusOK)
 		callAPI(t, http.MethodPost, server.URL+"/api/v1/comments", viewerToken, map[string]any{"videoId": videoID, "content": ""}, http.StatusBadRequest)
 		danmaku := callData(t, http.MethodPost, server.URL+"/api/v1/danmaku", viewerToken, map[string]any{"videoId": videoID, "content": "integration danmaku", "time": 12}, http.StatusOK)
-		danmakuID := uint(number(t, danmaku, "ID"))
+		danmakuID := uint(number(t, danmaku, "id"))
 		callAPI(t, http.MethodGet, fmt.Sprintf("%s/api/v1/danmaku/%d", server.URL, videoID), "", nil, http.StatusOK)
 		callAPI(t, http.MethodGet, server.URL+"/api/v1/admin/danmaku", viewerToken, nil, http.StatusForbidden)
 		callAPI(t, http.MethodGet, server.URL+"/api/v1/admin/danmaku", staffToken, nil, http.StatusOK)
@@ -150,11 +150,11 @@ func TestEngagementAPIAndWebSocketRegression(t *testing.T) {
 	var roomID uint
 	t.Run("live room gifts and WebSocket reconnect", func(t *testing.T) {
 		room := callData(t, http.MethodPost, server.URL+"/api/v1/live", ownerToken, map[string]any{"title": "integration live"}, http.StatusOK)
-		roomID = uint(number(t, room, "ID"))
+		roomID = uint(number(t, room, "id"))
 		if roomID == 0 {
 			t.Fatal("room ID is zero")
 		}
-		streamKey := stringValue(t, room, "StreamKey")
+		streamKey := stringValue(t, room, "streamKey")
 		callAPI(t, http.MethodPost, server.URL+"/internal/v1/live/hooks/srs", "", map[string]any{"action": "on_publish", "stream": streamKey}, http.StatusForbidden)
 		callInternalAPI(t, http.MethodPost, server.URL+"/internal/v1/live/hooks/srs", map[string]any{"action": "on_publish", "stream": streamKey}, http.StatusOK)
 
@@ -228,7 +228,7 @@ func TestEngagementAPIAndWebSocketRegression(t *testing.T) {
 		scheduledAt := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
 		body := map[string]any{"title": "integration schedule", "scheduledAt": scheduledAt}
 		schedule := callData(t, http.MethodPost, server.URL+"/api/v1/live-schedules", ownerToken, body, http.StatusOK)
-		scheduleID := uint(number(t, schedule, "ID"))
+		scheduleID := uint(number(t, schedule, "id"))
 		callAPI(t, http.MethodPost, server.URL+"/api/v1/live-schedules", ownerToken, body, http.StatusConflict)
 		callAPI(t, http.MethodGet, server.URL+"/api/v1/live-schedules?status=pending", "", nil, http.StatusOK)
 
@@ -297,7 +297,22 @@ func fakeContentService(t *testing.T) *httptest.Server {
 		}
 		const prefix = "/internal/v1/videos/"
 		if strings.HasPrefix(r.URL.Path, prefix) {
-			id, err := strconv.ParseUint(strings.TrimPrefix(r.URL.Path, prefix), 10, 64)
+			remainder := strings.TrimPrefix(r.URL.Path, prefix)
+			if r.Method == http.MethodPut && strings.HasSuffix(remainder, "/engagement") {
+				id, err := strconv.ParseUint(strings.TrimSuffix(remainder, "/engagement"), 10, 64)
+				var counters struct {
+					LikeCount    int64 `json:"likeCount"`
+					CollectCount int64 `json:"collectCount"`
+					DanmakuCount int64 `json:"danmakuCount"`
+				}
+				if err != nil || id == 0 || json.NewDecoder(r.Body).Decode(&counters) != nil || counters.LikeCount < 0 || counters.CollectCount < 0 || counters.DanmakuCount < 0 {
+					http.Error(w, "invalid engagement update", http.StatusBadRequest)
+					return
+				}
+				writeOK(w, map[string]any{"id": id, "likeCount": counters.LikeCount, "collectCount": counters.CollectCount, "danmakuCount": counters.DanmakuCount})
+				return
+			}
+			id, err := strconv.ParseUint(remainder, 10, 64)
 			if err != nil || id == 0 {
 				http.NotFound(w, r)
 				return
