@@ -54,7 +54,7 @@ CD 的 precheck 会验证 Node Ready、`metrics.k8s.io` 可用，并逐项检查
 | 版本 | 每个 `/api/v1/version` 响应必须包含目标 commit SHA |
 | 日志 | 保存 user/content/engagement/gateway 各 150 行日志 |
 | 集群快照 | 保存 Deployment、Pod、Service、PVC、镜像和最近 50 条 Event |
-| 自动扩缩容 | user/content/engagement/gateway 四个 HPA 均存在；保存目标值、副本数和容器资源使用率 |
+| 自动扩缩容 | user/content/engagement/gateway 四个 HPA（autoscaling.yaml 统一管理，1～5 副本、CPU 60%）；保存目标值、副本数和容器资源使用率 |
 
 每次运行都会上传 `microservice-cd-<sha>` artifact，保留 30 天。内容包括渲染后的非敏感清单、部署输出、可能的回滚输出和运行时证据。
 
