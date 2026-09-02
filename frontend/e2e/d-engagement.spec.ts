@@ -1,10 +1,3 @@
-/**
- * 成员 D 互动域增强套件：
- *   UC05 弹幕/评论 + UC09 预约 + UC10 直播 串起来验证跨页面状态一致性、
- *   WS 重连、以及刷新后数据持久化。
- * 单 UC 独立断言见 uc05/09/10 对应 spec；本文件保留原完整实现，并额外增加
- * “UC05 评论内容可在 UC10 直播间发送为聊天消息” 之类跨域轻校验。
- */
 import { expect, test } from '@playwright/test'
 import { loginViaApi, openAs } from './fixtures/auth'
 import { API, ENGAGEMENT_VIDEO_TITLE, USERS } from './test-data'

@@ -27,9 +27,7 @@ DanmakuStream 是一个面向创作者与社区的弹幕视频 + 直播平台，
 | 用例说明 | UC06 详细文档 | ✅ 交付 | [UC06-personal-library.md](../usecase/UC06-personal-library.md) |
 | 需求追溯 | 13 用例追溯矩阵 | ✅ 交付 | [traceability-matrix.md](../traceability/traceability-matrix.md) |
 | 测试 | E2E 测试计划 | ✅ 交付 | [e2e-test-plan.md](../testing/e2e-test-plan.md) |
-| 测试 | E2E 测试报告（单体 13/13） | ✅ 交付（骨架，执行时填实） | [e2e-test-report.md](../testing/e2e-test-report.md) |
-| 测试 | 微服务 E2E 报告（Day 8） | ✅ 交付（骨架，执行时填实） | [microservices-e2e-full-report.md](../testing/microservices-e2e-full-report.md) |
-| 测试 | Day 4 E2E 12UC 独立骨架（成员 E） | ✅ 交付 | `frontend/e2e/uc02-video-search.spec.ts` 等 10 个新文件 + 原混合文件 LEGACY 标注 |
+| 测试 | E2E 测试报告 | ✅ 交付（骨架，执行时填实） | [e2e-test-report.md](../testing/e2e-test-report.md) |
 | 压测（Day 9） | k6 脚本 × 3 核心接口 | ✅ 交付 | `benchmarks/k6/01-public-video-search.js`、`02-auth-login.js`、`03-library-history.js` |
 | 压测（Day 9） | 一键对比脚本（单体 vs 微服务各 3 轮，自动数据播种+资源采样+聚合） | ✅ 交付 | [run-benchmark-comparison.sh](../../scripts/run-benchmark-comparison.sh) |
 | 压测（Day 9） | 对比报告模板（吞吐/Avg/P95/错误率/CPU/内存 对比表+行动项） | ✅ 交付（骨架，执行时填实） | [benchmark-comparison-template.md](../testing/benchmark-comparison-template.md) |
@@ -203,7 +201,7 @@ AI 生成骨架/代码/图档/文档
 | E2E 条目总数 | ≥ 39 条 | | |
 | 关键 API P95（单体 3 轮平均） | BM01≤800ms / BM02≤1500ms / BM03≤1200ms | BM01: __ms / BM02: __ms / BM03: __ms | |
 | 关键 API P95（微服务 3 轮平均） | 同单体阈值 | BM01: __ms / BM02: __ms / BM03: __ms | |
-| 压测错误率（两轮合计） | < 5% | % | |
+| 压测错误率（三轮平均） | < 5% | % | |
 | WS 断连恢复 | 3s 重试、计数不重复 | | |
 | P0/P1 严重缺陷 | 0 | | |
 

@@ -1,14 +1,8 @@
-/**
- * 成员 B 工作流增强套件：
- *   UC07 关注/分组/黑名单 + UC08 订阅/付费 + UC11 私信/媒体分享。
- * 单 UC 独立断言见 uc07/08/11 对应 spec；本文件保留原完整实现，作为“同一 viewer 会话下关注→订阅→私信”
- * 完整链路的补充测试，用来验证通知徽章、订阅后权限标记和私信媒体分享之间的联动。
- */
 import { expect, test } from '@playwright/test'
 import { loginViaApi, openAs } from './fixtures/auth'
 import { API, USERS } from './test-data'
 
-test.describe.serial('UC07 / UC08 / UC11 完整业务流程增强套件', () => {
+test.describe.serial('UC07 / UC08 / UC11 完整业务流程', () => {
   test('E2E-TC07 关注、分组与黑名单状态在页面可验证', async ({ page, request }) => {
     const owner = await loginViaApi(request, USERS.owner.nickname, USERS.owner.password)
     const viewer = await loginViaApi(request, USERS.viewer.nickname, USERS.viewer.password)

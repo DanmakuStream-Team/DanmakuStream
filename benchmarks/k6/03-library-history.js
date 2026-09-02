@@ -2,13 +2,13 @@
  * k6 脚本 BM-03：个人资料库-观看历史（GET /api/v1/users/me/history）
  *
  * UC06 核心接口：需要鉴权 + 查 watch_histories 分页 + JOIN videos。
- * Setup 阶段先创建 1 个账号并写入 300 条历史，模拟真实用户数据量。
+ * Setup 阶段先创建 1 个账号，并为最多 100 个不同视频写入历史。
  *
  * 环境变量：
  *   K6_BASE_URL        压测目标（默认 http://127.0.0.1:8888）
  *   K6_VUS             并发（默认 40）
  *   K6_DURATION        单轮持续时间（默认 60s）
- *   K6_HISTORY_SEEDER  1=在 setup 中写入 300 条历史；0=跳过（已有数据时）
+ *   K6_HISTORY_SEEDER  1=在 setup 中写入不同视频的历史；0=跳过（已有数据时）
  *   K6_PASSWORD        账号密码（默认 Benchmark123!）
  */
 import http from 'k6/http';
@@ -46,9 +46,9 @@ export function setup() {
   const token = login.json().data.token;
   if (!token) throw new Error('setup register/login did not return token');
 
-  // 查 10 个公开视频作为历史写入目标
-  const videosResp = http.get(`${BASE}/api/v1/videos?page=1&pageSize=10`);
-  let videoIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  // 查最多 100 个公开视频作为历史写入目标。
+  const videosResp = http.get(`${BASE}/api/v1/videos?page=1&pageSize=100`);
+  let videoIds = [];
   try {
     const videos = videosResp.json().data.list || [];
     if (videos.length > 0) videoIds = videos.map((v) => v.id).filter(Boolean);
@@ -56,13 +56,12 @@ export function setup() {
 
   if ((__ENV.K6_HISTORY_SEEDER || '1') !== '0') {
     const authHeaders = { ...headers, Authorization: `Bearer ${token}` };
-    // 写入 300 条历史：每个视频循环写入 30 次不同进度
-    for (let i = 0; i < 300; i += 1) {
-      const vid = videoIds[i % videoIds.length] || ((i % 10) + 1);
+    for (let i = 0; i < videoIds.length; i += 1) {
+      const vid = videoIds[i];
       const progress = Math.floor(Math.random() * 1200) + 1;
       http.post(`${BASE}/api/v1/users/me/history/${vid}`,
         JSON.stringify({ progress }), { headers: authHeaders });
-      if (i % 30 === 0) sleep(0.02);
+      if (i % 20 === 0) sleep(0.02);
     }
   }
 

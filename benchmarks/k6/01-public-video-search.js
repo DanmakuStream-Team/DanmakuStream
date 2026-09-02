@@ -41,7 +41,7 @@ export default function () {
   const url = `${BASE}/api/v1/videos?page=1&pageSize=20&keyword=${encodeURIComponent(kw)}`;
   const res = http.get(url, { tags: { api: 'bm01_search' } });
 
-  check(res, {
+  const ok = check(res, {
     'status is 200': (r) => r.status === 200,
     'has json data.list': (r) => {
       try {
@@ -51,7 +51,8 @@ export default function () {
         return false;
       }
     },
-  }) || errorRate.add(1);
+  });
+  errorRate.add(!ok);
 
   if (res.timings) ttfbTrend.add(res.timings.waiting);
   sleep(0.3 + Math.random() * 0.5);

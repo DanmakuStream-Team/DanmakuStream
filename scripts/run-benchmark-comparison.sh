@@ -55,6 +55,18 @@ docker_compose() {
   docker compose --project-name "$p" -f "$REPO_ROOT/$f" "$@"
 }
 
+benchmark_video_values() {
+  local include_transcode=$1 separator=''
+  for i in $(seq 1 100); do
+    if [ "$include_transcode" = 1 ]; then
+      printf "%s(NOW(),NOW(),'BM-公开视频-%d','压测数据','/data/videos/seed.mp4','approved','ready',@owner_id)" "$separator" "$i"
+    else
+      printf "%s(NOW(),NOW(),'BM-公开视频-%d','压测数据','/data/videos/seed.mp4','approved',@owner_id)" "$separator" "$i"
+    fi
+    separator=,
+  done
+}
+
 # 等待一个 URL 就绪
 wait_url() {
   local name=$1 url=$2 timeout=${3:-120}
@@ -84,7 +96,9 @@ collect_stats() {
   sleep "$duration_sec"
   kill "$sampler_pid" 2>/dev/null || true
   wait "$sampler_pid" 2>/dev/null || true
-  echo "container,cpu_percent,mem_bytes,mem_limit" > "$output_file"
+  if [ ! -s "$output_file" ]; then
+    echo "container,cpu_percent,mem_bytes,mem_limit" > "$output_file"
+  fi
   python3 - "$tmp" "$output_file" <<'PY'
 import csv, re, sys
 src, dst = sys.argv[1], sys.argv[2]
@@ -116,8 +130,9 @@ for name, cpu, mem, lim in rows:
     agg[name][2] += mem; agg[name][3] += 1
 with open(dst, 'a', newline='') as f:
     w = csv.writer(f)
+    limits = {name: lim for name, _, _, lim in rows}
     for name, (cs, cn, ms, mn) in agg.items():
-        w.writerow([name, round(cs/cn,2), int(ms/mn) if mn else 0, (int(rows[0][3]))])
+        w.writerow([name, round(cs/cn,2), int(ms/mn) if mn else 0, limits[name]])
 PY
   rm -f "$tmp"
 }
@@ -130,17 +145,25 @@ run_k6_once() {
   local base_url=$4
   local vus=$5
   local duration=$6
-  local script="$REPO_ROOT/benchmarks/k6/0${bm_id}-"*".js"
+  local scripts=("$REPO_ROOT/benchmarks/k6/0${bm_id}-"*.js)
+  if [ "${#scripts[@]}" -ne 1 ] || [ ! -f "${scripts[0]}" ]; then
+    log "[error] bm${bm_id} 必须且只能匹配一个 k6 脚本"
+    return 1
+  fi
+  local script_name
+  script_name=$(basename "${scripts[0]}")
   local json_out="$ARTIFACT_DIR/${mode}-bm${bm_id}-r${round_n}.json"
   local text_out="$ARTIFACT_DIR/${mode}-bm${bm_id}-r${round_n}.txt"
   log "▶ k6 $mode bm${bm_id} r${round_n} — VUS=$vus DUR=$duration URL=$base_url"
   docker run --rm --add-host=host.docker.internal:host-gateway \
-    --network=host -v "$REPO_ROOT/benchmarks:/benchmarks:ro" \
+    --network=host \
+    -v "$REPO_ROOT/benchmarks/k6:/scripts:ro" \
+    -v "$ARTIFACT_DIR:/artifacts" \
     -e "K6_BASE_URL=$base_url" \
     -e "K6_VUS=$vus" -e "K6_DURATION=$duration" \
     "$K6_IMAGE" run \
-      --summary-export="/benchmarks/$(basename "$ARTIFACT_DIR")/$(basename "$json_out")" \
-      "/benchmarks/k6/0${bm_id}-"*".js" > >(tee "$text_out") 2>&1 \
+      --summary-export="/artifacts/$(basename "$json_out")" \
+      "/scripts/$script_name" > >(tee "$text_out") 2>&1 \
   || log "[warn] k6 bm${bm_id} r${round_n} 返回非零，仍继续后续轮次"
   sleep 3
 }
@@ -171,13 +194,15 @@ setup_monolith() {
     # 通过容器 id 更新角色
     mono_mysql_cid=$(docker compose --project-name danmaku-bench-mono ps -q mysql 2>/dev/null || true)
     if [ -n "$mono_mysql_cid" ]; then
+      video_values=$(benchmark_video_values 0)
       docker exec "$mono_mysql_cid" mysql -uroot -ppassword danmakustream -e "
         UPDATE users SET role='user'      WHERE nickname='test_user';
         UPDATE users SET role='moderator' WHERE nickname='test_moderator';
         UPDATE users SET role='admin'     WHERE nickname='test_admin';
-        INSERT IGNORE INTO videos (created_at,updated_at,title,description,video_url,status,author_id) VALUES
-         (NOW(),NOW(),'BM-公开视频A','压测用演示视频','/data/videos/seed.mp4','approved',(SELECT id FROM users WHERE nickname='test_user' LIMIT 1)),
-         (NOW(),NOW(),'BM-公开视频B','压测用演示视频','/data/videos/seed.mp4','approved',(SELECT id FROM users WHERE nickname='test_user' LIMIT 1));
+        SET @owner_id=(SELECT id FROM users WHERE nickname='test_user' LIMIT 1);
+        DELETE FROM videos WHERE title LIKE 'BM-公开视频-%';
+        INSERT INTO videos (created_at,updated_at,title,description,video_url,status,author_id)
+        VALUES $video_values;
       " >/dev/null 2>&1 || true
     fi
   )
@@ -196,12 +221,24 @@ setup_microservices() {
   )
   wait_url "micro gateway"  "http://127.0.0.1:${MICRO_GATEWAY_PORT}/gateway/health" 240
   wait_url "micro frontend" "http://127.0.0.1:${MICRO_FRONTEND_PORT}/" 180
-  log "微服务数据播种：调用 seed-microservices-e2e-data.sh 的等价 API"
+  log "微服务数据播种：创建基准账号和公开视频"
   (
-    export MICRO_E2E_GATEWAY_URL="http://127.0.0.1:${MICRO_GATEWAY_PORT}"
-    export MICRO_E2E_PROJECT_NAME=danmaku-bench-micro
-    bash "$REPO_ROOT/scripts/seed-microservices-e2e-data.sh" >/dev/null 2>&1 \
-      || log "[warn] 微服务数据播种失败，仍尝试继续"
+    benchmark_user=benchmark-content-owner
+    curl -sS -o /dev/null -X POST "http://127.0.0.1:${MICRO_GATEWAY_PORT}/api/v1/auth/register" \
+      -H 'Content-Type: application/json' \
+      -d "{\"nickname\":\"$benchmark_user\",\"password\":\"Benchmark123!\"}" || true
+    micro_mysql_cid=$(docker compose --project-name danmaku-bench-micro ps -q mysql 2>/dev/null || true)
+    if [ -n "$micro_mysql_cid" ]; then
+      video_values=$(benchmark_video_values 1)
+      docker exec "$micro_mysql_cid" mysql -uroot \
+        -p"${MYSQL_ROOT_PASSWORD:-local-dev-root-password}" -e "
+          SET @owner_id=(SELECT id FROM user_db.users WHERE nickname='$benchmark_user' LIMIT 1);
+          DELETE FROM content_db.videos WHERE title LIKE 'BM-公开视频-%';
+          INSERT INTO content_db.videos
+            (created_at,updated_at,title,description,video_url,status,transcode_status,author_id)
+          VALUES $video_values;
+        " >/dev/null
+    fi
   )
   sleep 5
 }
@@ -228,12 +265,15 @@ run_suite() {
 # ── 生成 comparison.csv / comparison.md ──────────────────────
 summarize() {
   step "生成聚合报告"
-  python3 - "$ARTIFACT_DIR" <<'PY'
+  python3 - "$ARTIFACT_DIR" "$VUS_BM01" "$VUS_BM02" "$VUS_BM03" "$DURATION" "$ROUNDS" <<'PY'
 import json, os, re, sys, csv
+from datetime import datetime, timezone
 from pathlib import Path
 from collections import defaultdict
 
 artifact = Path(sys.argv[1])
+vus = sys.argv[2:5]
+duration, rounds = sys.argv[5:7]
 
 rows = []  # mode, bm, round, vus, duration, http_reqs, req_rate, avg_ms, p95_ms, err_rate
 for mode in ['monolith','microservices']:
@@ -274,7 +314,7 @@ bm_name = {'01':'BM01 公开搜索 GET /videos','02':'BM02 登录 POST /auth/log
 md = []
 md.append('# Day 9 性能压测对比报告（单体 vs 微服务）')
 md.append('')
-md.append(f'> 生成时间：__FILL_TIME__ ；运行 `bash scripts/run-benchmark-comparison.sh` 生成；参数 VUS={os.environ.get("BENCHMARK_VUS_BM01","50")}/{os.environ.get("BENCHMARK_VUS_BM02","30")}/{os.environ.get("BENCHMARK_VUS_BM03","40")}，时长 {os.environ.get("BENCHMARK_DURATION","60s")}，轮次 {os.environ.get("BENCHMARK_ROUNDS","3")}')
+md.append(f'> 生成时间：{datetime.now(timezone.utc).isoformat(timespec="seconds")}；运行 `bash scripts/run-benchmark-comparison.sh` 生成；参数 VUS={"/".join(vus)}，时长 {duration}，轮次 {rounds}')
 md.append('')
 md.append('## 1. 核心指标对比（单体 vs 微服务，各 N 轮平均值）')
 md.append('')
@@ -310,15 +350,21 @@ for mode in ['monolith','microservices']:
     if csvf.exists():
         with open(csvf) as f:
             rr = list(csv.DictReader(f))
+            by_container = defaultdict(lambda: {'cpu': [], 'mem': [], 'limit': 0})
             for r in rr:
-                mem = int(r['mem_bytes'] or 0)
-                lim = int(r['mem_limit'] or 0)
+                item = by_container[r['container']]
+                item['cpu'].append(float(r['cpu_percent'] or 0))
+                item['mem'].append(int(r['mem_bytes'] or 0))
+                item['limit'] = int(r['mem_limit'] or 0)
+            for container, item in sorted(by_container.items()):
+                mem = int(mean(item['mem']))
+                lim = item['limit']
                 def fmt(n):
                     if n>=1e9: return f'{n/1e9:.2f}GB'
                     if n>=1e6: return f'{n/1e6:.2f}MB'
                     if n>=1e3: return f'{n/1e3:.2f}KB'
                     return str(n)
-                md.append(f'| {mode} | {r["container"]} | {r["cpu_percent"]}% | {fmt(mem)} | {fmt(lim)} |')
+                md.append(f'| {mode} | {container} | {mean(item["cpu"])}% | {fmt(mem)} | {fmt(lim)} |')
 md.append('')
 md.append('## 4. 单轮明细索引')
 md.append('')
@@ -334,7 +380,7 @@ md.append('## 5. 注意事项 / 待分析')
 md.append('')
 md.append('- 单体：所有流量通过 nginx-gateway 单 Go 进程处理；微服务：先 nginx-gateway，再 by-path 分发到 user/content/engagement 三服务。')
 md.append('- BM02（登录）受密码哈希 + JWT 签发 CPU 开销影响，微服务版若使用独立 user-service 单实例通常略慢；需要横向扩容可在 compose 中将 user-service 调为 2 实例对比。')
-md.append('- BM03（资料库历史）有 setup 阶段写入 300 条历史；真实生产数据量应扩大到 10k 级别后复测。')
+md.append('- BM03（资料库历史）会为压测用户写入最多 100 条不同视频的历史；真实生产数据量应扩大到 10k 级别后复测。')
 md.append('- CPU% 采样使用 docker stats 1s 间隔 20 次取平均，粗粒度但足够做趋势对比；若要精确数据，请接入 cAdvisor + Prometheus。')
 md.append('')
 

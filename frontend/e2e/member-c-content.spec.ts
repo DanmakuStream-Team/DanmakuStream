@@ -1,18 +1,12 @@
-/**
- * 成员 C 内容域跨域增强套件：
- *   UC02 搜索+UC03 投稿+UC04 审核+UC12 数据分析串联工作流。
- * 与独立 uc02/03/04/12.spec.ts 中的单 UC 用例不同，本文件断言在同一次运行中复用
- * 上游产物（投稿/审核后视频的 title、id）验证跨页面跳转、状态一致性与反向越权。
- */
 import { expect, test, type Locator } from '@playwright/test'
 import { loginViaApi, openAs } from './fixtures/auth'
-import { API, USERS, VIDEO_TITLE_FALLBACK } from './test-data'
+import { API, USERS } from './test-data'
 
 function dropdownOption(page: import('@playwright/test').Page, text: string): Locator {
   return page.locator('.el-select-dropdown:visible .el-select-dropdown__item', { hasText: text })
 }
 
-test.describe.serial('成员 C 内容域跨域增强套件', () => {
+test.describe.serial('成员 C 内容域', () => {
   // E2E-TC02-01 搜索 → 详情 → 播放器，并验证空搜索结果。
   test('UC02 用户搜索公开视频并进入播放页', async ({ page }) => {
     const initialVideosResponse = page.waitForResponse((response) =>
