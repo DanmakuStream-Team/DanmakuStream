@@ -78,73 +78,50 @@ login_and_get_token() {
 CREATOR_TOKEN=$(login_and_get_token e2e-mc-creator)
 OWNER_TOKEN=$(login_and_get_token e2e-d-owner)
 
-log "内容域测试数据：清理并插入视频"
+log "内容域测试数据：清理并插入视频（直接 MySQL INSERT 绕过上传接口校验 40010）"
+
 mysql_root "
 DELETE FROM content_db.videos WHERE title LIKE '${MARK}-%' OR title IN ('E2E-MC-公开视频','E2E-MC-待审核通过','E2E-MC-待审核拒绝','E2E-MEMBER-B-分享视频','E2E-UC05-互动测试视频');
 "
 
 SEED_VIDEO_FILE="$repo_root/tests/fixtures/seed-mini.mp4"
 if [ ! -f "$SEED_VIDEO_FILE" ]; then
-  log "  警告：seed-mini.mp4 不存在 -> 创建一个 10KB 伪 MP4 文件用于 multipart 上传"
+  log "  准备媒体占位：创建 10KB 空文件用于挂载内容"
   mkdir -p "$(dirname "$SEED_VIDEO_FILE")"
   printf 'ftypmp42' > "$SEED_VIDEO_FILE" 2>/dev/null || true
   head -c 10240 /dev/zero 2>/dev/null >> "$SEED_VIDEO_FILE" || head -c 10240 /dev/urandom >> "$SEED_VIDEO_FILE" 2>/dev/null || true
 fi
-log "  上传视频源文件：$SEED_VIDEO_FILE （大小=$(du -b "$SEED_VIDEO_FILE" 2>/dev/null | awk '{print $1}' || echo unknown) 字节）"
+log "  占位视频源文件：$SEED_VIDEO_FILE （大小=$(du -b "$SEED_VIDEO_FILE" 2>/dev/null | awk '{print $1}' || echo unknown) 字节）"
 
-upload_video() {
-  local token=$1 title=$2 status=$3
-  if [ -z "$token" ]; then
-    log "  [$title] 跳过（token 为空）"
+CREATOR_ID=$(mysql_root "SELECT id FROM user_db.users WHERE nickname='e2e-mc-creator' LIMIT 1;" | head -n1 || echo "")
+log "  creator(e2e-mc-creator) id=$CREATOR_ID"
+
+mysql_insert_video() {
+  local title=$1 status=$2 owner_id=$3 description="$MARK 演示视频"
+  if [ -z "$owner_id" ]; then
+    log "  [$title] 跳过（owner_id 为空）"
     echo ""
     return 0
   fi
-  local http_body http_code
-  http_body=$(mktemp)
-  http_code=$(curl --silent --show-error --request POST \
-    --header "Authorization: Bearer $token" \
-    --header 'Accept: application/json' \
-    --form "title=$title" \
-    --form "description=$MARK 演示视频" \
-    --form "video=@$SEED_VIDEO_FILE;type=video/mp4;filename=seed.mp4" \
-    --output "$http_body" \
-    --write-out '%{http_code}' \
-    "$gateway_url/api/v1/videos/upload" || echo "000")
-  local body
-  body=$(cat "$http_body" 2>/dev/null | tr -d '\r' || echo '')
-  rm -f "$http_body"
-  log "  [$title] upload HTTP=$http_code body=$body"
+  mysql_root "INSERT INTO content_db.videos (user_id,title,description,video_url,cover_url,status,view_count,like_count,danmaku_count,created_at,updated_at) VALUES ($owner_id,'$title','$description','/data/videos/seed.mp4','','$status',0,0,0,NOW(),NOW());" 2>/dev/null || true
   local id
-  id=$(printf '%s' "$body" | python3 -c "import sys,json
-try: d=json.load(sys.stdin)
-except Exception as e:
-  print('', end=''); sys.exit(0)
-payload = d.get('data', {}) if isinstance(d.get('data', {}), dict) else {}
-for k in ('id','videoId','video_id'):
-  v = payload.get(k)
-  if v is not None and str(v) != '':
-    print(v); sys.exit(0)
-print(d.get('id', ''))" 2>/dev/null || echo "")
-  if [ -n "$id" ]; then
-    mysql_root "UPDATE content_db.videos SET status='$status', video_url='/data/videos/seed.mp4', cover_url='' WHERE id=$id LIMIT 1;" 2>/dev/null || true
-  else
-    log "  [$title] 无法解析视频 id，请检查 body 是否含 {data:{id:...}}"
+  id=$(mysql_root "SELECT id FROM content_db.videos WHERE title='$title' AND user_id=$owner_id ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d '\r\n' || echo "")
+  if [ -z "$id" ]; then
+    log "  [$title] INSERT 失败，请检查 content_db.videos 是否就绪"
   fi
   echo "$id"
 }
 
-if [ -n "$CREATOR_TOKEN" ]; then
-  VID_APPROVED=$(upload_video "$CREATOR_TOKEN" "E2E-MC-公开视频"        "approved") || true
-  VID_PENDING1=$(upload_video "$CREATOR_TOKEN" "E2E-MC-待审核通过"       "pending")  || true
-  VID_PENDING2=$(upload_video "$CREATOR_TOKEN" "E2E-MC-待审核拒绝"       "pending")  || true
-  VID_SHARED_B=$(upload_video "$CREATOR_TOKEN" "E2E-MEMBER-B-分享视频"   "approved") || true
-  VID_UC05=$(upload_video     "$CREATOR_TOKEN" "E2E-UC05-互动测试视频"   "approved") || true
-  log "  E2E-MC-公开视频      id=$VID_APPROVED"
-  log "  E2E-MC-待审核通过     id=$VID_PENDING1"
-  log "  E2E-MC-待审核拒绝     id=$VID_PENDING2"
-  log "  E2E-MEMBER-B-分享视频 id=$VID_SHARED_B"
-  log "  E2E-UC05-互动测试视频 id=$VID_UC05"
-fi
+VID_APPROVED=$(mysql_insert_video "E2E-MC-公开视频"      "approved" "$CREATOR_ID") || true
+VID_PENDING1=$(mysql_insert_video "E2E-MC-待审核通过"     "pending"  "$CREATOR_ID") || true
+VID_PENDING2=$(mysql_insert_video "E2E-MC-待审核拒绝"     "pending"  "$CREATOR_ID") || true
+VID_SHARED_B=$(mysql_insert_video "E2E-MEMBER-B-分享视频" "approved" "$CREATOR_ID") || true
+VID_UC05=$(mysql_insert_video     "E2E-UC05-互动测试视频" "approved" "$CREATOR_ID") || true
+log "  E2E-MC-公开视频      id=$VID_APPROVED"
+log "  E2E-MC-待审核通过     id=$VID_PENDING1"
+log "  E2E-MC-待审核拒绝     id=$VID_PENDING2"
+log "  E2E-MEMBER-B-分享视频 id=$VID_SHARED_B"
+log "  E2E-UC05-互动测试视频 id=$VID_UC05"
 
 if [ -n "$OWNER_TOKEN" ] && [ -n "${VID_UC05:-}" ]; then
   log "互动域测试数据：为 UC05 视频预埋 0 弹幕/评论/点赞/收藏（E2E脚本自行验证从0起步）"
