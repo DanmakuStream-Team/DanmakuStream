@@ -59,6 +59,30 @@ mysql_root() {
   "${compose[@]}" exec -T mysql mysql -uroot -p"${MYSQL_ROOT_PASSWORD:-local-dev-root-password}" -N -B -e "$1" 2>/dev/null || true
 }
 
+mysql_exec() {
+  local sql="$1" label="${2:-unnamed-sql}"
+  local stdout_tmp stderr_tmp rc
+  stdout_tmp=$(mktemp)
+  stderr_tmp=$(mktemp)
+  set +e
+  "${compose[@]}" exec -T mysql mysql -uroot -p"${MYSQL_ROOT_PASSWORD:-local-dev-root-password}" -N -B -e "$sql" \
+    >"$stdout_tmp" 2>"$stderr_tmp"
+  rc=$?
+  set -e
+  local stdout_text stderr_text
+  stdout_text=$(tr -d '\r' < "$stdout_tmp" | sed '/^$/d' || true)
+  stderr_text=$(tr -d '\r' < "$stderr_tmp" | sed '/^$/d' || true)
+  rm -f "$stdout_tmp" "$stderr_tmp"
+  if [ "$rc" -ne 0 ] || [ -n "$stderr_text" ]; then
+    log "  MySQL [$label] rc=$rc"
+    [ -n "$stdout_text" ] && printf '%s\n' "$stdout_text" | while IFS= read -r line; do log "    [stdout] $line"; done
+    [ -n "$stderr_text" ] && printf '%s\n' "$stderr_text" | while IFS= read -r line; do log "    [stderr] $line"; done
+    log "  MySQL [$label] sql>>> $sql"
+  fi
+  [ -n "$stdout_text" ] && printf '%s\n' "$stdout_text"
+  return $rc
+}
+
 log "固化账号角色（e2e-mc-moderator=moderator, tadmin=admin, 其余=user）"
 mysql_root "
 UPDATE user_db.users SET role='moderator' WHERE nickname IN ('tmod','e2e-mc-moderator');
@@ -80,9 +104,12 @@ OWNER_TOKEN=$(login_and_get_token e2e-d-owner)
 
 log "内容域测试数据：清理并插入视频（直接 MySQL INSERT 绕过上传接口校验 40010）"
 
-mysql_root "
+mysql_exec "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME IN ('content_db','user_db','engagement_db') ORDER BY SCHEMA_NAME;" "检查3库是否存在"
+mysql_exec "SHOW CREATE TABLE content_db.videos\G" "DESCRIBE content_db.videos（排查字段名/类型/NOT NULL/DEFAULT）"
+
+mysql_exec "
 DELETE FROM content_db.videos WHERE title LIKE '${MARK}-%' OR title IN ('E2E-MC-公开视频','E2E-MC-待审核通过','E2E-MC-待审核拒绝','E2E-MEMBER-B-分享视频','E2E-UC05-互动测试视频');
-"
+" "清理旧播种视频"
 
 SEED_VIDEO_FILE="$repo_root/tests/fixtures/seed-mini.mp4"
 if [ ! -f "$SEED_VIDEO_FILE" ]; then
@@ -93,7 +120,8 @@ if [ ! -f "$SEED_VIDEO_FILE" ]; then
 fi
 log "  占位视频源文件：$SEED_VIDEO_FILE （大小=$(du -b "$SEED_VIDEO_FILE" 2>/dev/null | awk '{print $1}' || echo unknown) 字节）"
 
-CREATOR_ID=$(mysql_root "SELECT id FROM user_db.users WHERE nickname='e2e-mc-creator' LIMIT 1;" | head -n1 || echo "")
+CREATOR_ID=$(mysql_exec "SELECT id, nickname, role FROM user_db.users WHERE nickname='e2e-mc-creator' LIMIT 1;" "查 creator(e2e-mc-creator) 完整行" | awk '{print $1; exit}' || echo "")
+CREATOR_ID="${CREATOR_ID:-}"
 log "  creator(e2e-mc-creator) id=$CREATOR_ID"
 
 mysql_insert_video() {
@@ -103,11 +131,32 @@ mysql_insert_video() {
     echo ""
     return 0
   fi
-  mysql_root "INSERT INTO content_db.videos (user_id,title,description,video_url,cover_url,status,view_count,like_count,danmaku_count,created_at,updated_at) VALUES ($owner_id,'$title','$description','/data/videos/seed.mp4','','$status',0,0,0,NOW(),NOW());" 2>/dev/null || true
+  log "  [$title] 开始 INSERT：owner_id=$owner_id status=$status"
+  local insert_sql_full insert_sql_min
+  insert_sql_full="INSERT INTO content_db.videos (user_id,title,description,video_url,cover_url,status,view_count,like_count,danmaku_count,created_at,updated_at) VALUES ($owner_id,'$title','$description','/data/videos/seed.mp4','','$status',0,0,0,NOW(),NOW());"
+  insert_sql_min="INSERT INTO content_db.videos (user_id,title,status,created_at,updated_at) VALUES ($owner_id,'$title','$status',NOW(),NOW());"
+  local used_sql=""
+  set +e
+  mysql_exec "$insert_sql_full" "video-insert-full[$title]"
+  local rc_full=$?
+  set -e
+  used_sql="$insert_sql_full"
   local id
-  id=$(mysql_root "SELECT id FROM content_db.videos WHERE title='$title' AND user_id=$owner_id ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d '\r\n' || echo "")
+  id=$(mysql_exec "SELECT id FROM content_db.videos WHERE title='$title' AND user_id=$owner_id ORDER BY id DESC LIMIT 1;" "lookup[$title]" 2>/dev/null | tr -d '\r\n' || echo "")
   if [ -z "$id" ]; then
-    log "  [$title] INSERT 失败，请检查 content_db.videos 是否就绪"
+    log "  [$title] 全字段 INSERT 未生效，回退到最小字段集（走 NOT NULL + DEFAULT）"
+    set +e
+    mysql_exec "$insert_sql_min" "video-insert-min[$title]"
+    local rc_min=$?
+    set -e
+    used_sql="$insert_sql_min"
+    id=$(mysql_exec "SELECT id FROM content_db.videos WHERE title='$title' AND user_id=$owner_id ORDER BY id DESC LIMIT 1;" "lookup2[$title]" 2>/dev/null | tr -d '\r\n' || echo "")
+    if [ -z "$id" ]; then
+      log "  [$title] 两版 INSERT 都失败，最终 used_sql>>> $used_sql"
+      log "  [$title] 请根据上方 [stderr] 的 MySQL Error 行修复：字段不存在/外键约束失败/字段类型不匹配/缺少 NOT NULL 无 DEFAULT 列。"
+    else
+      log "  [$title] 回退最小字段集成功，id=$id"
+    fi
   fi
   echo "$id"
 }
