@@ -14,6 +14,7 @@ on:
       - 'scripts/run-microservices-e2e.sh'
       - 'scripts/render-microservice-manifests.sh'
       - 'scripts/k3s-microservice-deploy.sh'
+      - 'scripts/check-microservice-hpa.sh'
       - 'scripts/k3s-hpa-chaos.sh'
       - 'scripts/render-hpa-timeline.py'
       - '.github/workflows/microservices-e2e.yml'
@@ -32,6 +33,7 @@ on:
       - 'scripts/run-microservices-e2e.sh'
       - 'scripts/render-microservice-manifests.sh'
       - 'scripts/k3s-microservice-deploy.sh'
+      - 'scripts/check-microservice-hpa.sh'
       - 'scripts/k3s-hpa-chaos.sh'
       - 'scripts/render-hpa-timeline.py'
       - '.github/workflows/microservices-e2e.yml'
@@ -62,6 +64,8 @@ jobs:
         run: |
           npm ci
           npx playwright install --with-deps chromium
+      - name: Validate Kubernetes HPA coverage
+        run: bash scripts/check-microservice-hpa.sh
       - name: Run microservice E2E environment
         run: bash scripts/run-microservices-e2e.sh
       - name: Upload E2E evidence

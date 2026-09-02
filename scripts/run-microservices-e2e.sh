@@ -74,6 +74,8 @@ export E2E_BASE_URL="$MICRO_E2E_FRONTEND_URL"
 export COMPOSE_MICRO="${compose[*]}"
 export MYSQL_ROOT_CMD="${compose[*]} exec -T mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD}"
 
+# CI enables the full UC01-UC13 suite; local smoke runs remain available by
+# leaving MICRO_E2E_FULL_SUITE unset.
 e2e_npm_script=test:e2e:microservices
 if [[ "${MICRO_E2E_FULL_SUITE:-0}" == "1" ]]; then
   e2e_npm_script=test:e2e:microservices:full
