@@ -124,17 +124,34 @@ CREATOR_ID=$(mysql_exec "SELECT id, nickname, role FROM user_db.users WHERE nick
 CREATOR_ID="${CREATOR_ID:-}"
 log "  creator(e2e-mc-creator) id=$CREATOR_ID"
 
+sql_escape() {
+  local s="${1:-}"
+  printf '%s' "$s" | sed "s/'/\\\\'/g"
+}
+
 mysql_insert_video() {
-  local title=$1 status=$2 owner_id=$3 description="$MARK 演示视频"
+  local title="$1"
+  local status="$2"
+  local owner_id="$3"
+  local description="${MARK:-MICRO-E2E-SEED} 演示视频"
   if [ -z "$owner_id" ]; then
     log "  [$title] 跳过（owner_id 为空）"
     echo ""
     return 0
   fi
-  log "  [$title] 开始 INSERT：owner_id=$owner_id status=$status"
-  local insert_sql_full insert_sql_min
-  insert_sql_full="INSERT INTO content_db.videos (user_id,title,description,video_url,cover_url,status,view_count,like_count,danmaku_count,created_at,updated_at) VALUES ($owner_id,'$title','$description','/data/videos/seed.mp4','','$status',0,0,0,NOW(),NOW());"
-  insert_sql_min="INSERT INTO content_db.videos (user_id,title,status,created_at,updated_at) VALUES ($owner_id,'$title','$status',NOW(),NOW());"
+  if ! [[ "$owner_id" =~ ^[0-9]+$ ]] || [ "$owner_id" -le 0 ]; then
+    log "  [$title] 跳过（owner_id=$owner_id 不是正整数）"
+    echo ""
+    return 0
+  fi
+  local esc_title esc_desc
+  esc_title=$(sql_escape "$title")
+  esc_desc=$(sql_escape "$description")
+  log "  [$title] 开始 INSERT：author_id=$owner_id status=$status description='$description'"
+  local insert_sql_full insert_sql_min lookup_sql
+  insert_sql_full="INSERT INTO content_db.videos (author_id,title,description,video_url,cover_url,status,transcode_status,transcode_error,duration,view_count,like_count,collect_count,danmaku_count,tags,category,created_at,updated_at,deleted_at) VALUES ($owner_id,'$esc_title','$esc_desc','/data/videos/seed.mp4','','$status','ready','',0,0,0,0,0,'','',NOW(3),NOW(3),NULL);"
+  insert_sql_min="INSERT INTO content_db.videos (author_id,title,status,video_url,created_at,updated_at) VALUES ($owner_id,'$esc_title','$status','/data/videos/seed.mp4',NOW(3),NOW(3));"
+  lookup_sql="SELECT id FROM content_db.videos WHERE title='$esc_title' AND author_id=$owner_id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1;"
   local used_sql=""
   set +e
   mysql_exec "$insert_sql_full" "video-insert-full[$title]"
@@ -142,21 +159,23 @@ mysql_insert_video() {
   set -e
   used_sql="$insert_sql_full"
   local id
-  id=$(mysql_exec "SELECT id FROM content_db.videos WHERE title='$title' AND user_id=$owner_id ORDER BY id DESC LIMIT 1;" "lookup[$title]" 2>/dev/null | tr -d '\r\n' || echo "")
+  id=$(mysql_exec "$lookup_sql" "lookup[$title]" 2>/dev/null | tr -d '\r\n' || echo "")
   if [ -z "$id" ]; then
-    log "  [$title] 全字段 INSERT 未生效，回退到最小字段集（走 NOT NULL + DEFAULT）"
+    log "  [$title] 全字段 INSERT 未生效（rc=$rc_full），回退到最小 NOT NULL 字段集（走 DEFAULT）"
     set +e
     mysql_exec "$insert_sql_min" "video-insert-min[$title]"
     local rc_min=$?
     set -e
     used_sql="$insert_sql_min"
-    id=$(mysql_exec "SELECT id FROM content_db.videos WHERE title='$title' AND user_id=$owner_id ORDER BY id DESC LIMIT 1;" "lookup2[$title]" 2>/dev/null | tr -d '\r\n' || echo "")
+    id=$(mysql_exec "$lookup_sql" "lookup2[$title]" 2>/dev/null | tr -d '\r\n' || echo "")
     if [ -z "$id" ]; then
-      log "  [$title] 两版 INSERT 都失败，最终 used_sql>>> $used_sql"
-      log "  [$title] 请根据上方 [stderr] 的 MySQL Error 行修复：字段不存在/外键约束失败/字段类型不匹配/缺少 NOT NULL 无 DEFAULT 列。"
+      log "  [$title] 两版 INSERT 都失败（full rc=$rc_full / min rc=$rc_min）"
+      log "  [$title] 最终 used_sql>>> $used_sql"
     else
       log "  [$title] 回退最小字段集成功，id=$id"
     fi
+  else
+    log "  [$title] 全字段 INSERT 成功，id=$id"
   fi
   echo "$id"
 }
