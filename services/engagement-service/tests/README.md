@@ -14,6 +14,18 @@ ENGAGEMENT_INTEGRATION_DSN='engagement_test:***@tcp(127.0.0.1:3306)/engagement_d
   go test ./tests -run TestEngagementAPIAndWebSocketRegression -v -count=1
 ```
 
+CI 会为这组回归启动独立 MySQL，并使用下面的口径统计业务代码覆盖率：
+
+```bash
+go test -count=1 -v \
+  -coverpkg=./internal/... \
+  -coverprofile=engagement-coverage.out \
+  ./tests
+go tool cover -func=engagement-coverage.out
+```
+
+当 `internal` 业务包总覆盖率低于 **60%** 时 CI 直接失败。这组测试不允许因为未配置 DSN 而在 CI 中静默跳过。
+
 当前自动回归覆盖：平台探针/版本、鉴权与后台权限、视频点赞与收藏切换、评论创建/点赞/删除、
 弹幕发送/查询/屏蔽、播放进度幂等、历史/稍后再看/收藏列表及清空、直播创建/管理/监控/设置、
 点赞/礼物/Super Chat、SRS Hook 内部鉴权、WebSocket 受限聊天鉴权、消息与同用户重连计数、
