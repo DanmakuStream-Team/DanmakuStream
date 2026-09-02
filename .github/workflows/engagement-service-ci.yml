@@ -4,7 +4,9 @@ on:
   pull_request:
     branches: [dev, main]
   push:
-    branches: [dev]
+    # The feature branch entry is temporary and is removed after the coverage
+    # baseline run; dev remains the only long-lived push trigger.
+    branches: [dev, codex/engagement-coverage]
 
 permissions:
   contents: read

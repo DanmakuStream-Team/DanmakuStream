@@ -69,6 +69,22 @@ jobs:
           set -o pipefail
           go test -count=1 -tags=integration ./integration -v | tee integration-test-output.txt
 
+      - name: engagement-service API/WebSocket integration coverage
+        if: inputs.service == 'engagement-service'
+        working-directory: services/engagement-service
+        env:
+          ENGAGEMENT_INTEGRATION_DSN: root:root_test_pass@tcp(127.0.0.1:3306)/user_db?charset=utf8mb4&parseTime=True&loc=Local
+        run: |
+          set -euo pipefail
+          go test -count=1 -v \
+            -coverpkg=./internal/... \
+            -coverprofile=engagement-coverage.out \
+            ./tests \
+            | tee engagement-integration-output.txt
+          go tool cover -func=engagement-coverage.out | tee engagement-coverage.txt
+          coverage="$(go tool cover -func=engagement-coverage.out | awk '/^total:/ {gsub(/%/, "", $3); print $3}')"
+          awk -v coverage="$coverage" 'BEGIN { if (coverage + 0 < 60) { printf "engagement-service coverage %.1f%% is below required 60%%\n", coverage; exit 1 } }'
+
       - name: Upload test evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -77,6 +93,9 @@ jobs:
           path: |
             services/${{ inputs.service }}/service-test-output.txt
             services/${{ inputs.service }}/integration-test-output.txt
+            services/${{ inputs.service }}/engagement-integration-output.txt
+            services/${{ inputs.service }}/engagement-coverage.out
+            services/${{ inputs.service }}/engagement-coverage.txt
           if-no-files-found: warn
 
       - name: Compute immutable image name
