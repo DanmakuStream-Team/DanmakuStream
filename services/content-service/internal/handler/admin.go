@@ -23,7 +23,10 @@ func (h *Handler) PublicBanners(c *gin.Context) {
 
 func (h *Handler) PublicAnnouncements(c *gin.Context) {
 	var items []model.SiteAnnouncement
-	if err := h.DB.Where("enabled = ? AND (started_at IS NULL OR started_at <= CURRENT_TIMESTAMP) AND (ended_at IS NULL OR ended_at >= CURRENT_TIMESTAMP)").Order("id DESC").Find(&items).Error; err != nil {
+	if err := h.DB.Where("enabled = 1").
+		Where("started_at IS NULL OR started_at <= CURRENT_TIMESTAMP").
+		Where("ended_at IS NULL OR ended_at >= CURRENT_TIMESTAMP").
+		Order("id DESC").Find(&items).Error; err != nil {
 		writeLogicError(c, err)
 		return
 	}
