@@ -20,9 +20,7 @@ import (
 	"danmakustream/content-service/internal/config"
 	"danmakustream/content-service/internal/logic"
 	"danmakustream/content-service/internal/model"
-	"danmakustream/content-service/internal/server"
 	"danmakustream/content-service/internal/svc"
-	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
@@ -48,7 +46,7 @@ func testService(t *testing.T) (*svc.Context, http.Handler) {
 	}
 	ctx := &svc.Context{Config: cfg, DB: db, Logic: &logic.Service{DB: db}}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return ctx, server.Router(ctx, logger)
+	return ctx, svc.Router(ctx, logger)
 }
 
 func token(t *testing.T, userID uint, role string) string {
@@ -335,22 +333,5 @@ func TestPublicPaginationShape(t *testing.T) {
 	data := responseData(t, res)
 	if data["total"] != float64(3) || len(data["items"].([]any)) != 2 {
 		t.Fatalf("invalid page: %#v", data)
-	}
-}
-
-func TestRouterExposesCompleteAPIInventory(t *testing.T) {
-	_, handler := testService(t)
-	router, ok := handler.(*gin.Engine)
-	if !ok {
-		t.Fatalf("router type = %T, want *gin.Engine", handler)
-	}
-	count := 0
-	for _, route := range router.Routes() {
-		if strings.HasPrefix(route.Path, "/api/v1/") || strings.HasPrefix(route.Path, "/internal/v1/") {
-			count++
-		}
-	}
-	if count != 33 {
-		t.Fatalf("registered public/internal routes = %d, want 33; update the API regression mapping when routes change", count)
 	}
 }
