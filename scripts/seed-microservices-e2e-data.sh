@@ -65,7 +65,7 @@ mysql_exec() {
   stdout_tmp=$(mktemp)
   stderr_tmp=$(mktemp)
   set +e
-  "${compose[@]}" exec -T mysql mysql -uroot -p"${MYSQL_ROOT_PASSWORD:-local-dev-root-password}" -N -B -e "$sql" \
+  "${compose[@]}" exec -T mysql mysql -uroot -p"${MYSQL_ROOT_PASSWORD:-local-dev-root-password}" --default-character-set=utf8mb4 -N -B -e "SET NAMES utf8mb4; SET CHARACTER SET utf8mb4; $sql" \
     >"$stdout_tmp" 2>"$stderr_tmp"
   rc=$?
   set -e
@@ -90,7 +90,7 @@ mysql_exec() {
         [ -n "$line" ] && log "    [stderr] $line"
       done
     fi
-    log "  MySQL [$label] sql>>> $sql"
+    log "  MySQL [$label] sql>>> SET NAMES utf8mb4; SET CHARACTER SET utf8mb4; $sql"
   fi
 
   if [ -n "$stdout_text" ]; then
@@ -213,7 +213,7 @@ log "  E2E-MC-待审核拒绝     id=$VID_PENDING2"
 log "  E2E-MEMBER-B-分享视频 id=$VID_SHARED_B"
 log "  E2E-UC05-互动测试视频 id=$VID_UC05"
 set +e
-mysql_exec "SELECT id, author_id, status, title, video_url FROM content_db.videos WHERE author_id=$CREATOR_ID AND deleted_at IS NULL ORDER BY id DESC LIMIT 6;" "播种后 content_db 回查（6条）" >/dev/null
+mysql_exec "SELECT id, author_id, status, title, video_url, HEX(title) AS hex_title FROM content_db.videos WHERE author_id=$CREATOR_ID AND deleted_at IS NULL ORDER BY id DESC LIMIT 6;" "播种后 content_db 回查（6条，含 HEX(title) 验证 UTF-8 未乱码）" >/dev/null
 set -e
 
 log "===== [HTTP 自检] content-service 通过网关的 7 个真实接口响应（直接判断接口认不认 DB 里的数据） ====="

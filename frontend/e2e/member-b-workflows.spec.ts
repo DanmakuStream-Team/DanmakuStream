@@ -1,21 +1,14 @@
 /**
- * ============================================================
- *  LEGACY FILE — 内容已迁移为独立骨架文件（Day4 任务）
- * ============================================================
- *  本文件内的 UC 用例已按 UC 编号拆分到以下独立骨架文件，
- *  各自带 test.skip 占位并标注了对应领域负责人。
- *  待领域负责人补全断言后，可删除本文件。
- *
- *   UC07  →  uc07-follow-group-block.spec.ts        (成员B)
- *   UC08  →  uc08-membership-subscription.spec.ts   (成员B)
- *   UC11  →  uc11-chat-message.spec.ts              (成员B)
- * ============================================================
+ * 成员 B 工作流增强套件：
+ *   UC07 关注/分组/黑名单 + UC08 订阅/付费 + UC11 私信/媒体分享。
+ * 单 UC 独立断言见 uc07/08/11 对应 spec；本文件保留原完整实现，作为“同一 viewer 会话下关注→订阅→私信”
+ * 完整链路的补充测试，用来验证通知徽章、订阅后权限标记和私信媒体分享之间的联动。
  */
 import { expect, test } from '@playwright/test'
 import { loginViaApi, openAs } from './fixtures/auth'
 import { API, USERS } from './test-data'
 
-test.describe.serial('UC07 / UC08 / UC11 完整业务流程 [LEGACY — 见上方注释]', () => {
+test.describe.serial('UC07 / UC08 / UC11 完整业务流程增强套件', () => {
   test('E2E-TC07 关注、分组与黑名单状态在页面可验证', async ({ page, request }) => {
     const owner = await loginViaApi(request, USERS.owner.nickname, USERS.owner.password)
     const viewer = await loginViaApi(request, USERS.viewer.nickname, USERS.viewer.password)
