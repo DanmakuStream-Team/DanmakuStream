@@ -91,8 +91,21 @@ jobs:
         run: npm run build
 
   microservice-platform:
-    name: 微服务平台配置与 engagement-service 验证
+    name: engagement-service 全量 API/WS 回归与覆盖率
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: engagement_db
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -ppassword"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -101,9 +114,32 @@ jobs:
           cache-dependency-path: services/engagement-service/go.sum
       - name: Validate Compose configuration
         run: docker compose -f docker-compose.microservices.yml config --quiet
-      - name: Test engagement-service
+      - name: Unit and contract tests
         working-directory: services/engagement-service
-        run: go test ./...
+        run: go test -count=1 ./... -v
+      - name: MySQL API/WebSocket integration tests with coverage gate
+        working-directory: services/engagement-service
+        env:
+          ENGAGEMENT_INTEGRATION_DSN: "root:password@tcp(127.0.0.1:3306)/engagement_db?charset=utf8mb4&parseTime=True&loc=Local"
+        run: |
+          set -euo pipefail
+          go test -count=1 -v \
+            -coverpkg=./internal/... \
+            -coverprofile=engagement-coverage.out \
+            ./tests \
+            | tee engagement-integration-output.txt
+          go tool cover -func=engagement-coverage.out | tee engagement-coverage.txt
+          coverage="$(go tool cover -func=engagement-coverage.out | awk '/^total:/ {gsub(/%/, "", $3); print $3}')"
+          awk -v coverage="$coverage" 'BEGIN { if (coverage + 0 < 60) { printf "engagement-service coverage %.1f%% is below required 60%%\n", coverage; exit 1 } }'
+      - name: Upload engagement-service test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: engagement-service-test-evidence
+          path: |
+            services/engagement-service/engagement-integration-output.txt
+            services/engagement-service/engagement-coverage.out
+            services/engagement-service/engagement-coverage.txt
       - name: Build engagement-service image with commit metadata
         run: |
           IMAGE_TAG="${GITHUB_SHA::12}"
