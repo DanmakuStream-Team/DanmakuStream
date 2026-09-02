@@ -19,7 +19,6 @@ metadata:
   name: user-service
   namespace: danmakustream-microservices
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: user-service

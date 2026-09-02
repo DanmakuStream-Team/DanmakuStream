@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | `project/` | 课程要求、开发计划、协作规范、完整用例清单 | [项目文档](project/) |
 | `architecture/` | 单体、Kubernetes 与微服务架构规范 | [部署设计](architecture/deployment-design.md) · [微服务统一规范](architecture/microservices/service-standards.md) |
-| `deploy/` | CI/CD、镜像与部署运维说明 | [CD 流水线](deploy/cd-pipeline.md) · [微服务独立 CI](deploy/microservice-ci.md) · [微服务 CD](deploy/microservice-cd.md) |
+| `deploy/` | CI/CD、镜像与部署运维说明 | [CD 流水线](deploy/cd-pipeline.md) · [微服务独立 CI](deploy/microservice-ci.md) · [微服务 CD](deploy/microservice-cd.md) · [HPA 实验](deploy/hpa-experiment.md) |
 | `models/` | PlantUML 源文件、SVG/PNG 与检查记录 | [模型索引](models/README.md) |
 | `testing/` | 测试用例和原始测试报告 | [测试用例](testing/test-cases/) |
 | `traceability/` | 需求—设计—代码—测试追溯（总表 + 单用例） | [总追溯表 master.md](traceability/master.md) |
@@ -29,6 +29,7 @@
 - [微服务统一规范](architecture/microservices/service-standards.md)
 - [微服务独立 CI 与镜像规范](deploy/microservice-ci.md)
 - [三微服务自动部署与排障手册](deploy/microservice-cd.md)
+- [HPA 自动扩缩容实验](deploy/hpa-experiment.md)
 
 ## 当前交付缺口
 
@@ -37,8 +38,8 @@
 1. UC01、UC06、UC07、UC08、UC11 缺少系统级、组件级和对象级三层模型，共 15 张图；项目也缺少覆盖 UC01～UC13 的总用例图。
 2. 除 UC13 及成员 D 的 UC05、UC09、UC10 外，其余用例缺少成套的独立说明、测试用例/结果与追溯材料；还缺 UC01～UC13 总追溯表。
 3. 三个业务微服务、网关、独立 CI、微服务 E2E 和 SHA 自动部署已建立；完整 13/13 微服务 E2E 与实际集群验收材料仍需在流水线运行后归档。
-4. 云原生实验缺少 HPA 扩缩容原始数据、故障注入与降级/超时/熔断结果，以及单体和微服务在相同条件下至少三轮的性能对比原始数据与分析。
-5. 单体 CD 与微服务 SHA 镜像推送/自动部署已建立；微服务 CD 会检查探针和版本、失败回滚并归档三服务日志，HPA 与扩缩容证据留待第 9 天。
+4. 四个无状态工作负载的 HPA 配置和实验步骤已补齐；仍缺真实集群扩缩容原始数据、故障注入与降级/超时/熔断结果，以及单体和微服务在相同条件下至少三轮的性能对比原始数据与分析。
+5. 单体 CD 与微服务 SHA 镜像推送/自动部署已建立；微服务 CD 会检查探针、版本、HPA 和 metrics-server，失败回滚并归档三服务日志与资源快照。
 6. 项目管理缺每日站会简报、看板/统计截图和汇总证据；最终答辩材料、技术总结、成员权重确认、AI 使用说明尚未归档。
 
 详细提交范围以课程任务书为准。新增文档后请同步更新本索引和对应追溯表。
