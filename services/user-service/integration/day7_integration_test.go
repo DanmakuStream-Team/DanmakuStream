@@ -109,4 +109,16 @@ func TestVideoShareUsesContentAPIAndUserDB(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("WebSocket video share did not call content-service")
 	}
+	if err := conn.SetReadDeadline(time.Now().Add(3 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	var outbound struct {
+		Type string `json:"type"`
+	}
+	if err := conn.ReadJSON(&outbound); err != nil {
+		t.Fatal(err)
+	}
+	if outbound.Type != "message" {
+		t.Fatalf("WebSocket response type = %q, want message", outbound.Type)
+	}
 }
