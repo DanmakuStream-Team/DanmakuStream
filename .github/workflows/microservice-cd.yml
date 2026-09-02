@@ -14,6 +14,7 @@ on:
       - 'scripts/run-microservices-e2e.sh'
       - 'scripts/render-microservice-manifests.sh'
       - 'scripts/k3s-microservice-deploy.sh'
+      - 'scripts/check-microservice-hpa.sh'
       - '.github/workflows/service-ci-reusable.yml'
       - '.github/workflows/user-service-ci.yml'
       - '.github/workflows/content-service-ci.yml'
@@ -121,6 +122,7 @@ jobs:
 
       - name: Render immutable-SHA manifests
         run: |
+          bash scripts/check-microservice-hpa.sh
           mkdir -p artifacts/microservice-cd
           bash scripts/render-microservice-manifests.sh \
             "$GITHUB_SHA" "$GITHUB_REPOSITORY_OWNER" \

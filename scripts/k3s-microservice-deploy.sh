@@ -7,6 +7,7 @@ target_sha=${2:-}
 rollout_timeout=${ROLLOUT_TIMEOUT:-240s}
 deployments=(user-service content-service engagement-service gateway)
 services=(user-service content-service engagement-service)
+hpas=(user-service-hpa content-service-hpa engagement-service-hpa gateway-hpa)
 
 k() {
   sudo k3s kubectl -n "$namespace" "$@"
@@ -40,6 +41,10 @@ wait_for_endpoint() {
 
 precheck() {
   sudo k3s kubectl wait --for=condition=Ready node --all --timeout=60s
+  if ! sudo k3s kubectl get --raw '/apis/metrics.k8s.io/v1beta1/nodes' >/dev/null; then
+    echo "metrics.k8s.io is unavailable; HPA requires metrics-server" >&2
+    return 1
+  fi
   k get secret micro-secrets >/dev/null
   local keys=(
     MYSQL_ROOT_PASSWORD USER_DB_PASSWORD CONTENT_DB_PASSWORD ENGAGEMENT_DB_PASSWORD
@@ -54,7 +59,7 @@ precheck() {
       return 1
     fi
   done
-  echo "precheck OK: node Ready and micro-secrets contains all required keys"
+  echo "precheck OK: node Ready, metrics-server available, and micro-secrets contains all required keys"
 }
 
 deploy() {
@@ -75,6 +80,11 @@ deploy() {
     wait_for_endpoint "$deployment" /api/v1/health
     wait_for_endpoint "$deployment" /api/v1/version "$target_sha"
   done
+  local hpa
+  for hpa in "${hpas[@]}"; do
+    k get "horizontalpodautoscaler/$hpa" >/dev/null
+  done
+  echo "HPA objects verified: ${hpas[*]}"
   echo "microservice deployment verified at commit $target_sha"
 }
 
@@ -93,7 +103,9 @@ rollback() {
 evidence() {
   set +e
   echo "== workloads and services =="
-  k get deployments,pods,services,pvc -o wide
+  k get deployments,pods,services,pvc,horizontalpodautoscalers -o wide
+  echo "== resource usage =="
+  k top pods --containers
   echo "== deployed images =="
   k get deployments -o custom-columns='NAME:.metadata.name,IMAGE:.spec.template.spec.containers[*].image,READY:.status.readyReplicas,AVAILABLE:.status.availableReplicas'
   echo "== probes and versions =="

@@ -27,7 +27,6 @@ metadata:
   name: engagement-service
   namespace: danmakustream-microservices
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: engagement-service
