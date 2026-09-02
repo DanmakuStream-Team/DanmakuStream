@@ -34,3 +34,7 @@ cd frontend && MICRO_E2E_FULL_SUITE=1 npm run test:e2e:micro
 ```
 
 全量模式会启用 `E2E_MICROSERVICES=1`，按 v1.1 归属准备三库数据并把媒体夹具复制到 content-service。该命令用于暴露尚未完成的网关路由、服务接口和响应契约，不作为微服务环境 PR 的绿色门禁；用例逐项兼容后再迁入 `frontend/e2e-microservices/`。
+
+真实失败、定位和修复时间线见 [微服务 E2E 失败排查记录](reports/microservice-e2e-failure-investigation-2026-09-01.md)。自动部署后的三服务日志、探针和版本响应由 `microservice-cd-<sha>` Actions artifact 保存。
+
+成员 B 第 8 天 user-service 公开/内部 API 回归范围、命令与真实执行状态见 [user-service 回归报告（2026-09-02）](reports/user-service-regression-2026-09-02.md)。

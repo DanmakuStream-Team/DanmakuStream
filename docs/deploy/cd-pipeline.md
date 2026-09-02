@@ -23,7 +23,7 @@ main                          暂不自动部署（留给最终稳定版/人工�
 - `concurrency: production-deploy`（排队不取消）保证**同一时间只有一次部署**。
 - 数据库与视频 PVC 不随部署删除；**数据库不做自动回滚**（结构变更遵循向前兼容迁移）。
 - CD 会在应用前自动创建/更新 `nginx-gateway` ConfigMap、Deployment 与 Service，避免 frontend 因网关 DNS 不存在而启动失败。
-- 镜像规则：不使用裸 `latest`。当前 CD 部署单体前后端；三个微服务由各自独立 CI 使用完整 commit SHA 构建并推送，详见 [微服务独立 CI](microservice-ci.md)。
+- 镜像规则：不使用裸 `latest`。本文工作流部署单体前后端；三个微服务由独立 CI 使用完整 commit SHA 构建推送，并由另一条门禁流水线部署，详见 [微服务独立 CI](microservice-ci.md) 和 [微服务 CD](microservice-cd.md)。
 
 ### 微服务 CI 阻断
 

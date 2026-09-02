@@ -54,12 +54,6 @@ spec:
               value: 2s
             - name: SERVICE_NAME
               value: user-service
-            - name: SERVICE_VERSION
-              value: microservice-0.1.0
-            - name: COMMIT_SHA
-              value: "0000000000000000000000000000000000000000"
-            - name: BUILD_TIME
-              value: "1970-01-01T00:00:00Z"
           ports:
             - containerPort: 8080
           volumeMounts:

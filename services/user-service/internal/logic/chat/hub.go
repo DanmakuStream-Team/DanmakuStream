@@ -106,12 +106,17 @@ type broadcastRequest struct {
 }
 
 var (
-	hubOnce sync.Once
+	hubMu   sync.Mutex
 	hubInst *Hub
 )
 
 func GetHub(svcCtx *svc.ServiceContext) *Hub {
-	hubOnce.Do(func() {
+	hubMu.Lock()
+	defer hubMu.Unlock()
+	// Production has one ServiceContext. Recreate the hub when an isolated test
+	// or embedded server supplies another context, otherwise the process-wide
+	// singleton may retain a closed database transaction.
+	if hubInst == nil || hubInst.svc != svcCtx {
 		hubInst = &Hub{
 			svc:        svcCtx,
 			clients:    make(map[uint]map[*Client]struct{}),
@@ -120,7 +125,7 @@ func GetHub(svcCtx *svc.ServiceContext) *Hub {
 			broadcast:  make(chan broadcastRequest, 256),
 		}
 		go hubInst.run()
-	})
+	}
 	return hubInst
 }
 
