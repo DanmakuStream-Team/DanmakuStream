@@ -1,0 +1,190 @@
+name: microservice-cd
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - 'services/**'
+      - 'frontend/**'
+      - 'deploy/nginx-gateway-microservices.conf'
+      - 'deploy/k8s/microservices/**'
+      - 'deploy/platform/**'
+      - 'docker-compose.microservices.yml'
+      - 'scripts/microservices-db-init.sql'
+      - 'scripts/run-microservices-e2e.sh'
+      - 'scripts/render-microservice-manifests.sh'
+      - 'scripts/k3s-microservice-deploy.sh'
+      - '.github/workflows/service-ci-reusable.yml'
+      - '.github/workflows/user-service-ci.yml'
+      - '.github/workflows/content-service-ci.yml'
+      - '.github/workflows/engagement-service-ci.yml'
+      - '.github/workflows/microservices-e2e.yml'
+      - '.github/workflows/microservice-cd.yml'
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: microservice-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  wait-for-quality-gates:
+    name: 等待同一 SHA 的三服务 CI 与 E2E 全绿
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Verify required workflow runs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const targetSha = context.sha
+            const required = [
+              'user-service-ci.yml',
+              'content-service-ci.yml',
+              'engagement-service-ci.yml',
+              'microservices-e2e.yml',
+            ]
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+            for (let attempt = 1; attempt <= 65; attempt += 1) {
+              const pending = []
+              for (const workflow of required) {
+                const response = await github.rest.actions.listWorkflowRuns({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: workflow,
+                  branch: 'dev',
+                  event: 'push',
+                  per_page: 30,
+                })
+                const run = response.data.workflow_runs.find(
+                  (candidate) => candidate.head_sha === targetSha,
+                )
+                if (!run || run.status !== 'completed') {
+                  pending.push(`${workflow}: ${run?.status ?? 'not started'}`)
+                  continue
+                }
+                if (run.conclusion !== 'success') {
+                  throw new Error(
+                    `${workflow} failed for ${targetSha}: ${run.html_url}`,
+                  )
+                }
+                core.info(`${workflow} passed: ${run.html_url}`)
+              }
+              if (pending.length === 0) {
+                core.notice(`All microservice quality gates passed for ${targetSha}`)
+                return
+              }
+              core.info(`Attempt ${attempt}/65; waiting for ${pending.join(', ')}`)
+              await sleep(30000)
+            }
+            throw new Error(`Timed out waiting for quality gates for ${targetSha}`)
+
+  deploy-k3s:
+    name: 部署三微服务到公网 k3s
+    needs: wait-for-quality-gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.K3S_SSH_KEY }}
+          HOST_KEY: ${{ secrets.K3S_HOST_KEY }}
+        run: |
+          install -d -m 700 ~/.ssh
+          install -m 600 /dev/null ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$HOST_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Bootstrap namespace
+        env:
+          K3S_HOST: ${{ secrets.K3S_HOST }}
+          K3S_SSH_USER: ${{ secrets.K3S_SSH_USER }}
+        run: |
+          ssh "${K3S_SSH_USER}@${K3S_HOST}" \
+            'sudo k3s kubectl apply -f -' \
+            < deploy/k8s/microservices/namespace.yaml
+
+      - name: Precheck node and microservice secrets
+        env:
+          K3S_HOST: ${{ secrets.K3S_HOST }}
+          K3S_SSH_USER: ${{ secrets.K3S_SSH_USER }}
+        run: |
+          ssh "${K3S_SSH_USER}@${K3S_HOST}" bash -s -- precheck \
+            < scripts/k3s-microservice-deploy.sh
+
+      - name: Render immutable-SHA manifests
+        run: |
+          mkdir -p artifacts/microservice-cd
+          bash scripts/render-microservice-manifests.sh \
+            "$GITHUB_SHA" "$GITHUB_REPOSITORY_OWNER" \
+            > artifacts/microservice-cd/rendered-manifests.yaml
+          if grep -q '0000000000000000000000000000000000000000' \
+            artifacts/microservice-cd/rendered-manifests.yaml; then
+            echo 'unrendered image placeholder remains' >&2
+            exit 1
+          fi
+
+      - id: apply
+        name: Apply manifests with immutable images
+        env:
+          K3S_HOST: ${{ secrets.K3S_HOST }}
+          K3S_SSH_USER: ${{ secrets.K3S_SSH_USER }}
+        run: |
+          ssh "${K3S_SSH_USER}@${K3S_HOST}" \
+            'sudo k3s kubectl apply -f -' \
+            < artifacts/microservice-cd/rendered-manifests.yaml
+
+      - id: verify
+        name: Verify rollouts, probes and versions
+        env:
+          K3S_HOST: ${{ secrets.K3S_HOST }}
+          K3S_SSH_USER: ${{ secrets.K3S_SSH_USER }}
+        run: |
+          set -o pipefail
+          ssh "${K3S_SSH_USER}@${K3S_HOST}" bash -s -- deploy "$GITHUB_SHA" \
+            < scripts/k3s-microservice-deploy.sh 2>&1 \
+            | tee artifacts/microservice-cd/deploy-output.txt
+
+      - name: Roll back all microservice workloads on failure
+        if: always() && (steps.apply.outcome == 'failure' || steps.verify.outcome == 'failure')
+        continue-on-error: true
+        env:
+          K3S_HOST: ${{ secrets.K3S_HOST }}
+          K3S_SSH_USER: ${{ secrets.K3S_SSH_USER }}
+        run: |
+          set -o pipefail
+          ssh "${K3S_SSH_USER}@${K3S_HOST}" bash -s -- rollback \
+            < scripts/k3s-microservice-deploy.sh 2>&1 \
+            | tee artifacts/microservice-cd/rollback-output.txt
+
+      - name: Collect three-service logs and runtime evidence
+        if: always()
+        env:
+          K3S_HOST: ${{ secrets.K3S_HOST }}
+          K3S_SSH_USER: ${{ secrets.K3S_SSH_USER }}
+        run: |
+          mkdir -p artifacts/microservice-cd
+          {
+            echo '== microservice CD evidence =='
+            echo "commit: $GITHUB_SHA"
+            echo "run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "time: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+            ssh "${K3S_SSH_USER}@${K3S_HOST}" bash -s -- evidence \
+              < scripts/k3s-microservice-deploy.sh
+          } > artifacts/microservice-cd/runtime-evidence.txt 2>&1 || true
+
+      - name: Upload deployment and troubleshooting evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: microservice-cd-${{ github.sha }}
+          path: artifacts/microservice-cd/
+          if-no-files-found: warn
+          retention-days: 30

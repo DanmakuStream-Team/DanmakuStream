@@ -230,6 +230,9 @@ spec:
     metadata:
       labels:
         app: gateway
+      annotations:
+        # 发布时替换，确保 ConfigMap 更新会触发网关滚动重启。
+        danmakustream.io/release-commit: "0000000000000000000000000000000000000000"
     spec:
       containers:
         - name: gateway
