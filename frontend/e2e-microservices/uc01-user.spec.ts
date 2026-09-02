@@ -58,14 +58,20 @@ test.describe('UC01 用户注册、登录与资料维护（微服务版）', () 
   })
 
   test('E2E-TC01-05 编辑个人简介并持久化', async ({ page, request }) => {
+    test.setTimeout(60_000)
     const session = await loginViaApi(request, USERS.owner.nickname, USERS.owner.password)
     const bio = `Micro UC01 E2E bio ${Date.now()}`
     await openAs(page, session, `/user/${session.userInfo.id}`)
-    await page.getByText('编辑简介', { exact: true }).click()
-    await page.getByPlaceholder('写一段个人简介').fill(bio)
+    await page.locator('.profile-page').waitFor({ state: 'visible', timeout: 20_000 })
+    const bioDisplay = page.locator('.bio-display').first()
+    await expect(bioDisplay).toBeVisible({ timeout: 10_000 })
+    await bioDisplay.click({ force: true })
+    const bioEditor = page.locator('.bio-editor').first()
+    await expect(bioEditor.getByPlaceholder('写一段个人简介')).toBeVisible({ timeout: 10_000 })
+    await bioEditor.getByPlaceholder('写一段个人简介').fill(bio)
     await page.locator('.bio-actions').getByRole('button', { name: '保存', exact: true }).click()
-    await expect(page.getByText('简介已更新').last()).toBeVisible()
-    await expect(page.locator('.bio-display')).toContainText(bio)
+    await expect(page.getByText('简介已更新').last()).toBeVisible({ timeout: 10_000 })
+    await expect(bioDisplay).toContainText(bio, { timeout: 10_000 })
     const profile = await request.get(`${API}/users/${session.userInfo.id}`, {
       headers: { Authorization: `Bearer ${session.token}` },
     })

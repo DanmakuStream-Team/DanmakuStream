@@ -26,6 +26,18 @@ wait_for_gateway() {
 }
 wait_for_gateway
 
+wait_for_content_service() {
+  for i in $(seq 1 60); do
+    if curl --fail --silent --show-error "$gateway_url/api/v1/videos?pageSize=1" >/dev/null 2>&1; then
+      log "content-service 健康（videos 列表可调用）"
+      return 0
+    fi
+    [ "$i" = 60 ] && { log "content-service 未就绪（videos 列表始终不可达），放弃"; return 1; }
+    sleep 2
+  done
+}
+wait_for_content_service
+
 register() {
   local nick=$1
   curl --silent --show-error --output /dev/null -w '%{http_code}' \
@@ -71,22 +83,52 @@ mysql_root "
 DELETE FROM content_db.videos WHERE title LIKE '${MARK}-%' OR title IN ('E2E-MC-公开视频','E2E-MC-待审核通过','E2E-MC-待审核拒绝','E2E-MEMBER-B-分享视频','E2E-UC05-互动测试视频');
 "
 
+SEED_VIDEO_FILE="$repo_root/tests/fixtures/seed-mini.mp4"
+if [ ! -f "$SEED_VIDEO_FILE" ]; then
+  log "  警告：seed-mini.mp4 不存在 -> 创建一个 10KB 伪 MP4 文件用于 multipart 上传"
+  mkdir -p "$(dirname "$SEED_VIDEO_FILE")"
+  printf 'ftypmp42' > "$SEED_VIDEO_FILE" 2>/dev/null || true
+  head -c 10240 /dev/zero 2>/dev/null >> "$SEED_VIDEO_FILE" || head -c 10240 /dev/urandom >> "$SEED_VIDEO_FILE" 2>/dev/null || true
+fi
+log "  上传视频源文件：$SEED_VIDEO_FILE （大小=$(du -b "$SEED_VIDEO_FILE" 2>/dev/null | awk '{print $1}' || echo unknown) 字节）"
+
 upload_video() {
   local token=$1 title=$2 status=$3
-  local resp
-  resp=$(curl --silent --show-error --request POST \
+  if [ -z "$token" ]; then
+    log "  [$title] 跳过（token 为空）"
+    echo ""
+    return 0
+  fi
+  local http_body http_code
+  http_body=$(mktemp)
+  http_code=$(curl --silent --show-error --request POST \
     --header "Authorization: Bearer $token" \
-    --header 'Content-Type: multipart/form-data' \
+    --header 'Accept: application/json' \
     --form "title=$title" \
     --form "description=$MARK 演示视频" \
-    --form "video=@$repo_root/tests/fixtures/seed-mini.mp4;type=video/mp4;filename=seed.mp4" \
-    "$gateway_url/api/v1/videos/upload" 2>/dev/null || echo "{}")
+    --form "video=@$SEED_VIDEO_FILE;type=video/mp4;filename=seed.mp4" \
+    --output "$http_body" \
+    --write-out '%{http_code}' \
+    "$gateway_url/api/v1/videos/upload" || echo "000")
+  local body
+  body=$(cat "$http_body" 2>/dev/null | tr -d '\r' || echo '')
+  rm -f "$http_body"
+  log "  [$title] upload HTTP=$http_code body=$body"
   local id
-  id=$(echo "$resp" | python3 -c "import sys,json
-try: d=json.load(sys.stdin); print(d['data'].get('id', d.get('data',{}).get('videoId','')))
-except Exception: print('')" 2>/dev/null || echo "")
+  id=$(printf '%s' "$body" | python3 -c "import sys,json
+try: d=json.load(sys.stdin)
+except Exception as e:
+  print('', end=''); sys.exit(0)
+payload = d.get('data', {}) if isinstance(d.get('data', {}), dict) else {}
+for k in ('id','videoId','video_id'):
+  v = payload.get(k)
+  if v is not None and str(v) != '':
+    print(v); sys.exit(0)
+print(d.get('id', ''))" 2>/dev/null || echo "")
   if [ -n "$id" ]; then
     mysql_root "UPDATE content_db.videos SET status='$status', video_url='/data/videos/seed.mp4', cover_url='' WHERE id=$id LIMIT 1;" 2>/dev/null || true
+  else
+    log "  [$title] 无法解析视频 id，请检查 body 是否含 {data:{id:...}}"
   fi
   echo "$id"
 }
