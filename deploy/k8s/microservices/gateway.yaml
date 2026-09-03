@@ -96,6 +96,11 @@ data:
         }
 
         # ── engagement：视频互动（挂在与 content 相同的 /videos 前缀下，必须用正则先行）──
+        # 合集能力尚未迁移：只读查询显式降级为空列表，避免可选功能阻断视频详情页。
+        location ~ ^/api/v1/videos/[0-9]+/collections$ {
+          default_type application/json;
+          return 200 "{\"code\":0,\"message\":\"ok\",\"data\":[]}";
+        }
         location ~ ^/api/v1/videos/[0-9]+/(like|collect)(/.*)?$        { proxy_pass http://engagement_service; }
         location ~ ^/api/v1/videos/[0-9]+/(danmaku|comments)(/.*)?$    { proxy_pass http://engagement_service; }
 
@@ -123,6 +128,9 @@ data:
         location /api/v1/auth/            { proxy_pass http://user_service; }
         location = /api/v1/search/users   { proxy_pass http://user_service; }
         location = /api/v1/users/me       { proxy_pass http://user_service; }   # PUT 资料
+        # 内容服务的“我的投稿”与 user-service 的 /users/* 共用前缀，必须优先匹配。
+        location = /api/v1/users/me/videos { proxy_pass http://content_service; }
+        location ~ ^/api/v1/users/[0-9]+/videos$ { proxy_pass http://content_service; }
         location /api/v1/users/           { proxy_pass http://user_service; }   # 其余 users 子路径（关系/分组/屏蔽/他人资料）
         location /api/v1/follow-groups/   { proxy_pass http://user_service; }
         location /api/v1/creator/membership-plan { proxy_pass http://user_service; }

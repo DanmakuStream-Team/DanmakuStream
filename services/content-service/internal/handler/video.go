@@ -25,6 +25,8 @@ func (h *Handler) ListVideos(c *gin.Context) {
 		writeLogicError(c, err)
 		return
 	}
+	h.enrichVideos(c, result.Items)
+	result.List = result.Items
 	response.OK(c, result)
 }
 
@@ -39,6 +41,8 @@ func (h *Handler) UserVideos(c *gin.Context) {
 		writeLogicError(c, err)
 		return
 	}
+	h.enrichVideos(c, result.Items)
+	result.List = result.Items
 	response.OK(c, result)
 }
 
@@ -50,6 +54,8 @@ func (h *Handler) MyVideos(c *gin.Context) {
 		writeLogicError(c, err)
 		return
 	}
+	h.enrichVideos(c, result.Items)
+	result.List = result.Items
 	response.OK(c, result)
 }
 
@@ -67,7 +73,10 @@ func (h *Handler) VideoDetail(c *gin.Context) {
 		writeLogicError(c, err)
 		return
 	}
-	response.OK(c, logic.VideoView(video))
+	view := logic.VideoView(video)
+	views := []logic.VideoDTO{view}
+	h.enrichVideos(c, views)
+	response.OK(c, views[0])
 }
 
 // InternalUpdateEngagement accepts absolute counters owned by the engagement
@@ -155,7 +164,10 @@ func (h *Handler) UpdateVideo(c *gin.Context) {
 		writeLogicError(c, err)
 		return
 	}
-	response.OK(c, logic.VideoView(video))
+	view := logic.VideoView(video)
+	views := []logic.VideoDTO{view}
+	h.enrichVideos(c, views)
+	response.OK(c, views[0])
 }
 
 func (h *Handler) DeleteVideo(c *gin.Context) {
@@ -267,6 +279,8 @@ func (h *Handler) AdminListVideos(c *gin.Context) {
 		writeLogicError(c, err)
 		return
 	}
+	h.enrichVideos(c, result.Items)
+	result.List = result.Items
 	response.OK(c, result)
 }
 
@@ -289,7 +303,10 @@ func (h *Handler) ReviewVideo(c *gin.Context) {
 		writeLogicError(c, err)
 		return
 	}
-	response.OK(c, logic.VideoView(video))
+	view := logic.VideoView(video)
+	views := []logic.VideoDTO{view}
+	h.enrichVideos(c, views)
+	response.OK(c, views[0])
 }
 
 func (h *Handler) CreatorAnalytics(c *gin.Context) {
@@ -304,6 +321,7 @@ func (h *Handler) CreatorAnalytics(c *gin.Context) {
 		writeLogicError(c, err)
 		return
 	}
+	h.enrichVideos(c, result.TopVideos)
 	response.OK(c, result)
 }
 

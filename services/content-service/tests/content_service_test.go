@@ -278,7 +278,7 @@ func TestUploadReviewAndOwnershipFlow(t *testing.T) {
 	}
 	publicData := responseData(t, publicAfterReview)
 	author := publicData["author"].(map[string]any)
-	if author["id"] != float64(1) || author["nickname"] != "" {
+	if author["id"] != float64(1) || author["nickname"] != "用户 #1（资料暂不可用）" || author["username"] != "user-1" {
 		t.Fatalf("unexpected safe author fallback: %#v", author)
 	}
 }
