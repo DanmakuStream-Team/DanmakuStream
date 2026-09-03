@@ -1,0 +1,47 @@
+HPA_EXERCISE service=user-service duration=120s concurrency=40 min=1
+HPA_CSV,1788406267,2026-09-03T03:31:07Z,user-service,1,1,1,60
+HPA_SAMPLE time=2026-09-03T03:31:07Z service=user-service current=1 desired=1 cpu=1% target=60%
+job.batch/hpa-load-user-1788406267 created
+HPA_CSV,1788406269,2026-09-03T03:31:09Z,user-service,1,1,1,60
+HPA_SAMPLE time=2026-09-03T03:31:09Z service=user-service current=1 desired=1 cpu=1% target=60%
+HPA_CSV,1788406281,2026-09-03T03:31:21Z,user-service,1,1,1,60
+HPA_SAMPLE time=2026-09-03T03:31:21Z service=user-service current=1 desired=1 cpu=1% target=60%
+HPA_CSV,1788406293,2026-09-03T03:31:33Z,user-service,1,2,71,60
+HPA_SAMPLE time=2026-09-03T03:31:33Z service=user-service current=1 desired=2 cpu=71% target=60%
+HPA_CSV,1788406305,2026-09-03T03:31:45Z,user-service,1,2,71,60
+HPA_SAMPLE time=2026-09-03T03:31:45Z service=user-service current=1 desired=2 cpu=71% target=60%
+HPA_CSV,1788406318,2026-09-03T03:31:58Z,user-service,2,2,71,60
+HPA_SAMPLE time=2026-09-03T03:31:58Z service=user-service current=2 desired=2 cpu=71% target=60%
+HPA_CSV,1788406330,2026-09-03T03:32:10Z,user-service,2,2,95,60
+HPA_SAMPLE time=2026-09-03T03:32:10Z service=user-service current=2 desired=2 cpu=95% target=60%
+HPA_CSV,1788406342,2026-09-03T03:32:22Z,user-service,2,2,50,60
+HPA_SAMPLE time=2026-09-03T03:32:22Z service=user-service current=2 desired=2 cpu=50% target=60%
+HPA_CSV,1788406354,2026-09-03T03:32:34Z,user-service,2,2,51,60
+HPA_SAMPLE time=2026-09-03T03:32:34Z service=user-service current=2 desired=2 cpu=51% target=60%
+HPA_CSV,1788406366,2026-09-03T03:32:46Z,user-service,2,2,49,60
+HPA_SAMPLE time=2026-09-03T03:32:46Z service=user-service current=2 desired=2 cpu=49% target=60%
+HPA_CSV,1788406379,2026-09-03T03:32:59Z,user-service,2,2,49,60
+HPA_SAMPLE time=2026-09-03T03:32:59Z service=user-service current=2 desired=2 cpu=49% target=60%
+HPA_CSV,1788406391,2026-09-03T03:33:11Z,user-service,2,2,50,60
+HPA_SAMPLE time=2026-09-03T03:33:11Z service=user-service current=2 desired=2 cpu=50% target=60%
+HPA_CSV,1788406402,2026-09-03T03:33:22Z,user-service,2,2,49,60
+HPA_SAMPLE time=2026-09-03T03:33:22Z service=user-service current=2 desired=2 cpu=49% target=60%
+== load generator summary ==
+LOAD_RESULT requests=24476 errors=0 errorRate=0.0000% average=0.047560s p95=0.106172s
+== waiting for scale down ==
+HPA_CSV,1788406404,2026-09-03T03:33:24Z,user-service,2,2,49,60
+HPA_SAMPLE time=2026-09-03T03:33:24Z service=user-service current=2 desired=2 cpu=49% target=60%
+HPA_CSV,1788406415,2026-09-03T03:33:35Z,user-service,2,2,25,60
+HPA_SAMPLE time=2026-09-03T03:33:35Z service=user-service current=2 desired=2 cpu=25% target=60%
+HPA_CSV,1788406426,2026-09-03T03:33:46Z,user-service,2,2,1,60
+HPA_SAMPLE time=2026-09-03T03:33:46Z service=user-service current=2 desired=2 cpu=1% target=60%
+HPA_CSV,1788406437,2026-09-03T03:33:57Z,user-service,2,2,1,60
+HPA_SAMPLE time=2026-09-03T03:33:57Z service=user-service current=2 desired=2 cpu=1% target=60%
+HPA_CSV,1788406448,2026-09-03T03:34:09Z,user-service,2,2,1,60
+HPA_SAMPLE time=2026-09-03T03:34:09Z service=user-service current=2 desired=2 cpu=1% target=60%
+HPA_CSV,1788406460,2026-09-03T03:34:20Z,user-service,2,1,1,60
+HPA_SAMPLE time=2026-09-03T03:34:20Z service=user-service current=2 desired=1 cpu=1% target=60%
+HPA_CSV,1788406471,2026-09-03T03:34:31Z,user-service,1,1,1,60
+HPA_SAMPLE time=2026-09-03T03:34:31Z service=user-service current=1 desired=1 cpu=1% target=60%
+HPA_RESULT service=user-service min=1 maxObserved=2 final=1
+HPA scale-up and scale-down verified

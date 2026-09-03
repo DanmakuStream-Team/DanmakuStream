@@ -27,8 +27,14 @@ VUS_BM03="${BENCHMARK_VUS_BM03:-40}"    # 资料库历史
 K6_IMAGE="${BENCHMARK_K6_IMAGE:-docker.io/grafana/k6:0.52.0}"
 MONO_GATEWAY_PORT="${BENCHMARK_MONO_PORT:-28888}"
 MONO_FRONTEND_PORT="${BENCHMARK_MONO_FRONTEND_PORT:-28080}"
+MONO_MYSQL_PORT="${BENCHMARK_MONO_MYSQL_PORT:-23306}"
+MONO_RTMP_PORT="${BENCHMARK_MONO_RTMP_PORT:-29350}"
+MONO_SRS_API_PORT="${BENCHMARK_MONO_SRS_API_PORT:-21985}"
+MONO_HLS_PORT="${BENCHMARK_MONO_HLS_PORT:-28081}"
 MICRO_GATEWAY_PORT="${BENCHMARK_MICRO_PORT:-38888}"
 MICRO_FRONTEND_PORT="${BENCHMARK_MICRO_FRONTEND_PORT:-38080}"
+MICRO_RTMP_PORT="${BENCHMARK_MICRO_RTMP_PORT:-39350}"
+MICRO_HLS_PORT="${BENCHMARK_MICRO_HLS_PORT:-38081}"
 ARTIFACT_DIR="$REPO_ROOT/artifacts/benchmarks"
 LOG_FILE="$ARTIFACT_DIR/run.log"
 PULL_K6="${BENCHMARK_PULL_K6:-1}"
@@ -145,7 +151,7 @@ run_k6_once() {
   local base_url=$4
   local vus=$5
   local duration=$6
-  local scripts=("$REPO_ROOT/benchmarks/k6/0${bm_id}-"*.js)
+  local scripts=("$REPO_ROOT/benchmarks/k6/${bm_id}-"*.js)
   if [ "${#scripts[@]}" -ne 1 ] || [ ! -f "${scripts[0]}" ]; then
     log "[error] bm${bm_id} 必须且只能匹配一个 k6 脚本"
     return 1
@@ -157,6 +163,7 @@ run_k6_once() {
   log "▶ k6 $mode bm${bm_id} r${round_n} — VUS=$vus DUR=$duration URL=$base_url"
   docker run --rm --add-host=host.docker.internal:host-gateway \
     --network=host \
+    --user "$(id -u):$(id -g)" \
     -v "$REPO_ROOT/benchmarks/k6:/scripts:ro" \
     -v "$ARTIFACT_DIR:/artifacts" \
     -e "K6_BASE_URL=$base_url" \
@@ -173,10 +180,12 @@ setup_monolith() {
   step "启动单体栈（gateway=$MONO_GATEWAY_PORT frontend=$MONO_FRONTEND_PORT）"
   (
     cd "$REPO_ROOT"
-    MONO_GATEWAY_PORT_OLD="${GATEWAY_PORT:-}"
-    MONO_FRONTEND_PORT_OLD="${FRONTEND_PORT:-}"
     export GATEWAY_PORT="$MONO_GATEWAY_PORT"
     export FRONTEND_PORT="$MONO_FRONTEND_PORT"
+    export MYSQL_PORT="$MONO_MYSQL_PORT"
+    export RTMP_PORT="$MONO_RTMP_PORT"
+    export SRS_API_PORT="$MONO_SRS_API_PORT"
+    export HLS_PORT="$MONO_HLS_PORT"
     docker_compose docker-compose.yml danmaku-bench-mono down --volumes --remove-orphans >/dev/null 2>&1 || true
     docker_compose docker-compose.yml danmaku-bench-mono up --detach --build --remove-orphans
   )
@@ -216,6 +225,8 @@ setup_microservices() {
     cd "$REPO_ROOT"
     export MICRO_GATEWAY_PORT="$MICRO_GATEWAY_PORT"
     export MICRO_FRONTEND_PORT="$MICRO_FRONTEND_PORT"
+    export MICRO_RTMP_PORT="$MICRO_RTMP_PORT"
+    export MICRO_HLS_PORT="$MICRO_HLS_PORT"
     docker_compose docker-compose.microservices.yml danmaku-bench-micro down --volumes --remove-orphans >/dev/null 2>&1 || true
     docker_compose docker-compose.microservices.yml danmaku-bench-micro up --detach --build --remove-orphans
   )
@@ -246,18 +257,24 @@ setup_microservices() {
 # ── 跑 3 接口 × ROUNDS 轮次 ──────────────────────────────────
 run_suite() {
   local mode=$1 base_url=$2
+  local stats_project
+  case "$mode" in
+    monolith) stats_project=danmaku-bench-mono ;;
+    microservices) stats_project=danmaku-bench-micro ;;
+    *) log "[error] 未知架构模式: $mode"; return 1 ;;
+  esac
   step "开始 $mode 压测 × 3 接口 × $ROUNDS 轮"
   local stats_file="$ARTIFACT_DIR/${mode}-stats.csv"
   : > "$stats_file"
   for r in $(seq 1 "$ROUNDS"); do
     step "$mode —— 轮次 $r / $ROUNDS"
-    run_k6_once "$mode" "1" "$r" "$base_url" "$VUS_BM01" "$DURATION"
-    run_k6_once "$mode" "2" "$r" "$base_url" "$VUS_BM02" "$DURATION"
+    run_k6_once "$mode" "01" "$r" "$base_url" "$VUS_BM01" "$DURATION"
+    run_k6_once "$mode" "02" "$r" "$base_url" "$VUS_BM02" "$DURATION"
     # 资源采集放在接口 3（资料库）期间
     local bm03_bg_pid
-    ( sleep 10; collect_stats "danmaku-bench-${mode}" "$stats_file" 20 ) &
+    ( sleep 10; collect_stats "$stats_project" "$stats_file" 20 ) &
     bm03_bg_pid=$!
-    run_k6_once "$mode" "3" "$r" "$base_url" "$VUS_BM03" "$DURATION"
+    run_k6_once "$mode" "03" "$r" "$base_url" "$VUS_BM03" "$DURATION"
     wait "$bm03_bg_pid" 2>/dev/null || true
   done
 }
@@ -285,17 +302,20 @@ for mode in ['monolith','microservices']:
                 d = json.loads(j.read_text(encoding='utf-8'))
             except Exception: continue
             metrics = d.get('metrics', {})
-            reqs   = metrics.get('http_reqs',{}).get('count',0)
-            rate   = metrics.get('http_reqs',{}).get('rate',0)
-            avg    = metrics.get('http_req_duration',{}).get('avg',0)
-            p95    = metrics.get('http_req_duration',{}).get('p(95)',0)
-            fail   = metrics.get('http_req_failed',{}).get('rate',0)
+            # 每次迭代恰好执行一个被测业务请求。使用 iterations 和自定义
+            # Trend/Rate，避免 setup 中的注册、登录及历史播种污染主请求指标。
+            reqs   = metrics.get('iterations',{}).get('count',0)
+            rate   = metrics.get('iterations',{}).get('rate',0)
+            trend  = metrics.get(f'bm{bm}_duration',{})
+            avg    = trend.get('avg',0)
+            p95    = trend.get('p(95)',0)
+            fail   = metrics.get(f'bm{bm}_errors',{}).get('value',0)
             rows.append([mode,bm,r,int(reqs),round(rate,2),round(avg,2),round(p95,2),round(fail*100,2)])
 
 csv_path = artifact / 'comparison.csv'
 with open(csv_path, 'w', newline='') as f:
     w = csv.writer(f)
-    w.writerow(['mode','benchmark','round','http_reqs','req_rate_per_sec','avg_ms','p95_ms','error_pct'])
+    w.writerow(['mode','benchmark','round','business_reqs','req_rate_per_sec','avg_ms','p95_ms','error_pct'])
     w.writerows(rows)
 
 # 聚合 3 轮平均
@@ -379,7 +399,7 @@ md.append('')
 md.append('## 5. 注意事项 / 待分析')
 md.append('')
 md.append('- 单体：所有流量通过 nginx-gateway 单 Go 进程处理；微服务：先 nginx-gateway，再 by-path 分发到 user/content/engagement 三服务。')
-md.append('- BM02（登录）受密码哈希 + JWT 签发 CPU 开销影响，微服务版若使用独立 user-service 单实例通常略慢；需要横向扩容可在 compose 中将 user-service 调为 2 实例对比。')
+md.append('- BM02（登录）受密码哈希 + JWT 签发 CPU 开销影响；两套架构实现细节不同，测得差异不能仅归因于服务拆分。若要验证扩容收益，应另做固定单副本与多副本/HPA 的阶梯负载对照。')
 md.append('- BM03（资料库历史）会为压测用户写入最多 100 条不同视频的历史；真实生产数据量应扩大到 10k 级别后复测。')
 md.append('- CPU% 采样使用 docker stats 1s 间隔 20 次取平均，粗粒度但足够做趋势对比；若要精确数据，请接入 cAdvisor + Prometheus。')
 md.append('')

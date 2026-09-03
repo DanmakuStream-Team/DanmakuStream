@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 namespace=${MICROSERVICE_NAMESPACE:-danmakustream-microservices}
 action=${1:?usage: k3s-hpa-chaos.sh hpa SERVICE DURATION_SECONDS CONCURRENCY | chaos}
+HPA_JOB_NAME=''
 
 k() {
   sudo k3s kubectl -n "$namespace" "$@"
@@ -10,9 +11,21 @@ k() {
 
 require_service() {
   case "$1" in
-    user-service|content-service|engagement-service) ;;
+    user-service|content-service|engagement-service|gateway) ;;
     *) echo "unsupported service: $1" >&2; exit 2 ;;
   esac
+}
+
+hpa_for_service() {
+  local service=$1
+  if k get hpa "$service" >/dev/null 2>&1; then
+    printf '%s\n' "$service"
+  elif k get hpa "${service}-hpa" >/dev/null 2>&1; then
+    printf '%s\n' "${service}-hpa"
+  else
+    echo "HPA not found for deployment: $service" >&2
+    return 1
+  fi
 }
 
 number_in_range() {
@@ -24,13 +37,14 @@ number_in_range() {
 }
 
 sample_hpa() {
-  local service=$1 now iso current desired cpu target
+  local service=$1 hpa now iso current desired cpu target
+  hpa=$(hpa_for_service "$service")
   now=$(date +%s)
   iso=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-  current=$(k get hpa "$service" -o jsonpath='{.status.currentReplicas}' 2>/dev/null || true)
-  desired=$(k get hpa "$service" -o jsonpath='{.status.desiredReplicas}' 2>/dev/null || true)
-  cpu=$(k get hpa "$service" -o jsonpath='{.status.currentMetrics[0].resource.current.averageUtilization}' 2>/dev/null || true)
-  target=$(k get hpa "$service" -o jsonpath='{.spec.metrics[0].resource.target.averageUtilization}' 2>/dev/null || true)
+  current=$(k get hpa "$hpa" -o jsonpath='{.status.currentReplicas}' 2>/dev/null || true)
+  desired=$(k get hpa "$hpa" -o jsonpath='{.status.desiredReplicas}' 2>/dev/null || true)
+  cpu=$(k get hpa "$hpa" -o jsonpath='{.status.currentMetrics[0].resource.current.averageUtilization}' 2>/dev/null || true)
+  target=$(k get hpa "$hpa" -o jsonpath='{.spec.metrics[0].resource.target.averageUtilization}' 2>/dev/null || true)
   current=${current:-0}
   desired=${desired:-0}
   cpu=${cpu:-0}
@@ -45,23 +59,33 @@ run_hpa() {
   local service=${2:?service is required}
   local duration=${3:-180}
   local concurrency=${4:-80}
+  local target_url
   require_service "$service"
   number_in_range "$duration" 60 600 duration
   number_in_range "$concurrency" 1 500 concurrency
 
   k get deployment "$service" >/dev/null
-  k get hpa "$service" >/dev/null
+  local hpa
+  hpa=$(hpa_for_service "$service")
+  if [[ "$service" == gateway ]]; then
+    target_url=http://gateway/gateway/health
+  else
+    target_url="http://${service}:8080/api/v1/livez"
+  fi
   if ! k top pods -l "app=$service" >/dev/null 2>&1; then
     echo "resource metrics are unavailable; verify the k3s metrics-server before running HPA" >&2
     exit 1
   fi
 
   local min_replicas job_name deadline max_observed=0 scaled_down=0
-  min_replicas=$(k get hpa "$service" -o jsonpath='{.spec.minReplicas}')
+  min_replicas=$(k get hpa "$hpa" -o jsonpath='{.spec.minReplicas}')
   job_name="hpa-load-${service%-service}-$(date +%s)"
+  HPA_JOB_NAME=$job_name
   cleanup_hpa_job() {
     set +e
-    k delete job "$job_name" --ignore-not-found --wait=false >/dev/null 2>&1
+    if [[ -n ${HPA_JOB_NAME:-} ]]; then
+      k delete job "$HPA_JOB_NAME" --ignore-not-found --wait=false >/dev/null 2>&1
+    fi
   }
   trap cleanup_hpa_job EXIT
 
@@ -72,6 +96,7 @@ run_hpa() {
     -e "s/__SERVICE__/$service/g" \
     -e "s/__DURATION__/$duration/g" \
     -e "s/__CONCURRENCY__/$concurrency/g" <<'YAML' | k apply -f -
+    -e "s|__TARGET_URL__|$target_url|g" <<'YAML' | k apply -f -
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -100,7 +125,7 @@ spec:
                   while [ "$(date +%s)" -lt "$end" ]; do
                     curl -sS --no-keepalive --max-time 3 -o /dev/null \
                       -w '%{time_total},%{http_code}\n' \
-                      http://__SERVICE__:8080/api/v1/livez >> "$results" \
+                      __TARGET_URL__ >> "$results" \
                       || printf '3.000000,000\n' >> "$results"
                   done
                 ) &

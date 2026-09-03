@@ -1,5 +1,6 @@
 FROM golang:1.25-alpine AS builder
 WORKDIR /src
+RUN go env -w GOPROXY=https://goproxy.cn,direct
 ARG COMMIT_SHA=0000000
 ARG BUILD_TIME=1970-01-01T00:00:00Z
 ARG SERVICE_VERSION=microservice-0.1.0
