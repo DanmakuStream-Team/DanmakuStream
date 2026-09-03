@@ -80,11 +80,31 @@ func TestAllPublicAndInternalAPIRoutes(t *testing.T) {
 	defer tx.Rollback()
 
 	data := seedFixture(t, tx)
+	notificationCalls := 0
+	notificationServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		notificationCalls++
+		expectedPath := fmt.Sprintf("/internal/v1/users/%d/followers/notifications", data.ownerID)
+		if r.Method != http.MethodPost || r.URL.Path != expectedPath {
+			t.Errorf("notification request = %s %s, want POST %s", r.Method, r.URL.Path, expectedPath)
+		}
+		if token := r.Header.Get("X-Internal-Token"); token != regressionInternal {
+			t.Errorf("notification internal token = %q", token)
+		}
+		var payload struct {
+			Type    string `json:"type"`
+			Content string `json:"content"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil || payload.Type != "dynamic" || payload.Content != "route regression" {
+			t.Errorf("notification payload = %#v err=%v", payload, err)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer notificationServer.Close()
 	cfg := config.Config{
 		ServiceName: "content-service", ServiceVersion: "day8-regression", CommitSHA: "integration",
 		BuildTime: time.Now().UTC().Format(time.RFC3339), Port: "8080", JWTSecret: regressionJWTSecret,
 		InternalAPIToken: regressionInternal, RequestTimeout: time.Second, StorageDir: t.TempDir(),
-		MaxVideoBytes: 1 << 20, MaxImageBytes: 1 << 20,
+		MaxVideoBytes: 1 << 20, MaxImageBytes: 1 << 20, UserServiceURL: notificationServer.URL,
 	}
 	ctx := &svc.Context{Config: cfg, DB: tx, Logic: &logic.Service{DB: tx}}
 	router := server.Router(ctx, slog.New(slog.NewTextHandler(io.Discard, nil)))
@@ -123,6 +143,9 @@ func TestAllPublicAndInternalAPIRoutes(t *testing.T) {
 	}
 	if tested != len(expectedRoutes) {
 		t.Fatalf("tested %d routes, want %d", tested, len(expectedRoutes))
+	}
+	if notificationCalls != 1 {
+		t.Fatalf("notification calls = %d, want 1", notificationCalls)
 	}
 }
 
