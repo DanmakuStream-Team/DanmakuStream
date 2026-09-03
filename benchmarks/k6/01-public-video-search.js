@@ -16,7 +16,7 @@ import { check, sleep } from 'k6';
 import { Rate, Trend } from 'k6/metrics';
 
 const errorRate = new Rate('bm01_errors');
-const ttfbTrend = new Trend('bm01_ttfb', true);
+const durationTrend = new Trend('bm01_duration', true);
 
 const keywords = __ENV.K6_KEYWORDS
   ? __ENV.K6_KEYWORDS.split(',')
@@ -54,6 +54,6 @@ export default function () {
   });
   errorRate.add(!ok);
 
-  if (res.timings) ttfbTrend.add(res.timings.waiting);
+  if (res.timings) durationTrend.add(res.timings.duration);
   sleep(0.3 + Math.random() * 0.5);
 }

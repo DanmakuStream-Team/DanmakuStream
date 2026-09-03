@@ -16,7 +16,7 @@ import { check, group, sleep } from 'k6';
 import { Rate, Trend } from 'k6/metrics';
 
 const errorRate = new Rate('bm03_errors');
-const ttfbTrend = new Trend('bm03_ttfb', true);
+const durationTrend = new Trend('bm03_duration', true);
 
 export const options = {
   vus: Number(__ENV.K6_VUS || 40),
@@ -55,12 +55,15 @@ export function setup() {
   } catch (e) {}
 
   if ((__ENV.K6_HISTORY_SEEDER || '1') !== '0') {
-    const authHeaders = { ...headers, Authorization: `Bearer ${token}` };
+    const authHeaders = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    };
     for (let i = 0; i < videoIds.length; i += 1) {
       const vid = videoIds[i];
       const progress = Math.floor(Math.random() * 1200) + 1;
-      http.post(`${BASE}/api/v1/users/me/history/${vid}`,
-        JSON.stringify({ progress }), { headers: authHeaders });
+      http.put(`${BASE}/api/v1/users/me/history/${vid}`,
+        JSON.stringify({ position: progress }), { headers: authHeaders });
       if (i % 20 === 0) sleep(0.02);
     }
   }
@@ -88,7 +91,7 @@ export default function (data) {
       },
     });
     errorRate.add(!ok);
-    if (res.timings) ttfbTrend.add(res.timings.waiting);
+    if (res.timings) durationTrend.add(res.timings.duration);
   });
   sleep(0.4 + Math.random() * 0.4);
 }

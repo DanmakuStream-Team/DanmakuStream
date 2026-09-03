@@ -15,7 +15,7 @@ import { check, sleep } from 'k6';
 import { Rate, Trend } from 'k6/metrics';
 
 const errorRate = new Rate('bm02_errors');
-const ttfbTrend = new Trend('bm02_ttfb', true);
+const durationTrend = new Trend('bm02_duration', true);
 
 export const options = {
   vus: Number(__ENV.K6_VUS || 30),
@@ -62,6 +62,6 @@ export default function (data) {
     },
   });
   errorRate.add(!ok);
-  if (login.timings) ttfbTrend.add(login.timings.waiting);
+  if (login.timings) durationTrend.add(login.timings.duration);
   sleep(0.6 + Math.random() * 0.4);
 }

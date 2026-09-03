@@ -13,7 +13,7 @@ on:
         description: HPA target; ignored by the chaos exercise
         required: true
         type: choice
-        options: [user-service, content-service, engagement-service]
+        options: [user-service, content-service, engagement-service, gateway]
         default: content-service
       duration_seconds:
         description: HPA load duration (60-600 seconds)
