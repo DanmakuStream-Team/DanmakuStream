@@ -78,16 +78,31 @@ run_hpa() {
   fi
 
   local min_replicas job_name deadline max_observed=0 scaled_down=0
+  local pod_watch_log pod_watch_pid=''
   min_replicas=$(k get hpa "$hpa" -o jsonpath='{.spec.minReplicas}')
   job_name="hpa-load-${service%-service}-$(date +%s)"
   HPA_JOB_NAME=$job_name
+  pod_watch_log="/tmp/hpa-pods-${service}-$(date +%s).log"
   cleanup_hpa_job() {
     set +e
+    if [[ -n ${pod_watch_pid:-} ]]; then
+      kill "$pod_watch_pid" >/dev/null 2>&1 || true
+      wait "$pod_watch_pid" 2>/dev/null || true
+    fi
     if [[ -n ${HPA_JOB_NAME:-} ]]; then
       k delete job "$HPA_JOB_NAME" --ignore-not-found --wait=false >/dev/null 2>&1
     fi
   }
   trap cleanup_hpa_job EXIT
+
+  echo "== starting pod lifecycle watch =="
+  k get pods \
+    -l "app=$service" \
+    -w \
+    --output-watch-events \
+    -o wide \
+    >"$pod_watch_log" 2>&1 &
+  pod_watch_pid=$!
 
   echo "HPA_EXERCISE service=$service duration=${duration}s concurrency=$concurrency min=$min_replicas"
   sample_hpa "$service"
@@ -170,6 +185,15 @@ YAML
     fi
     sleep 10
   done
+
+  if [[ -n ${pod_watch_pid:-} ]]; then
+    kill "$pod_watch_pid" 2>/dev/null || true
+    wait "$pod_watch_pid" 2>/dev/null || true
+    pod_watch_pid=''
+  fi
+
+  echo "== pod lifecycle =="
+  cat "$pod_watch_log" || true
 
   echo "HPA_RESULT service=$service min=$min_replicas maxObserved=$max_observed final=$HPA_CURRENT"
   if (( max_observed <= min_replicas )); then
