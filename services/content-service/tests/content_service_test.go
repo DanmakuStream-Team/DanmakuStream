@@ -385,7 +385,7 @@ func TestRouterExposesCompleteAPIInventory(t *testing.T) {
 			count++
 		}
 	}
-	if count != 33 {
-		t.Fatalf("registered public/internal routes = %d, want 33; update the API regression mapping when routes change", count)
+	if count != 34 {
+		t.Fatalf("registered public/internal routes = %d, want 34; update the API regression mapping when routes change", count)
 	}
 }

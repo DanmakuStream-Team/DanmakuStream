@@ -12,8 +12,8 @@
 ## 本次补强
 
 1. 将生产路由注册从 `internal/svc` 提取为唯一的 `internal/server.Router`，生产启动与测试共用同一套路由。
-2. 新增带 `integration` build tag 的真实 MySQL API 回归，维护 33 个公开/内部接口的显式清单并自动对比 Gin 实际注册结果。
-3. 自动触达全部 33 个接口，统一断言无未解释 5xx，并断言入口 `X-Request-ID` 原样返回。
+2. 新增带 `integration` build tag 的真实 MySQL API 回归，维护 34 个公开/内部接口的显式清单并自动对比 Gin 实际注册结果。
+3. 自动触达全部 34 个接口，统一断言无未解释 5xx，并断言入口 `X-Request-ID` 原样返回。
 4. 对搜索、可播放详情、播放统计持久化、内部可播放性、审核发布和创作者分析增加真实数据成功断言。
 5. content-service 独立 CI 启用 MySQL 集成测试；普通测试或集成回归失败时，不再继续构建 commit-SHA 镜像。
 
@@ -27,8 +27,8 @@
 | 动态 | 3 | 创建/查询/删除路由触达与权限回归 |
 | 审核与分析 | 3 | 待审视频发布、重复审核、创作者统计真实数据断言 |
 | Banner、公告 | 10 | public/admin CRUD 全路由触达与角色校验 |
-| 内部视频接口 | 2 | 单条/批量摘要、可播放性、所有权字段和内部 Token 断言 |
-| **合计** | **33** | 显式清单与 Gin 实际注册结果必须完全一致 |
+| 内部视频接口 | 3 | 单条/批量摘要、可播放性、所有权字段、互动计数幂等同步和内部 Token 断言 |
+| **合计** | **34** | 显式清单与 Gin 实际注册结果必须完全一致 |
 
 ## 主流程和异常流程
 
@@ -44,7 +44,7 @@
 - **现象**：真实 MySQL 回归访问 `GET /api/v1/announcements` 时返回 500；SQLite 测试未复现。
 - **原因**：公告有效期查询把布尔条件和两段 `CURRENT_TIMESTAMP` 表达式写在同一个 `Where` 中，GORM/MySQL 路径生成了未绑定的 `enabled = ?`，MySQL 返回 1064。
 - **修复**：将启用状态、开始时间和结束时间拆分为独立查询条件，并使用跨 SQLite/MySQL 一致的 `enabled = 1`。
-- **回归**：33 条公开/内部 API 的真实 MySQL 扫描会持续断言该接口及其他接口均不返回 5xx。
+- **回归**：34 条公开/内部 API 的真实 MySQL 扫描会持续断言该接口及其他接口均不返回 5xx。
 
 ## 执行记录
 
@@ -54,7 +54,7 @@
 | 集成套件编译 | `go test -count=1 -tags=integration ./integration` | 本地编译通过；未配置 DSN 时按约定跳过 |
 | 构建 | `go build ./...` | 本地通过 |
 | 静态检查 | `go vet ./...` | 本地通过 |
-| 真实 MySQL API 回归 | `CONTENT_SERVICE_TEST_DSN=... go test -count=1 -tags=integration ./integration -v` | 通过：33/33 已注册公开/内部路由子测试通过，核心成功契约通过，未解释 5xx 为 0 |
+| 真实 MySQL API 回归 | `CONTENT_SERVICE_TEST_DSN=... go test -count=1 -tags=integration ./integration -v` | 通过：34/34 已注册公开/内部路由子测试通过，核心成功契约通过，未解释 5xx 为 0 |
 | Docker 镜像与运行时 | `docker build ...`；容器内探针和版本请求 | 镜像构建通过；容器 `healthy`；以 `uid=100(app)` 非 root 运行；livez/health/version 通过 |
 | 微服务 E2E | `cd frontend && npm run test:e2e:micro` | 通过：网关、服务目录、内部接口隔离及同一 JWT 跨三服务访问，Playwright 2/2 |
 
@@ -64,4 +64,4 @@
 
 ## 验收判定
 
-代码结构、普通测试、静态检查、真实 MySQL 33/33 API 回归、Docker 运行时和微服务 E2E 已在本地验证。最终合并仍须以本分支 GitHub Actions 绿灯和另一名有写权限成员 Review 为准；远端证据完成前不提前标记 #140 Done。
+代码结构、普通测试、静态检查、真实 MySQL 34/34 API 回归、Docker 运行时和微服务 E2E 已在本地验证。最终合并仍须以本分支 GitHub Actions 绿灯和另一名有写权限成员 Review 为准；远端证据完成前不提前标记 #140 Done。

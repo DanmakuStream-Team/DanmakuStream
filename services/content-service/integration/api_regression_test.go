@@ -44,7 +44,8 @@ var expectedRoutes = map[string]struct{}{
 	"POST /api/v1/dynamics": {}, "DELETE /api/v1/dynamics/:id": {},
 	"GET /api/v1/admin/videos": {}, "PUT /api/v1/admin/videos/:id/status": {},
 	"GET /internal/v1/videos/batch": {}, "GET /internal/v1/videos/:id": {},
-	"GET /api/v1/admin/banners": {}, "POST /api/v1/admin/banners": {},
+	"PUT /internal/v1/videos/:id/engagement": {},
+	"GET /api/v1/admin/banners":              {}, "POST /api/v1/admin/banners": {},
 	"PUT /api/v1/admin/banners/:id": {}, "DELETE /api/v1/admin/banners/:id": {},
 	"GET /api/v1/admin/announcements": {}, "POST /api/v1/admin/announcements": {},
 	"PUT /api/v1/admin/announcements/:id": {}, "DELETE /api/v1/admin/announcements/:id": {},
@@ -179,6 +180,15 @@ func assertContentContracts(t *testing.T, router http.Handler, db *gorm.DB, data
 	if internal.Code != http.StatusOK || !strings.Contains(internal.Body.String(), `"playable":true`) {
 		t.Fatalf("internal playable contract failed: %d %s", internal.Code, internal.Body.String())
 	}
+	engagement := serve(t, router, http.MethodPut, fmt.Sprintf("/internal/v1/videos/%d/engagement", data.videoID), regressionInternal,
+		bytes.NewBufferString(`{"likeCount":7,"collectCount":5,"danmakuCount":3}`))
+	if engagement.Code != http.StatusOK {
+		t.Fatalf("internal engagement contract failed: %d %s", engagement.Code, engagement.Body.String())
+	}
+	if err := db.First(&stored, data.videoID).Error; err != nil || stored.LikeCount != 7 || stored.CollectCount != 5 || stored.DanmakuCount != 3 {
+		t.Fatalf("engagement statistics were not persisted: like=%d collect=%d danmaku=%d err=%v",
+			stored.LikeCount, stored.CollectCount, stored.DanmakuCount, err)
+	}
 	review := serve(t, router, http.MethodPut, fmt.Sprintf("/api/v1/admin/videos/%d/status", data.pendingID), regressionToken(t, data.ownerID, "moderator"), bytes.NewBufferString(`{"status":"approved"}`))
 	if review.Code != http.StatusOK {
 		t.Fatalf("review contract failed: %d %s", review.Code, review.Body.String())
@@ -233,6 +243,8 @@ func regressionBody(method, path string) io.Reader {
 	switch {
 	case path == "/api/v1/dynamics":
 		return bytes.NewBufferString(`{"content":"route regression","images":[]}`)
+	case path == "/internal/v1/videos/:id/engagement":
+		return bytes.NewBufferString(`{"likeCount":7,"collectCount":5,"danmakuCount":3}`)
 	case strings.HasSuffix(path, "/collaborators"):
 		return bytes.NewBufferString(`{"userId":999999}`)
 	case strings.HasSuffix(path, "/status"):
