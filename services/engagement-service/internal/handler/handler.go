@@ -113,6 +113,10 @@ func (h *Handler) SendDanmaku(c *gin.Context) {
 		response.Error(c, 500, "保存弹幕失败")
 		return
 	}
+	if err := h.syncVideoEngagement(c, req.VideoID); err != nil {
+		dependencyError(c, err, "视频互动计数")
+		return
+	}
 	response.OK(c, row)
 }
 func (h *Handler) AdminListDanmaku(c *gin.Context) {
@@ -167,7 +171,10 @@ func (h *Handler) ListComments(c *gin.Context) {
 		response.Error(c, 500, "查询评论失败")
 		return
 	}
-	response.OK(c, gin.H{"list": rows, "page": p, "pageSize": size})
+	// The public comments contract is an array (the frontend store consumes
+	// res.data directly). Returning a page object here broke rendering of every
+	// video detail page in the microservice deployment.
+	response.OK(c, rows)
 }
 func (h *Handler) CreateComment(c *gin.Context) {
 	var req struct {
@@ -286,6 +293,10 @@ func (h *Handler) toggleVideoRelation(c *gin.Context, collect bool) {
 		response.Error(c, 500, "更新互动状态失败")
 		return
 	}
+	if err := h.syncVideoEngagement(c, id); err != nil {
+		dependencyError(c, err, "视频互动计数")
+		return
+	}
 	if collect {
 		response.OK(c, gin.H{"collected": active})
 		return
@@ -294,6 +305,20 @@ func (h *Handler) toggleVideoRelation(c *gin.Context, collect bool) {
 }
 func (h *Handler) ToggleVideoLike(c *gin.Context)       { h.toggleVideoRelation(c, false) }
 func (h *Handler) ToggleVideoCollection(c *gin.Context) { h.toggleVideoRelation(c, true) }
+
+func (h *Handler) syncVideoEngagement(c *gin.Context, videoID uint) error {
+	var likes, collects, danmaku int64
+	if err := h.db.Model(&model.VideoLike{}).Where("video_id = ?", videoID).Count(&likes).Error; err != nil {
+		return err
+	}
+	if err := h.db.Model(&model.VideoCollection{}).Where("video_id = ?", videoID).Count(&collects).Error; err != nil {
+		return err
+	}
+	if err := h.db.Model(&model.Danmaku{}).Where("video_id = ? AND scene = ?", videoID, "video").Count(&danmaku).Error; err != nil {
+		return err
+	}
+	return h.content.UpdateVideoEngagement(c.Request.Context(), videoID, likes, collects, danmaku)
+}
 
 func (h *Handler) ListHistory(c *gin.Context) {
 	p, size := page(c)

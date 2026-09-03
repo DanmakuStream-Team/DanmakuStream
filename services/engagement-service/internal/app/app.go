@@ -62,7 +62,7 @@ func (a *App) Router() *gin.Engine {
 	v1.GET("/comments/:videoId", h.ListComments)
 	v1.GET("/live", h.ListLiveRooms)
 	v1.GET("/live/rankings/heat", h.HeatRanking)
-	v1.GET("/live-schedules", h.ListSchedules)
+	v1.GET("/live-schedules", middleware.OptionalAuth(a.Config.Auth.AccessSecret), h.ListSchedules)
 	v1.GET("/live/:id", h.GetLiveRoom)
 	v1.GET("/live/:id/interaction", h.LiveInteraction)
 	v1.GET("/live/:id/danmaku", h.CurrentLiveDanmaku)

@@ -3,6 +3,7 @@ package notification
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"danmakustream/user-service/internal/handler/response"
 	"danmakustream/user-service/internal/middleware"
@@ -21,6 +22,47 @@ type notificationInfo struct {
 	Read      bool            `json:"read"`
 	Actor     *model.UserInfo `json:"actor,omitempty"`
 	CreatedAt string          `json:"createdAt"`
+}
+
+// FollowersHandler is an internal fan-out boundary used by content-service.
+// Keeping follower lookup and notification persistence in user-service avoids
+// cross-schema reads after the monolith is split.
+func FollowersHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		actorID64, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil || actorID64 == 0 {
+			response.Fail(c, http.StatusBadRequest, "无效的发布者 ID")
+			return
+		}
+		actorID := uint(actorID64)
+		var input struct {
+			Type    string `json:"type"`
+			Title   string `json:"title"`
+			Content string `json:"content"`
+			Link    string `json:"link"`
+		}
+		if c.ShouldBindJSON(&input) != nil || strings.TrimSpace(input.Title) == "" {
+			response.Fail(c, http.StatusBadRequest, "无效的通知内容")
+			return
+		}
+		var follows []model.Follow
+		if err := svcCtx.DB.Where("followee_id = ?", actorID).Find(&follows).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, "关注者查询失败")
+			return
+		}
+		notifications := make([]model.Notification, 0, len(follows))
+		for _, follow := range follows {
+			id := actorID
+			notifications = append(notifications, model.Notification{UserID: follow.FollowerID, ActorID: &id, Type: input.Type, Title: input.Title, Content: input.Content, Link: input.Link})
+		}
+		if len(notifications) > 0 {
+			if err := svcCtx.DB.Create(&notifications).Error; err != nil {
+				response.Fail(c, http.StatusInternalServerError, "通知创建失败")
+				return
+			}
+		}
+		response.Ok(c, gin.H{"created": len(notifications)})
+	}
 }
 
 func ListHandler(svcCtx *svc.ServiceContext) gin.HandlerFunc {

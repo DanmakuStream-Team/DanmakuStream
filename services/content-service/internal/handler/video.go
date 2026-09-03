@@ -70,6 +70,47 @@ func (h *Handler) VideoDetail(c *gin.Context) {
 	response.OK(c, logic.VideoView(video))
 }
 
+// InternalUpdateEngagement accepts absolute counters owned by the engagement
+// service. Absolute values make retries idempotent and avoid double counting
+// when a service-to-service request is retried.
+func (h *Handler) InternalUpdateEngagement(c *gin.Context) {
+	id, ok := uintParam(c, "id")
+	if !ok {
+		return
+	}
+	var input struct {
+		LikeCount    int64 `json:"likeCount"`
+		CollectCount int64 `json:"collectCount"`
+		DanmakuCount int64 `json:"danmakuCount"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil || input.LikeCount < 0 || input.CollectCount < 0 || input.DanmakuCount < 0 {
+		response.Error(c, http.StatusBadRequest, 40001, "invalid engagement counters")
+		return
+	}
+	result := h.DB.Model(&model.Video{}).Where("id = ?", id).Updates(map[string]any{
+		"like_count": input.LikeCount, "collect_count": input.CollectCount, "danmaku_count": input.DanmakuCount,
+	})
+	if result.Error != nil {
+		writeLogicError(c, result.Error)
+		return
+	}
+	if result.RowsAffected == 0 {
+		// MySQL reports zero affected rows both when the record is absent and
+		// when an idempotent retry writes the same absolute counters. Distinguish
+		// those cases so a safe retry never becomes a false 404.
+		var count int64
+		if err := h.DB.Model(&model.Video{}).Where("id = ?", id).Count(&count).Error; err != nil {
+			writeLogicError(c, err)
+			return
+		}
+		if count == 0 {
+			response.Error(c, http.StatusNotFound, 40401, "video not found")
+			return
+		}
+	}
+	response.OK(c, gin.H{"id": id, "likeCount": input.LikeCount, "collectCount": input.CollectCount, "danmakuCount": input.DanmakuCount})
+}
+
 type updateVideoInput struct {
 	Title       *string `json:"title"`
 	Description *string `json:"description"`
@@ -252,7 +293,13 @@ func (h *Handler) ReviewVideo(c *gin.Context) {
 }
 
 func (h *Handler) CreatorAnalytics(c *gin.Context) {
-	result, err := h.Logic.CreatorAnalytics(middleware.UserID(c))
+	days, err := strconv.Atoi(c.DefaultQuery("days", "30"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, 40000, "invalid days")
+		return
+	}
+	videoID := parseUint(c.Query("videoId"))
+	result, err := h.Logic.CreatorAnalytics(middleware.UserID(c), days, videoID)
 	if err != nil {
 		writeLogicError(c, err)
 		return
