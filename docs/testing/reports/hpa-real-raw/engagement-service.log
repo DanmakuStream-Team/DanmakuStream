@@ -1,0 +1,49 @@
+HPA_EXERCISE service=engagement-service duration=120s concurrency=40 min=1
+HPA_CSV,1788406497,2026-09-03T03:34:57Z,engagement-service,1,1,1,60
+HPA_SAMPLE time=2026-09-03T03:34:57Z service=engagement-service current=1 desired=1 cpu=1% target=60%
+job.batch/hpa-load-engagement-1788406497 created
+HPA_CSV,1788406499,2026-09-03T03:34:59Z,engagement-service,1,1,1,60
+HPA_SAMPLE time=2026-09-03T03:34:59Z service=engagement-service current=1 desired=1 cpu=1% target=60%
+HPA_CSV,1788406511,2026-09-03T03:35:11Z,engagement-service,1,1,1,60
+HPA_SAMPLE time=2026-09-03T03:35:11Z service=engagement-service current=1 desired=1 cpu=1% target=60%
+HPA_CSV,1788406523,2026-09-03T03:35:23Z,engagement-service,1,1,29,60
+HPA_SAMPLE time=2026-09-03T03:35:23Z service=engagement-service current=1 desired=1 cpu=29% target=60%
+HPA_CSV,1788406535,2026-09-03T03:35:35Z,engagement-service,1,2,98,60
+HPA_SAMPLE time=2026-09-03T03:35:35Z service=engagement-service current=1 desired=2 cpu=98% target=60%
+HPA_CSV,1788406547,2026-09-03T03:35:47Z,engagement-service,2,2,95,60
+HPA_SAMPLE time=2026-09-03T03:35:47Z service=engagement-service current=2 desired=2 cpu=95% target=60%
+HPA_CSV,1788406559,2026-09-03T03:35:59Z,engagement-service,2,2,95,60
+HPA_SAMPLE time=2026-09-03T03:35:59Z service=engagement-service current=2 desired=2 cpu=95% target=60%
+HPA_CSV,1788406571,2026-09-03T03:36:11Z,engagement-service,2,2,72,60
+HPA_SAMPLE time=2026-09-03T03:36:11Z service=engagement-service current=2 desired=2 cpu=72% target=60%
+HPA_CSV,1788406583,2026-09-03T03:36:23Z,engagement-service,2,2,54,60
+HPA_SAMPLE time=2026-09-03T03:36:23Z service=engagement-service current=2 desired=2 cpu=54% target=60%
+HPA_CSV,1788406596,2026-09-03T03:36:36Z,engagement-service,2,2,51,60
+HPA_SAMPLE time=2026-09-03T03:36:36Z service=engagement-service current=2 desired=2 cpu=51% target=60%
+HPA_CSV,1788406608,2026-09-03T03:36:48Z,engagement-service,2,2,50,60
+HPA_SAMPLE time=2026-09-03T03:36:48Z service=engagement-service current=2 desired=2 cpu=50% target=60%
+HPA_CSV,1788406620,2026-09-03T03:37:00Z,engagement-service,2,2,50,60
+HPA_SAMPLE time=2026-09-03T03:37:00Z service=engagement-service current=2 desired=2 cpu=50% target=60%
+HPA_CSV,1788406632,2026-09-03T03:37:12Z,engagement-service,2,2,50,60
+HPA_SAMPLE time=2026-09-03T03:37:12Z service=engagement-service current=2 desired=2 cpu=50% target=60%
+== load generator summary ==
+LOAD_RESULT requests=25316 errors=0 errorRate=0.0000% average=0.048199s p95=0.110420s
+== waiting for scale down ==
+HPA_CSV,1788406634,2026-09-03T03:37:14Z,engagement-service,2,2,50,60
+HPA_SAMPLE time=2026-09-03T03:37:14Z service=engagement-service current=2 desired=2 cpu=50% target=60%
+HPA_CSV,1788406644,2026-09-03T03:37:24Z,engagement-service,2,2,52,60
+HPA_SAMPLE time=2026-09-03T03:37:24Z service=engagement-service current=2 desired=2 cpu=52% target=60%
+HPA_CSV,1788406656,2026-09-03T03:37:36Z,engagement-service,2,2,7,60
+HPA_SAMPLE time=2026-09-03T03:37:36Z service=engagement-service current=2 desired=2 cpu=7% target=60%
+HPA_CSV,1788406667,2026-09-03T03:37:47Z,engagement-service,2,2,1,60
+HPA_SAMPLE time=2026-09-03T03:37:47Z service=engagement-service current=2 desired=2 cpu=1% target=60%
+HPA_CSV,1788406678,2026-09-03T03:37:58Z,engagement-service,2,2,1,60
+HPA_SAMPLE time=2026-09-03T03:37:58Z service=engagement-service current=2 desired=2 cpu=1% target=60%
+HPA_CSV,1788406689,2026-09-03T03:38:09Z,engagement-service,2,2,1,60
+HPA_SAMPLE time=2026-09-03T03:38:09Z service=engagement-service current=2 desired=2 cpu=1% target=60%
+HPA_CSV,1788406700,2026-09-03T03:38:20Z,engagement-service,2,1,1,60
+HPA_SAMPLE time=2026-09-03T03:38:20Z service=engagement-service current=2 desired=1 cpu=1% target=60%
+HPA_CSV,1788406711,2026-09-03T03:38:31Z,engagement-service,1,1,1,60
+HPA_SAMPLE time=2026-09-03T03:38:31Z service=engagement-service current=1 desired=1 cpu=1% target=60%
+HPA_RESULT service=engagement-service min=1 maxObserved=2 final=1
+HPA scale-up and scale-down verified
