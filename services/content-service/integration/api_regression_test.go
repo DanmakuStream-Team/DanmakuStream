@@ -4,6 +4,7 @@ package integration
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -194,8 +195,40 @@ func assertContentContracts(t *testing.T, router http.Handler, db *gorm.DB, data
 		t.Fatalf("review contract failed: %d %s", review.Code, review.Body.String())
 	}
 	analytics := serve(t, router, http.MethodGet, "/api/v1/creator/analytics", regressionToken(t, data.ownerID, "user"), nil)
-	if analytics.Code != http.StatusOK || !strings.Contains(analytics.Body.String(), `"videoCount":2`) {
+	if analytics.Code != http.StatusOK {
 		t.Fatalf("analytics contract failed: %d %s", analytics.Code, analytics.Body.String())
+	}
+	var analyticsPayload struct {
+		Code int `json:"code"`
+		Data struct {
+			Days    int `json:"days"`
+			Summary struct {
+				TotalViews    int64 `json:"totalViews"`
+				TotalCollects int64 `json:"totalCollects"`
+			} `json:"summary"`
+			TopVideos []struct {
+				ID           uint  `json:"id"`
+				LikeCount    int64 `json:"likeCount"`
+				CollectCount int64 `json:"collectCount"`
+				DanmakuCount int64 `json:"danmakuCount"`
+			} `json:"topVideos"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(analytics.Body.Bytes(), &analyticsPayload); err != nil {
+		t.Fatalf("decode analytics response: %v body=%s", err, analytics.Body.String())
+	}
+	if analyticsPayload.Code != 0 || analyticsPayload.Data.Days != 30 || analyticsPayload.Data.Summary.TotalViews != 1 ||
+		analyticsPayload.Data.Summary.TotalCollects != 5 || len(analyticsPayload.Data.TopVideos) != 2 {
+		t.Fatalf("analytics summary contract failed: %#v", analyticsPayload)
+	}
+	foundUpdatedVideo := false
+	for _, video := range analyticsPayload.Data.TopVideos {
+		if video.ID == data.videoID {
+			foundUpdatedVideo = video.LikeCount == 7 && video.CollectCount == 5 && video.DanmakuCount == 3
+		}
+	}
+	if !foundUpdatedVideo {
+		t.Fatalf("analytics topVideos did not expose persisted engagement counters: %#v", analyticsPayload.Data.TopVideos)
 	}
 }
 
