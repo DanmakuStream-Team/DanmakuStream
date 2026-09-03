@@ -17,6 +17,7 @@
 - [详细设计说明书](./detailed-design.md)：实现类图，以及三个用例各 1 张对象级顺序图。
 - [追溯表](./traceability.md)：需求、用例、三层模型、代码模块、测试编号和实际结果的统一追溯。
 - [验收测试记录](./acceptance-test-report.md)：UC05、UC09、UC10 的自动化测试方法、执行环境和实际结果。
+- [9 月 3 日依赖故障验收](./day9-dependency-fault.md)：超时/降级测试、K3s Pod 不连锁重启判定和自动恢复脚本。
 - [完整业务场景清单](../../project/use-case-catalog.md)：项目最终验收用例清单及详细用例说明。
 - [PlantUML 模型索引](../../models/README.md)：正式图 `.puml` 源文件及 SVG/PNG 导出图。
 - [部署设计说明](../../architecture/deployment-design.md)：改造前单体部署图和改造后 Kubernetes 部署图。

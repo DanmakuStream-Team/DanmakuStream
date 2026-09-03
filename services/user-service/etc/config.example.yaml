@@ -1,0 +1,10 @@
+Name: user-service
+Host: 0.0.0.0
+Port: 8080
+Auth:
+  AccessSecret: ""
+  AccessExpire: 86400
+Database:
+  DataSource: ""
+VideoDir: data
+ContentServiceURL: http://127.0.0.1:8082

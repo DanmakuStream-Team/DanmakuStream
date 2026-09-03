@@ -1,0 +1,160 @@
+# 微服务版 Compose（D06）——与单体 docker-compose.yml 并存，用于本地/联调验证拆分形态。
+# 启动：docker compose -f docker-compose.microservices.yml up -d --build
+# 验收：docker compose -f docker-compose.microservices.yml config
+#
+# 形态要求（对应 8.31 任务书 A-4）：
+# - 三个业务服务只在内部网络暴露 8080，宿主机仅暴露网关(8888)与前端(80)；
+# - 每个服务使用独立数据库账号（scripts/microservices-db-init.sql）；
+# - 健康检查与启动依赖齐全；数据卷/媒体卷独立。
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-local-dev-root-password}
+    volumes:
+      - micro_mysql_data:/var/lib/mysql
+      - ./scripts/microservices-db-init.sql:/docker-entrypoint-initdb.d/01-schemas-accounts.sql:ro
+    healthcheck:
+      # 强制 TCP；localhost 会走初始化临时实例的 Unix Socket，导致过早判为 healthy。
+      test: ["CMD-SHELL", "mysqladmin ping --protocol=tcp -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  srs:
+    image: ossrs/srs:5
+    restart: unless-stopped
+    command: ["./objs/srs", "-c", "conf/danmakustream.conf"]
+    ports:
+      - "${MICRO_RTMP_PORT:-1935}:1935"
+      - "${MICRO_HLS_PORT:-8081}:8080"
+    volumes:
+      - ./deploy/srs.conf:/usr/local/srs/conf/danmakustream.conf:ro
+      - ./backend/data/live:/usr/local/srs/objs/nginx/html/live
+
+  user-service:
+    build: ./services/user-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SERVICE_NAME: user-service
+      DATABASE_DSN: "user_app:user_app_pass@tcp(mysql:3306)/user_db?charset=utf8mb4&parseTime=True&loc=Local"
+      JWT_SECRET: ${MICRO_JWT_SECRET:-local-dev-jwt-secret-change-me}
+      INTERNAL_API_TOKEN: ${MICRO_INTERNAL_TOKEN:-local-dev-internal-token-change-me}
+      CONTENT_SERVICE_URL: http://content-service:8080
+      SERVICE_VERSION: ${MICRO_SERVICE_VERSION:-microservice-0.1.0}
+      COMMIT_SHA: ${COMMIT_SHA:-development}
+      BUILD_TIME: ${BUILD_TIME:-1970-01-01T00:00:00Z}
+      REQUEST_TIMEOUT: ${REQUEST_TIMEOUT:-2s}
+    volumes:
+      - ./deploy/configs/user-service.yaml:/app/etc/config.yaml:ro
+      - micro_media_data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/v1/livez"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  content-service:
+    # content-service 已独立构建；公开流量统一由 gateway 转发。
+    build: ./services/content-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SERVICE_NAME: content-service
+      DATABASE_DSN: "content_app:content_app_pass@tcp(mysql:3306)/content_db?charset=utf8mb4&parseTime=True&loc=Local"
+      JWT_SECRET: ${MICRO_JWT_SECRET:-local-dev-jwt-secret-change-me}
+      INTERNAL_API_TOKEN: ${MICRO_INTERNAL_TOKEN:-local-dev-internal-token-change-me}
+      USER_SERVICE_URL: http://user-service:8080
+      AUTO_MIGRATE: "true"
+      SERVICE_VERSION: ${MICRO_SERVICE_VERSION:-microservice-0.1.0}
+      COMMIT_SHA: ${COMMIT_SHA:-development}
+      BUILD_TIME: ${BUILD_TIME:-1970-01-01T00:00:00Z}
+      REQUEST_TIMEOUT: ${REQUEST_TIMEOUT:-2s}
+    volumes:
+      - ./deploy/configs/content-service.yaml:/app/etc/config.yaml:ro
+      - micro_media_data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/v1/livez"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  engagement-service:
+    build: ./services/engagement-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      content-service:
+        condition: service_healthy
+    environment:
+      SERVICE_NAME: engagement-service
+      DATABASE_DSN: "engagement_app:engagement_app_pass@tcp(mysql:3306)/engagement_db?charset=utf8mb4&parseTime=True&loc=Local"
+      JWT_SECRET: ${MICRO_JWT_SECRET:-local-dev-jwt-secret-change-me}
+      INTERNAL_API_TOKEN: ${MICRO_INTERNAL_TOKEN:-local-dev-internal-token-change-me}
+      USER_SERVICE_URL: http://user-service:8080
+      CONTENT_SERVICE_URL: http://content-service:8080
+      SRS_RTMP_HOST: srs:1935
+      SERVICE_VERSION: ${MICRO_SERVICE_VERSION:-microservice-0.1.0}
+      COMMIT_SHA: ${COMMIT_SHA:-development}
+      BUILD_TIME: ${BUILD_TIME:-1970-01-01T00:00:00Z}
+      REQUEST_TIMEOUT: ${REQUEST_TIMEOUT:-2s}
+    volumes:
+      - ./deploy/configs/engagement-service.yaml:/app/etc/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/v1/livez"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  gateway:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      user-service:
+        condition: service_healthy
+      engagement-service:
+        condition: service_healthy
+      content-service:
+        condition: service_healthy
+    ports:
+      - "${MICRO_GATEWAY_PORT:-8888}:80"
+    networks:
+      default:
+        aliases:
+          - nginx-gateway
+    volumes:
+      - ./deploy/nginx-gateway-microservices.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/platform:/usr/share/nginx/html/platform:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1/gateway/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${MICRO_FRONTEND_PORT:-80}:80"
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+volumes:
+  micro_mysql_data:
+  micro_media_data:

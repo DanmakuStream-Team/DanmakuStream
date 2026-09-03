@@ -1,0 +1,6 @@
+.git
+tests
+README.md
+*.log
+*.exe
+coverage.out

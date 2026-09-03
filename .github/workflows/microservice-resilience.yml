@@ -1,0 +1,158 @@
+name: microservice-resilience
+
+on:
+  workflow_dispatch:
+    inputs:
+      exercise:
+        description: Exercise to run against the production microservice namespace
+        required: true
+        type: choice
+        options: [hpa, chaos]
+        default: hpa
+      service:
+        description: HPA target; ignored by the chaos exercise
+        required: true
+        type: choice
+        options: [user-service, content-service, engagement-service, gateway]
+        default: content-service
+      duration_seconds:
+        description: HPA load duration (60-600 seconds)
+        required: true
+        type: string
+        default: '180'
+      concurrency:
+        description: HPA load concurrency (1-500 workers)
+        required: true
+        type: string
+        default: '80'
+      confirm_chaos:
+        description: Required acknowledgement when exercise=chaos
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: microservice-resilience
+  cancel-in-progress: false
+
+jobs:
+  exercise:
+    name: HPA / dependency failure exercise
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate manual inputs
+        env:
+          EXERCISE: ${{ inputs.exercise }}
+          CONFIRM_CHAOS: ${{ inputs.confirm_chaos }}
+        run: |
+          if [ "$EXERCISE" = chaos ] && [ "$CONFIRM_CHAOS" != true ]; then
+            echo 'confirm_chaos must be checked for a chaos exercise' >&2
+            exit 2
+          fi
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.K3S_SSH_KEY }}
+          HOST_KEY: ${{ secrets.K3S_HOST_KEY }}
+        run: |
+          install -d -m 700 ~/.ssh
+          install -m 600 /dev/null ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$HOST_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Apply canonical HPA policy
+        env:
+          K3S_HOST: ${{ secrets.K3S_HOST }}
+          K3S_SSH_USER: ${{ secrets.K3S_SSH_USER }}
+        run: |
+          ssh "${K3S_SSH_USER}@${K3S_HOST}" \
+            'sudo k3s kubectl apply -f -' \
+            < deploy/k8s/microservices/hpa.yaml
+
+      - name: Run selected exercise
+        env:
+          K3S_HOST: ${{ secrets.K3S_HOST }}
+          K3S_SSH_USER: ${{ secrets.K3S_SSH_USER }}
+          EXERCISE: ${{ inputs.exercise }}
+          SERVICE: ${{ inputs.service }}
+          DURATION: ${{ inputs.duration_seconds }}
+          CONCURRENCY: ${{ inputs.concurrency }}
+        run: |
+          mkdir -p artifacts/microservice-resilience
+          set -o pipefail
+          if [ "$EXERCISE" = hpa ]; then
+            ssh "${K3S_SSH_USER}@${K3S_HOST}" bash -s -- \
+              hpa "$SERVICE" "$DURATION" "$CONCURRENCY" \
+              < scripts/k3s-hpa-chaos.sh 2>&1 \
+              | tee artifacts/microservice-resilience/exercise.log
+          else
+            ssh "${K3S_SSH_USER}@${K3S_HOST}" \
+              'CONFIRM_CHAOS=yes bash -s -- chaos' \
+              < scripts/k3s-hpa-chaos.sh 2>&1 \
+              | tee artifacts/microservice-resilience/exercise.log
+          fi
+
+      - name: Restore canonical HPA policy
+        if: always()
+        env:
+          K3S_HOST: ${{ secrets.K3S_HOST }}
+          K3S_SSH_USER: ${{ secrets.K3S_SSH_USER }}
+        run: |
+          ssh "${K3S_SSH_USER}@${K3S_HOST}" \
+            'sudo k3s kubectl apply -f -' \
+            < deploy/k8s/microservices/hpa.yaml
+
+      - name: Build HPA timeline chart
+        if: always()
+        run: |
+          mkdir -p artifacts/microservice-resilience
+          {
+            echo 'timestamp,isoTime,service,currentReplicas,desiredReplicas,cpuUtilization,cpuTarget'
+            awk -F, '$1 == "HPA_CSV" {print $2","$3","$4","$5","$6","$7","$8}' \
+              artifacts/microservice-resilience/exercise.log 2>/dev/null || true
+          } > artifacts/microservice-resilience/hpa-timeline.csv
+          if [ "$(wc -l < artifacts/microservice-resilience/hpa-timeline.csv)" -gt 1 ]; then
+            python3 scripts/render-hpa-timeline.py \
+              artifacts/microservice-resilience/hpa-timeline.csv \
+              artifacts/microservice-resilience/hpa-timeline.svg
+          fi
+
+      - name: Collect metrics, events and logs
+        if: always()
+        env:
+          K3S_HOST: ${{ secrets.K3S_HOST }}
+          K3S_SSH_USER: ${{ secrets.K3S_SSH_USER }}
+        run: |
+          mkdir -p artifacts/microservice-resilience
+          ssh "${K3S_SSH_USER}@${K3S_HOST}" '
+            NS=danmakustream-microservices
+            K="sudo k3s kubectl -n $NS"
+            echo "== HPA =="
+            $K get hpa -o wide
+            echo "== Pods and resource metrics =="
+            $K get pods -o wide
+            $K top pods || true
+            echo "== Recent events =="
+            $K get events --sort-by=.lastTimestamp | tail -60
+            for service in user-service content-service engagement-service gateway; do
+              echo "== $service logs =="
+              $K logs deployment/$service --all-containers=true --tail=150 || true
+            done
+          ' > artifacts/microservice-resilience/cluster-evidence.txt 2>&1 || true
+
+      - name: Upload HPA and chaos evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: microservice-resilience-${{ inputs.exercise }}-${{ github.sha }}
+          path: artifacts/microservice-resilience/
+          if-no-files-found: warn
+          retention-days: 30

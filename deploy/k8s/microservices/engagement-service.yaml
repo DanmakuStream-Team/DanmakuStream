@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: engagement-service-config
+  namespace: danmakustream-microservices
+data:
+  config.yaml: |
+    # 敏感配置由 Deployment 的 Secret 环境变量覆盖，不写入 ConfigMap。
+    Name: engagement-service
+    Host: 0.0.0.0
+    Port: 8080
+    Dependencies:
+      UserBaseURL: http://user-service:8080
+      ContentBaseURL: http://content-service:8080
+      TimeoutMS: 1500
+    Live:
+      RTMPHost: srs:1935
+    Build:
+      Version: microservice-0.1.0
+      # 保持编译期哨兵值，让镜像中的 commit/buildTime 成为版本接口权威值。
+      GitSHA: "0000000"
+      Time: "1970-01-01T00:00:00Z"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: engagement-service
+  namespace: danmakustream-microservices
+spec:
+  selector:
+    matchLabels:
+      app: engagement-service
+  template:
+    metadata:
+      labels:
+        app: engagement-service
+    spec:
+      containers:
+        - name: engagement-service
+          # 发布流水线必须将占位标签替换为完整 ${GITHUB_SHA}。
+          image: ghcr.io/danmakustream-team/engagement-service:0000000000000000000000000000000000000000
+          env:
+            - name: DATABASE_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: micro-secrets
+                  key: ENGAGEMENT_DATABASE_DSN
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: micro-secrets
+                  key: JWT_SECRET
+            - name: INTERNAL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: micro-secrets
+                  key: INTERNAL_API_TOKEN
+            - name: USER_SERVICE_URL
+              value: http://user-service:8080
+            - name: CONTENT_SERVICE_URL
+              value: http://content-service:8080
+            - name: SERVICE_NAME
+              value: engagement-service
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: config
+              mountPath: /app/etc/config.yaml
+              subPath: config.yaml
+              readOnly: true
+
+          livenessProbe:
+            httpGet:
+              path: /api/v1/livez
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: config
+          configMap:
+            name: engagement-service-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: engagement-service
+  namespace: danmakustream-microservices
+spec:
+  selector:
+    app: engagement-service
+  ports:
+    - port: 8080
+      targetPort: 8080

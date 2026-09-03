@@ -1,0 +1,122 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: micro-mysql-data
+  namespace: danmakustream-microservices
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init
+  namespace: danmakustream-microservices
+data:
+  01-schemas-accounts.sh: |
+    #!/bin/sh
+    set -eu
+    # 密码来自 micro-secrets。模板要求使用不含单引号的 URL-safe 随机值。
+    mysql --protocol=socket -uroot -p"${MYSQL_ROOT_PASSWORD}" <<SQL
+    CREATE DATABASE IF NOT EXISTS user_db       CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE DATABASE IF NOT EXISTS content_db    CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE DATABASE IF NOT EXISTS engagement_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE USER IF NOT EXISTS 'user_app'       @'%' IDENTIFIED BY '${USER_DB_PASSWORD}';
+    CREATE USER IF NOT EXISTS 'content_app'    @'%' IDENTIFIED BY '${CONTENT_DB_PASSWORD}';
+    CREATE USER IF NOT EXISTS 'engagement_app' @'%' IDENTIFIED BY '${ENGAGEMENT_DB_PASSWORD}';
+    REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'user_app'@'%';
+    REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'content_app'@'%';
+    REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'engagement_app'@'%';
+    GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP, REFERENCES ON user_db.* TO 'user_app'@'%';
+    GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP, REFERENCES ON content_db.* TO 'content_app'@'%';
+    GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP, REFERENCES ON engagement_db.* TO 'engagement_app'@'%';
+    SQL
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: danmakustream-microservices
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: micro-secrets
+                  key: MYSQL_ROOT_PASSWORD
+            - name: USER_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: micro-secrets
+                  key: USER_DB_PASSWORD
+            - name: CONTENT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: micro-secrets
+                  key: CONTENT_DB_PASSWORD
+            - name: ENGAGEMENT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: micro-secrets
+                  key: ENGAGEMENT_DB_PASSWORD
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "mysqladmin ping --protocol=tcp -h 127.0.0.1 -uroot -p$MYSQL_ROOT_PASSWORD"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "mysqladmin ping --protocol=tcp -h 127.0.0.1 -uroot -p$MYSQL_ROOT_PASSWORD"]
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: micro-mysql-data
+        - name: init
+          configMap:
+            name: mysql-init
+            defaultMode: 0555
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: danmakustream-microservices
+spec:
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306

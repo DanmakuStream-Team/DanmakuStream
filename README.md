@@ -14,7 +14,7 @@ DanmakuStream 是一个前后端分离的视频社区系统，支持视频点播
 | 后端 | Go · Gin · GORM · MySQL |
 | 直播 | SRS · RTMP 推流 · HLS 播放 |
 | 视频处理 | FFmpeg · HLS 分片 · 首帧封面 |
-| 部署 | Docker Compose · 前端容器内置 Nginx |
+| 部署 | Docker Compose · Kubernetes/k3s · Nginx API Gateway · HPA |
 
 ## 目录结构
 
@@ -22,6 +22,8 @@ DanmakuStream 是一个前后端分离的视频社区系统，支持视频点播
 DanmakuStream/
 ├── frontend/          # Vue 3 前端应用和 Nginx 配置
 ├── backend/           # Gin API 服务
+├── services/          # user/content/engagement 三个业务微服务
+├── deploy/            # 网关、Compose 与 Kubernetes 清单
 ├── docs/              # 项目、架构、模型、测试与追溯文档
 ├── scripts/           # 数据库初始化和测试脚本
 ├── docker-compose.yml
@@ -95,6 +97,22 @@ Live:
 ```
 
 如果这里仍然是 `localhost`，前端拿到的推流或播放地址会指向用户自己的电脑，直播会无法开启或无法观看。
+
+### 微服务与 Kubernetes
+
+微服务形态包含 API Gateway、`user-service`、`content-service`、`engagement-service` 和三个独立 Schema。本地一键联调：
+
+```bash
+# 启动微服务栈并运行跨网关 smoke E2E，结束后自动收集日志
+bash scripts/run-microservices-e2e.sh
+
+# 只展开检查 Compose
+docker compose -f docker-compose.microservices.yml config --quiet
+```
+
+合并到 `dev` 后，三服务独立 CI 和微服务 E2E 全绿才允许部署完整 SHA 镜像到 k3s。部署后自动验证探针与版本，失败执行 rollout undo。详细准备、Secret、验证和回滚步骤见[微服务 CD 手册](docs/deploy/microservice-cd.md)。
+
+HPA 和依赖故障实验通过 Actions 的 `microservice-resilience` 手动运行，保存副本曲线、CPU、请求数、P95、错误率、事件与日志；见[HPA/故障演练手册](docs/deploy/hpa-chaos.md)。最终版本使用 `release-freeze` 从 main 创建不可移动的 annotated tag；见[最终版本冻结与答辩手册](docs/delivery/release-freeze-and-demo.md)。
 
 ### 本地开发启动
 

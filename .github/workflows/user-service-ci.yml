@@ -1,0 +1,18 @@
+name: user-service-ci
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  user-service:
+    uses: ./.github/workflows/service-ci-reusable.yml
+    with:
+      service: user-service
+      mysql_integration: true

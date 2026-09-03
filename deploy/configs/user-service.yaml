@@ -1,0 +1,10 @@
+Name: user-service
+Host: 0.0.0.0
+Port: 8080
+Auth:
+  AccessSecret: "your-jwt-secret-key-change-in-production"
+  AccessExpire: 86400
+Database:
+  DataSource: "user_app:user_app_pass@tcp(mysql:3306)/user_db?charset=utf8mb4&parseTime=True&loc=Local"
+VideoDir: data
+ContentServiceURL: http://content-service:8080

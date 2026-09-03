@@ -1,0 +1,294 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config
+  namespace: danmakustream-microservices
+data:
+  nginx.conf: |
+    # DanmakuStream 微服务 API Gateway（D06 平台版）
+    #
+    # 完整路由表——不再使用"未匹配默认转发某服务"的兜底方式：
+    # 任何未列出的 /api/v1/* 路径返回 404（由最底部 location 兜底），
+    # 迫使新接口上线时必须同步本表（对应 docs/architecture/microservices/service-standards.md §9）。
+    #
+    # 路由权威来源：《微服务划分-接口-数据归属》§2 接口清单。
+    # nginx 匹配顺序：= 精确 > ^~ 前缀(不再进正则) > 正则(按书写序) > 最长前缀。
+
+    worker_processes auto;
+    events { worker_connections 1024; }
+
+    http {
+      include       /etc/nginx/mime.types;
+      default_type  application/json;
+      sendfile      on;
+      keepalive_timeout 65;
+
+      # Preserve a caller-provided request ID; otherwise generate one at the edge.
+      map $http_x_request_id $gateway_request_id {
+        default $http_x_request_id;
+        ""      $request_id;
+      }
+
+      # 访问日志含统一字段：service 由 location 内 proxy 注入不便，日志以 upstream 地址区分
+      log_format gateway '$remote_addr - [$time_local] "$request" $status ${body_bytes_sent}b '
+                         'rt=${request_time} uct=$upstream_connect_time '
+                         'rid=$gateway_request_id up=$upstream_addr';
+      access_log /dev/stdout gateway;
+
+      # ── 上游：三个业务服务（Compose/K8s 内同 DNS 名）──────────────────
+      upstream user_service       { server user-service:8080; }
+      upstream content_service    { server content-service:8080; }
+      upstream engagement_service { server engagement-service:8080; }
+
+      # 网关公共代理参数：传递 X-Request-ID（无则生成）、Host、链路头
+      proxy_set_header Host              $host;
+      proxy_set_header X-Real-IP         $remote_addr;
+      proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header X-Request-ID      $gateway_request_id;
+      proxy_connect_timeout 3s;
+      proxy_read_timeout    30s;   # 上传/直播等长路径在各自 location 覆盖
+
+      server {
+        listen 80;
+        server_name _;
+        client_max_body_size 2g;
+
+        # ── 网关自身与平台接口 ──────────────────────────────────────────
+        location = /gateway/health {
+          access_log off;
+          return 200 '{"code":0,"message":"ok","data":{"status":"up","service":"api-gateway"}}';
+        }
+
+        # 平台服务目录（静态清单；服务上线/下线时同步本文件）
+        location = /api/v1/platform/services {
+          access_log off;
+          root /usr/share/nginx/html/platform;
+          try_files /services.json =404;
+        }
+
+        # ── 平台级探针：转发到主服务（每服务自身探针见各自路由）─────────
+        location = /api/v1/livez   { proxy_pass http://user_service; }
+        location = /api/v1/health  { proxy_pass http://user_service; }
+        location = /api/v1/version { proxy_pass http://user_service; }
+
+        # ── WebSocket：先于普通 API 匹配 ────────────────────────────────
+        location /ws/chat {
+          proxy_pass http://user_service;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+          proxy_read_timeout 3600s;
+        }
+        location /ws/live {
+          proxy_pass http://engagement_service;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+          proxy_read_timeout 3600s;
+        }
+        location /ws/live-publish/ {
+          proxy_pass http://engagement_service;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+          proxy_read_timeout 3600s;
+        }
+
+        # ── engagement：视频互动（挂在与 content 相同的 /videos 前缀下，必须用正则先行）──
+        location ~ ^/api/v1/videos/[0-9]+/(like|collect)(/.*)?$        { proxy_pass http://engagement_service; }
+        location ~ ^/api/v1/videos/[0-9]+/(danmaku|comments)(/.*)?$    { proxy_pass http://engagement_service; }
+
+        # ── engagement：个人资料库（/users/me 下的三个子域，其余 /users/me* 归 user-service）──
+        location ~ ^/api/v1/users/me/(history|watch-later|collections)(/.*)?$ { proxy_pass http://engagement_service; }
+        # 单体遗留资料库前缀 /api/v1/user/*（UC06 脚本与旧前端在用）
+        location /api/v1/user/       { proxy_pass http://engagement_service; }
+
+        # ── engagement：弹幕、评论、直播域 ──────────────────────────────
+        # 注意与 /api/v1/livez 的冲突：livez 已用精确 location = 抢先；此处只承接其余 live*
+        location = /api/v1/live           { proxy_pass http://engagement_service; }
+        location /api/v1/live/            { proxy_pass http://engagement_service; }
+        location = /api/v1/live-schedules { proxy_pass http://engagement_service; }
+        location /api/v1/live-schedules/  { proxy_pass http://engagement_service; }
+        location = /api/v1/live-replays   { proxy_pass http://engagement_service; }
+        location /api/v1/live-replays/    { proxy_pass http://engagement_service; }
+        location = /api/v1/danmaku        { proxy_pass http://engagement_service; }
+        location /api/v1/danmaku/         { proxy_pass http://engagement_service; }
+        location = /api/v1/comments       { proxy_pass http://engagement_service; }
+        location /api/v1/comments/        { proxy_pass http://engagement_service; }
+        location = /api/v1/admin/danmaku  { proxy_pass http://engagement_service; }
+        location /api/v1/admin/danmaku/   { proxy_pass http://engagement_service; }
+
+        # ── user：身份、资料、关系、会员、私信、通知 ────────────────────
+        location /api/v1/auth/            { proxy_pass http://user_service; }
+        location = /api/v1/search/users   { proxy_pass http://user_service; }
+        location = /api/v1/users/me       { proxy_pass http://user_service; }   # PUT 资料
+        location /api/v1/users/           { proxy_pass http://user_service; }   # 其余 users 子路径（关系/分组/屏蔽/他人资料）
+        location /api/v1/follow-groups/   { proxy_pass http://user_service; }
+        location /api/v1/creator/membership-plan { proxy_pass http://user_service; }
+        location ~ ^/api/v1/creators/[0-9]+/membership-plan$ { proxy_pass http://user_service; }
+        location = /api/v1/subscriptions  { proxy_pass http://user_service; }
+        location /api/v1/subscriptions/   { proxy_pass http://user_service; }
+        location /api/v1/messages         { proxy_pass http://user_service; }
+        location /api/v1/messages/        { proxy_pass http://user_service; }
+        location = /api/v1/notifications  { proxy_pass http://user_service; }
+        location /api/v1/notifications/   { proxy_pass http://user_service; }
+        location = /api/v1/admin/users    { proxy_pass http://user_service; }
+        location /api/v1/admin/users/     { proxy_pass http://user_service; }
+        location = /api/v1/images/upload  { proxy_pass http://user_service; }
+        location /media/avatars/          { proxy_pass http://user_service; }
+        location /media/messages/         { proxy_pass http://user_service; }
+        location /media/images/           { proxy_pass http://user_service; }
+
+        # ── content：视频主体、搜索、媒体、审核运营、创作者分析 ──────────
+        location /api/v1/videos/upload {
+          proxy_pass http://content_service;
+          client_body_timeout 3600s;
+          proxy_request_buffering off;
+          proxy_connect_timeout 3600s;
+          proxy_send_timeout 3600s;
+          proxy_read_timeout 3600s;
+        }
+        location /api/v1/videos/          { proxy_pass http://content_service; }  # 列表/详情/编辑/封面/合集（like 等已被正则抢走）
+        location = /api/v1/videos         { proxy_pass http://content_service; }
+        location /api/v1/search/          { proxy_pass http://content_service; }
+        location /media/                  { proxy_pass http://content_service; }
+        location /api/v1/admin/videos     { proxy_pass http://content_service; }
+        location /api/v1/admin/banners    { proxy_pass http://content_service; }
+        location /api/v1/admin/announcements { proxy_pass http://content_service; }
+        location /api/v1/creator/analytics { proxy_pass http://content_service; }
+        location = /api/v1/dynamics       { proxy_pass http://content_service; }
+        location /api/v1/dynamics/        { proxy_pass http://content_service; }
+        location = /api/v1/collections    { proxy_pass http://content_service; }
+        location /api/v1/collections/     { proxy_pass http://content_service; }  # 合集主体（UC04）
+
+        # ── 内部接口不经过公网网关；服务间直接使用 Service DNS ──────────
+        location /internal/ {
+          return 404 '{"code":40400,"message":"route not found","data":null}';
+        }
+
+        # ── 兜底：路由表中不存在的 API 一律 404（防"默认转发"回流）──────
+        location /api/ {
+          return 404 '{"code":40400,"message":"route not found","data":null}';
+        }
+      }
+    }
+  services.json: |
+    {
+      "code": 0,
+      "message": "ok",
+      "data": {
+        "gateway": { "name": "api-gateway", "port": 80, "routes": "/api/v1/*, /ws/*, /media/*" },
+        "services": [
+          {
+            "name": "user-service",
+            "port": 8080,
+            "database": "user_db",
+            "useCases": ["UC01", "UC07", "UC08", "UC11"],
+            "endpoints": ["/api/v1/livez", "/api/v1/health", "/api/v1/version"]
+          },
+          {
+            "name": "content-service",
+            "port": 8080,
+            "database": "content_db",
+            "useCases": ["UC02", "UC03", "UC04", "UC12"],
+            "endpoints": ["/api/v1/livez", "/api/v1/health", "/api/v1/version"]
+          },
+          {
+            "name": "engagement-service",
+            "port": 8080,
+            "database": "engagement_db",
+            "useCases": ["UC05", "UC06", "UC09", "UC10"],
+            "endpoints": ["/api/v1/livez", "/api/v1/health", "/api/v1/version"]
+          }
+        ]
+      }
+    }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: micro-media-data
+  namespace: danmakustream-microservices
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: danmakustream-microservices
+spec:
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+      annotations:
+        # 发布时替换，确保 ConfigMap 更新会触发网关滚动重启。
+        danmakustream.io/release-commit: "0000000000000000000000000000000000000000"
+    spec:
+      containers:
+        - name: gateway
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: conf
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+            - name: platform
+              mountPath: /usr/share/nginx/html/platform
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /gateway/health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /gateway/health
+              port: 80
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+      volumes:
+        - name: conf
+          configMap:
+            name: gateway-config
+            items:
+              - key: nginx.conf
+                path: nginx.conf
+        - name: platform
+          configMap:
+            name: gateway-config
+            items:
+              - key: services.json
+                path: services.json
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: danmakustream-microservices
+spec:
+  type: NodePort
+  selector:
+    app: gateway
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30888
