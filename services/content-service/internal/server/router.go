@@ -1,4 +1,4 @@
-package svc
+package server
 
 import (
 	"log/slog"
@@ -7,10 +7,12 @@ import (
 	"danmakustream/content-service/internal/handler"
 	"danmakustream/content-service/internal/middleware"
 	"danmakustream/content-service/internal/response"
+	"danmakustream/content-service/internal/svc"
 	"github.com/gin-gonic/gin"
 )
 
-func Router(ctx *Context, logger *slog.Logger) *gin.Engine {
+// Router is the single route registry used by production and API regression tests.
+func Router(ctx *svc.Context, logger *slog.Logger) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.MaxMultipartMemory = 16 << 20
