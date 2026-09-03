@@ -95,7 +95,7 @@ run_hpa() {
     -e "s/__JOB_NAME__/$job_name/g" \
     -e "s/__SERVICE__/$service/g" \
     -e "s/__DURATION__/$duration/g" \
-    -e "s/__CONCURRENCY__/$concurrency/g" <<'YAML' | k apply -f -
+    -e "s/__CONCURRENCY__/$concurrency/g" \
     -e "s|__TARGET_URL__|$target_url|g" <<'YAML' | k apply -f -
 apiVersion: batch/v1
 kind: Job

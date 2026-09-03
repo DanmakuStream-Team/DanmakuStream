@@ -1,0 +1,45 @@
+HPA_EXERCISE service=gateway duration=120s concurrency=40 min=1
+HPA_CSV,1788416983,2026-09-03T06:29:43Z,gateway,1,1,2,60
+HPA_SAMPLE time=2026-09-03T06:29:43Z service=gateway current=1 desired=1 cpu=2% target=60%
+job.batch/hpa-load-gateway-1788416983 created
+HPA_CSV,1788416984,2026-09-03T06:29:44Z,gateway,1,1,2,60
+HPA_SAMPLE time=2026-09-03T06:29:44Z service=gateway current=1 desired=1 cpu=2% target=60%
+HPA_CSV,1788416996,2026-09-03T06:29:56Z,gateway,1,1,4,60
+HPA_SAMPLE time=2026-09-03T06:29:56Z service=gateway current=1 desired=1 cpu=4% target=60%
+HPA_CSV,1788417009,2026-09-03T06:30:09Z,gateway,1,1,4,60
+HPA_SAMPLE time=2026-09-03T06:30:09Z service=gateway current=1 desired=1 cpu=4% target=60%
+HPA_CSV,1788417021,2026-09-03T06:30:21Z,gateway,1,2,76,60
+HPA_SAMPLE time=2026-09-03T06:30:21Z service=gateway current=1 desired=2 cpu=76% target=60%
+HPA_CSV,1788417033,2026-09-03T06:30:33Z,gateway,2,2,74,60
+HPA_SAMPLE time=2026-09-03T06:30:33Z service=gateway current=2 desired=2 cpu=74% target=60%
+HPA_CSV,1788417045,2026-09-03T06:30:45Z,gateway,2,2,36,60
+HPA_SAMPLE time=2026-09-03T06:30:45Z service=gateway current=2 desired=2 cpu=36% target=60%
+HPA_CSV,1788417058,2026-09-03T06:30:58Z,gateway,2,2,32,60
+HPA_SAMPLE time=2026-09-03T06:30:58Z service=gateway current=2 desired=2 cpu=32% target=60%
+HPA_CSV,1788417070,2026-09-03T06:31:10Z,gateway,2,2,29,60
+HPA_SAMPLE time=2026-09-03T06:31:10Z service=gateway current=2 desired=2 cpu=29% target=60%
+HPA_CSV,1788417083,2026-09-03T06:31:23Z,gateway,2,2,29,60
+HPA_SAMPLE time=2026-09-03T06:31:23Z service=gateway current=2 desired=2 cpu=29% target=60%
+HPA_CSV,1788417095,2026-09-03T06:31:35Z,gateway,2,2,34,60
+HPA_SAMPLE time=2026-09-03T06:31:35Z service=gateway current=2 desired=2 cpu=34% target=60%
+HPA_CSV,1788417107,2026-09-03T06:31:47Z,gateway,2,2,37,60
+HPA_SAMPLE time=2026-09-03T06:31:47Z service=gateway current=2 desired=2 cpu=37% target=60%
+HPA_CSV,1788417119,2026-09-03T06:31:59Z,gateway,2,2,22,60
+HPA_SAMPLE time=2026-09-03T06:31:59Z service=gateway current=2 desired=2 cpu=22% target=60%
+== load generator summary ==
+LOAD_RESULT requests=23357 errors=0 errorRate=0.0000% average=0.049491s p95=0.113048s
+== waiting for scale down ==
+HPA_CSV,1788417121,2026-09-03T06:32:01Z,gateway,2,2,22,60
+HPA_SAMPLE time=2026-09-03T06:32:01Z service=gateway current=2 desired=2 cpu=22% target=60%
+HPA_CSV,1788417133,2026-09-03T06:32:13Z,gateway,2,2,13,60
+HPA_SAMPLE time=2026-09-03T06:32:13Z service=gateway current=2 desired=2 cpu=13% target=60%
+HPA_CSV,1788417144,2026-09-03T06:32:24Z,gateway,2,2,13,60
+HPA_SAMPLE time=2026-09-03T06:32:24Z service=gateway current=2 desired=2 cpu=13% target=60%
+HPA_CSV,1788417155,2026-09-03T06:32:35Z,gateway,2,2,2,60
+HPA_SAMPLE time=2026-09-03T06:32:35Z service=gateway current=2 desired=2 cpu=2% target=60%
+HPA_CSV,1788417166,2026-09-03T06:32:46Z,gateway,2,1,2,60
+HPA_SAMPLE time=2026-09-03T06:32:46Z service=gateway current=2 desired=1 cpu=2% target=60%
+HPA_CSV,1788417177,2026-09-03T06:32:57Z,gateway,1,1,2,60
+HPA_SAMPLE time=2026-09-03T06:32:57Z service=gateway current=1 desired=1 cpu=2% target=60%
+HPA_RESULT service=gateway min=1 maxObserved=2 final=1
+HPA scale-up and scale-down verified
