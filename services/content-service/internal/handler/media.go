@@ -44,6 +44,10 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 		Title: title, Description: c.PostForm("description"), Tags: c.PostForm("tags"),
 		Category: c.PostForm("category"), VideoURL: url, AuthorID: middleware.UserID(c), TranscodeStatus: "ready",
 	}
+	if !uploadedVideoHeaderValid(h.Config.StorageDir, url) {
+		video.TranscodeStatus = "failed"
+		video.TranscodeError = "请检查文件格式后重新上传"
+	}
 	coverURL, coverMime, coverSize := "", "", int64(0)
 	if cover, coverErr := c.FormFile("cover"); coverErr == nil {
 		coverURL, coverMime, coverSize, err = h.saveUpload(cover, "covers", h.Config.MaxImageBytes, map[string]bool{
@@ -183,9 +187,6 @@ func (h *Handler) saveUpload(header *multipart.FileHeader, directory string, lim
 		return "", "", 0, err
 	}
 	mimeType := http.DetectContentType(prefix[:n])
-	if directory == "videos" && !validVideoHeader(ext, prefix[:n]) {
-		return "", "", 0, errors.New("invalid video content")
-	}
 	if directory != "videos" && !strings.HasPrefix(mimeType, "image/") {
 		return "", "", 0, errors.New("invalid image content")
 	}
@@ -219,6 +220,24 @@ func (h *Handler) saveUpload(header *multipart.FileHeader, directory string, lim
 		return "", "", 0, closeErr
 	}
 	return "/media/" + directory + "/" + filename, mimeType, written, nil
+}
+
+func uploadedVideoHeaderValid(root, mediaURL string) bool {
+	path, err := localMediaPath(root, mediaURL)
+	if err != nil {
+		return false
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+	var prefix [512]byte
+	n, err := file.Read(prefix[:])
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false
+	}
+	return validVideoHeader(strings.ToLower(filepath.Ext(path)), prefix[:n])
 }
 
 func validVideoHeader(ext string, header []byte) bool {

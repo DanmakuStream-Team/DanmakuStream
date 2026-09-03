@@ -403,7 +403,7 @@ async function createLiveSchedule() {
   try {
     await liveApi.createSchedule({
       title,
-      scheduledAt: scheduleForm.scheduledAt,
+      scheduledAt: new Date(scheduleForm.scheduledAt.replace(' ', 'T')).toISOString(),
       coverUrl: scheduleForm.coverUrl.trim() || undefined,
     })
     scheduleVisible.value = false

@@ -129,6 +129,33 @@ func TestInternalVideoEndpoints(t *testing.T) {
 	if batch.Code != http.StatusOK {
 		t.Fatalf("batch status = %d body=%s", batch.Code, batch.Body.String())
 	}
+
+	updateBody := `{"likeCount":3,"collectCount":2,"danmakuCount":4}`
+	for attempt := 1; attempt <= 2; attempt++ {
+		updateReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/internal/v1/videos/%d/engagement", playable.ID), strings.NewReader(updateBody))
+		updateReq.Header.Set("Content-Type", "application/json")
+		updateReq.Header.Set("X-Internal-Token", "internal-test-token")
+		updated := httptest.NewRecorder()
+		router.ServeHTTP(updated, updateReq)
+		if updated.Code != http.StatusOK {
+			t.Fatalf("engagement attempt %d status = %d body=%s", attempt, updated.Code, updated.Body.String())
+		}
+	}
+	var persisted model.Video
+	if err := ctx.DB.First(&persisted, playable.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if persisted.LikeCount != 3 || persisted.CollectCount != 2 || persisted.DanmakuCount != 4 {
+		t.Fatalf("engagement counters = (%d,%d,%d)", persisted.LikeCount, persisted.CollectCount, persisted.DanmakuCount)
+	}
+	missingReq := httptest.NewRequest(http.MethodPut, "/internal/v1/videos/999999/engagement", strings.NewReader(updateBody))
+	missingReq.Header.Set("Content-Type", "application/json")
+	missingReq.Header.Set("X-Internal-Token", "internal-test-token")
+	missing := httptest.NewRecorder()
+	router.ServeHTTP(missing, missingReq)
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("missing engagement status = %d body=%s", missing.Code, missing.Body.String())
+	}
 	var result struct {
 		Data struct {
 			Items []struct {
@@ -256,7 +283,7 @@ func TestUploadReviewAndOwnershipFlow(t *testing.T) {
 	}
 }
 
-func TestUploadRejectsInvalidAndOversizedVideo(t *testing.T) {
+func TestUploadMarksInvalidVideoFailedAndRejectsOversizedVideo(t *testing.T) {
 	_, router := testService(t)
 	makeUpload := func(name string, content []byte) (*bytes.Buffer, string) {
 		body := &bytes.Buffer{}
@@ -276,8 +303,16 @@ func TestUploadRejectsInvalidAndOversizedVideo(t *testing.T) {
 	}
 	invalidBody, invalidType := makeUpload("fake.mp4", []byte("this is not a video"))
 	invalid := request(t, router, http.MethodPost, "/api/v1/videos/upload", token(t, 1, "user"), invalidBody, invalidType)
-	if invalid.Code != http.StatusBadRequest {
+	if invalid.Code != http.StatusCreated {
 		t.Fatalf("invalid media status = %d, body=%s", invalid.Code, invalid.Body.String())
+	}
+	var invalidPayload map[string]any
+	if err := json.Unmarshal(invalid.Body.Bytes(), &invalidPayload); err != nil {
+		t.Fatal(err)
+	}
+	invalidData := invalidPayload["data"].(map[string]any)
+	if invalidData["transcodeStatus"] != "failed" || invalidData["transcodeError"] == "" {
+		t.Fatalf("invalid media should be persisted as failed: %#v", invalidData)
 	}
 	large := append([]byte{0, 0, 0, 24}, []byte("ftypmp42")...)
 	large = append(large, bytes.Repeat([]byte{0}, (1<<20)+1)...)

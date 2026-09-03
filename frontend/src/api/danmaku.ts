@@ -18,7 +18,7 @@ export const danmakuApi = {
     return request.get<PageResult<Danmaku>>('/admin/danmaku', { params })
   },
   block(id: number) {
-    return request.put<void>(`/admin/danmaku/${id}/block`)
+    return request.put<void>(`/admin/danmaku/${id}/block`, { blocked: true })
   },
 }
 

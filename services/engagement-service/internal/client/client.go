@@ -54,10 +54,22 @@ type envelope struct {
 }
 
 func (c *Client) get(ctx context.Context, path string, target any) error {
+	return c.do(ctx, http.MethodGet, path, nil, target)
+}
+
+func (c *Client) do(ctx context.Context, method, path string, payload any, target any) error {
 	if c.baseURL == "" {
 		return fmt.Errorf("%w: base URL not configured", ErrUnavailable)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	var bodyReader io.Reader
+	if payload != nil {
+		encoded, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+		bodyReader = strings.NewReader(string(encoded))
+	}
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, bodyReader)
 	if err != nil {
 		return err
 	}
@@ -65,6 +77,9 @@ func (c *Client) get(ctx context.Context, path string, target any) error {
 		req.Header.Set("X-Internal-Token", c.token)
 	}
 	req.Header.Set("Accept", "application/json")
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	if requestID, _ := ctx.Value(requestIDKey{}).(string); requestID != "" {
 		req.Header.Set("X-Request-ID", requestID)
 	}
@@ -102,6 +117,12 @@ func (c *Client) get(ctx context.Context, path string, target any) error {
 		return fmt.Errorf("%w: %v", ErrBadGateway, err)
 	}
 	return nil
+}
+
+func (c *Client) UpdateVideoEngagement(ctx context.Context, id uint, likes, collects, danmaku int64) error {
+	return c.do(ctx, http.MethodPut, fmt.Sprintf("/internal/v1/videos/%d/engagement", id), map[string]int64{
+		"likeCount": likes, "collectCount": collects, "danmakuCount": danmaku,
+	}, nil)
 }
 
 func dependencyHTTPError(resp *http.Response) error {

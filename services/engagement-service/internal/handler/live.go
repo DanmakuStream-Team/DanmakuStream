@@ -38,7 +38,7 @@ func (h *Handler) GetLiveRoom(c *gin.Context) {
 		return
 	}
 	var row model.LiveRoom
-	if err := h.db.First(&row, id).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+	if err := h.db.Where("id = ? AND status = ?", id, "live").First(&row).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 		response.Error(c, 404, "直播间不存在")
 		return
 	} else if err != nil {
@@ -99,7 +99,13 @@ func (h *Handler) LiveInteraction(c *gin.Context) {
 		response.Error(c, 404, "直播间不存在")
 		return
 	}
-	response.OK(c, gin.H{"viewerCount": room.ViewerCount, "viewerPeak": room.ViewerPeak, "likeCount": room.LikeCount, "giftValue": room.GiftValue, "heat": room.ViewerCount*10 + room.LikeCount*2 + room.GiftValue, "chatSettings": gin.H{"chatMode": room.ChatMode, "slowModeSeconds": room.SlowModeSeconds, "pinnedMessage": room.PinnedMessage}})
+	response.OK(c, gin.H{
+		"viewerCount": room.ViewerCount, "viewerPeak": room.ViewerPeak,
+		"likeCount": room.LikeCount, "giftValue": room.GiftValue,
+		"heat":  room.ViewerCount*10 + room.LikeCount*2 + room.GiftValue,
+		"gifts": giftDefinitions(), "supportRank": []any{}, "superChats": []any{},
+		"chatSettings": gin.H{"chatMode": room.ChatMode, "slowModeSeconds": room.SlowModeSeconds, "pinnedMessage": room.PinnedMessage},
+	})
 }
 func (h *Handler) CurrentLiveDanmaku(c *gin.Context) {
 	id, ok := idParam(c, "id")
@@ -174,7 +180,21 @@ func (h *Handler) CreateLiveRoom(c *gin.Context) {
 		if err != nil {
 			return err
 		}
-		return tx.Model(&row).Updates(map[string]any{"title": strings.TrimSpace(req.Title), "cover_url": req.CoverURL, "stream_key": streamKey(), "status": "live", "started_at": &now, "ended_at": nil, "viewer_count": 0, "like_count": 0, "gift_value": 0}).Error
+		if err := tx.Model(&row).Updates(map[string]any{"title": strings.TrimSpace(req.Title), "cover_url": req.CoverURL, "stream_key": streamKey(), "status": "live", "started_at": &now, "ended_at": nil, "viewer_count": 0, "viewer_peak": 0, "like_count": 0, "gift_value": 0}).Error; err != nil {
+			return err
+		}
+		// Reopening an owner's single reusable room starts a fresh session.
+		// Session-scoped likes/gifts/chat must not leak into the new broadcast.
+		if err := tx.Unscoped().Where("room_id = ?", row.ID).Delete(&model.LiveLike{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Unscoped().Where("room_id = ?", row.ID).Delete(&model.LiveGift{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Unscoped().Where("room_id = ?", row.ID).Delete(&model.SuperChat{}).Error; err != nil {
+			return err
+		}
+		return tx.Unscoped().Where("video_id = ? AND scene = ?", row.ID, "live").Delete(&model.Danmaku{}).Error
 	})
 	if err != nil {
 		response.Error(c, 500, "创建直播失败")
@@ -252,7 +272,15 @@ func (h *Handler) ToggleLiveLike(c *gin.Context) {
 var gifts = map[string]struct {
 	Name  string
 	Value int64
-}{"flower": {"鲜花", 10}, "starlight": {"星光", 50}, "rocket": {"火箭", 200}}
+}{"flower": {"鲜花", 10}, "star": {"星光", 50}, "rocket": {"火箭", 200}}
+
+func giftDefinitions() []gin.H {
+	return []gin.H{
+		{"key": "flower", "name": "鲜花", "value": 10},
+		{"key": "star", "name": "星光", "value": 50},
+		{"key": "rocket", "name": "火箭", "value": 200},
+	}
+}
 
 func (h *Handler) SendGift(c *gin.Context) {
 	id, ok := idParam(c, "id")
@@ -294,8 +322,18 @@ func (h *Handler) SendGift(c *gin.Context) {
 		response.Error(c, 500, "赠送礼物失败")
 		return
 	}
-	h.hub.Broadcast(id, gin.H{"type": "live_gift", "payload": record})
-	response.OK(c, record)
+	var room model.LiveRoom
+	_ = h.db.First(&room, id).Error
+	payload := gin.H{
+		"id": record.ID, "userId": record.UserID,
+		"gift":  gin.H{"key": record.GiftKey, "name": record.Name, "value": gift.Value},
+		"count": record.Count, "value": record.Value, "message": record.Message,
+		"giftValue": room.GiftValue, "heat": room.ViewerCount*10 + room.LikeCount*2 + room.GiftValue,
+		"supportRank": []any{}, "createdAt": record.CreatedAt,
+		"displaySeconds": superChatSeconds(record.Value),
+	}
+	h.hub.Broadcast(id, gin.H{"type": "live_gift", "payload": payload})
+	response.OK(c, payload)
 }
 func superChatSeconds(value int64) int {
 	switch {
@@ -327,7 +365,31 @@ func (h *Handler) ListSchedules(c *gin.Context) {
 		response.Error(c, 500, "查询直播计划失败")
 		return
 	}
-	response.OK(c, gin.H{"items": rows, "list": rows, "page": p, "pageSize": size, "total": total})
+	type scheduleInfo struct {
+		model.LiveSchedule
+		Reserved bool `json:"reserved"`
+	}
+	items := make([]scheduleInfo, 0, len(rows))
+	userID := middleware.UserID(c)
+	reserved := map[uint]bool{}
+	if userID > 0 && len(rows) > 0 {
+		ids := make([]uint, 0, len(rows))
+		for _, row := range rows {
+			ids = append(ids, row.ID)
+		}
+		var reservations []model.LiveReservation
+		if err := h.db.Where("user_id = ? AND schedule_id IN ?", userID, ids).Find(&reservations).Error; err != nil {
+			response.Error(c, 500, "查询预约状态失败")
+			return
+		}
+		for _, item := range reservations {
+			reserved[item.ScheduleID] = true
+		}
+	}
+	for _, row := range rows {
+		items = append(items, scheduleInfo{LiveSchedule: row, Reserved: reserved[row.ID]})
+	}
+	response.OK(c, gin.H{"items": items, "list": items, "page": p, "pageSize": size, "total": total})
 }
 func (h *Handler) CreateSchedule(c *gin.Context) {
 	var req struct {
